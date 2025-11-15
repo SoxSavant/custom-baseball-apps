@@ -11,6 +11,19 @@ from datetime import date
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 st.set_page_config(page_title="Team Stat Leaders App", layout="wide")
+
+# Hide Streamlit Cloud toolbar + profile badge on deployed app
+st.markdown(
+    """
+    <style>
+        [data-testid="stToolbar"] {visibility: hidden;}
+        [data-testid="stDecoration"] {display: none;}
+        [data-testid="stStatusWidget"] {display: none;}
+        .viewerBadge_link__qRi_k {display: none;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Customizable Team Stat Leaders App")
