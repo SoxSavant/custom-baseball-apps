@@ -6,7 +6,7 @@ import matplotlib.image as mpimg
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
-from pybaseball import batting_stats
+from pybaseball import batting_stats, fielding_stats
 from datetime import date
 from st_aggrid import (
     AgGrid,
@@ -83,22 +83,90 @@ TEAMS = {
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
 DEFAULT_STATS = [
-    "WAR", "Off", "BsR", "Def", "xwOBA", "xBA", "xSLG", "EV", "Barrel%", 
-     "HardHit%", "O-Swing%", "Whiff%", "K%", "BB%"
+    "WAR", "Off", "BsR", "Def", "xwOBA", "xBA", "xSLG", "EV", "Barrel%",
+    "HardHit%", "O-Swing%", "Whiff%", "K%", "BB%", "FRV",
 ]
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "maxEV"
+    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "R", "RBI", "HR", "XBH", "2B", "3B", "SB", "CS", "BB", "IBB", "SO", 
+    "BABIP", "R", "RBI", "HR", "XBH", "2B", "3B", "SB", "CS", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-     "OPS+", "FRV",
+    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA", "FRV",
 ]
+PA_EXEMPT_STATS = {"FRV"}
+PCT_EXEMPT_STATS = {"FRV"}
+
+def _copy_column(df: pd.DataFrame, target: str, candidates: list[str]) -> bool:
+    for col in candidates:
+        if col in df.columns:
+            if col != target:
+                df[target] = df[col]
+            return True
+    return False
+
 
 @st.cache_data(show_spinner=True)
 def load_batting(y: int) -> pd.DataFrame:
-    return batting_stats(y, y, qual=0)
+    hitters = batting_stats(y, y, qual=0)
+    _copy_column(hitters, "Team", ["Team", "team", "Tm"])
+    _copy_column(hitters, "Name", ["Name", "Player", "player"])
+    hitter_has_player_key = _copy_column(hitters, "_merge_player", ["playerid", "playeridfg", "IDfg"])
+
+    try:
+        fielding = fielding_stats(y, y, qual=0)
+    except Exception:
+        fielding = None
+
+    hitters["FRV"] = np.nan
+
+    if fielding is not None and "FRV" in fielding.columns:
+        _copy_column(fielding, "Team", ["Team", "team", "Tm"])
+        _copy_column(fielding, "Name", ["Name", "Player", "player"])
+        field_has_player_key = _copy_column(fielding, "_merge_player", ["playerid", "playeridfg", "IDfg"])
+
+        def _clean_name(df: pd.DataFrame) -> None:
+            if "Name" in df.columns:
+                df["Name"] = (
+                    df["Name"].astype(str).str.replace(".", "", regex=False).str.strip()
+                )
+
+        _clean_name(hitters)
+        _clean_name(fielding)
+
+        def merge_fill(keys: list[str]) -> None:
+            nonlocal hitters
+            if not all(col in hitters.columns for col in keys):
+                return
+            if not all(col in fielding.columns for col in keys):
+                return
+            subset_cols = list(keys) + ["FRV"]
+            subset = fielding[subset_cols].copy()
+            subset["FRV"] = pd.to_numeric(subset["FRV"], errors="coerce")
+            subset = subset.dropna(subset=["FRV"])
+            if subset.empty:
+                return
+            subset = subset.groupby(keys, as_index=False)["FRV"].mean()
+            subset = subset.rename(columns={"FRV": "FRV_candidate"})
+            hitters = hitters.merge(subset, on=keys, how="left")
+            hitters["FRV"] = hitters["FRV"].combine_first(hitters["FRV_candidate"])
+            hitters = hitters.drop(columns=["FRV_candidate"])
+
+        merge_sequences: list[list[str]] = []
+        if hitter_has_player_key and field_has_player_key:
+            if "Team" in hitters.columns and "Team" in fielding.columns:
+                merge_sequences.append(["_merge_player", "Team"])
+            merge_sequences.append(["_merge_player"])
+        if "Name" in hitters.columns and "Name" in fielding.columns:
+            if "Team" in hitters.columns and "Team" in fielding.columns:
+                merge_sequences.append(["Name", "Team"])
+            merge_sequences.append(["Name"])
+
+        for cols in merge_sequences:
+            merge_fill(cols)
+
+    hitters = hitters.drop(columns=[col for col in ["_merge_player"] if col in hitters.columns])
+    return hitters
 
 def get_teams_for_year(season: int) -> dict[str, str]:
     """Return team mapping for provided season, handling Athletics rename."""
@@ -188,7 +256,8 @@ if league_for_pct.empty:
     st.stop()
 
 # Team leaders for selected PA
-team_df = df[(df["Team"] == team_abbr) & (df["PA"] >= min_pa)].copy()
+team_all = df[df["Team"] == team_abbr].copy()
+team_df = team_all[team_all["PA"] >= min_pa].copy()
 if team_df.empty:
     st.warning(f"No players on {team_abbr} with ≥ {min_pa} PA.")
     st.stop()
@@ -483,7 +552,8 @@ for stat in stats_order:
         continue
 
     # TEAM values
-    team_vals = team_df[[stat, "Name"]].dropna(subset=[stat])
+    source_team_df = team_all if stat in PA_EXEMPT_STATS else team_df
+    team_vals = source_team_df[[stat, "Name"]].dropna(subset=[stat])
     if team_vals.empty:
         continue  # no one on the team has a real value for this stat
 
@@ -494,7 +564,8 @@ for stat in stats_order:
     leader_val = float(team_leader_row[stat])
 
     # LEAGUE percentile distribution (340+ PA)
-    league_vals = league_for_pct[stat].dropna()
+    league_source = df if stat in PCT_EXEMPT_STATS else league_for_pct
+    league_vals = league_source[stat].dropna()
     if league_vals.empty:
         continue  # league does not have values for this stat
 
