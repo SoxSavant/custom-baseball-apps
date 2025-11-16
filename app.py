@@ -181,7 +181,7 @@ with left_col:
     team_select_key = "team_abbr_select"
     preferred_team = st.session_state.get(
         team_select_key,
-        "BOS" if "BOS" in team_options else team_options[0],
+        "ARI" if "ARI" in team_options else team_options[0],
     )
     if preferred_team not in team_options:
         preferred_team = team_options[0]
@@ -192,7 +192,7 @@ with left_col:
         index=default_index,
         key=team_select_key,
     )
-    min_pa = st.number_input("Minimum PA", 0, 800, 340)
+    min_pa = st.number_input("Minimum PA", 0, 800, 502)
 
 stat_builder_container = left_col.container()
 
