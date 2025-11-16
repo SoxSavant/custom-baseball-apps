@@ -425,7 +425,12 @@ with stat_builder_container:
     )
 
     st.markdown("### Customize stats")
-    st.caption("Drag to reorder. Use the drop downs to add or remove stats.")
+    st.markdown(
+        "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
+        "Drag to reorder. Use the drop downs to add or remove stats."
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     stats_in_config = [row.get("Stat") for row in current_stat_config if row.get("Stat")]
     available_pool = allowed_add_stats if allowed_add_stats else stat_options
@@ -599,8 +604,8 @@ def format_stat(stat: str, val) -> str:
         return ""
 
     upper_stat = stat.upper()
-
-    if upper_stat in {"WAR", "FWAR", "EV", "AVG EXIT VELO"}:
+    # append .0 to these stats if its a whole number
+    if upper_stat in {"WAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}: 
         v = float(val)
         if abs(v - round(v)) < 1e-9:
             return f"{int(round(v))}.0"
