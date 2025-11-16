@@ -536,6 +536,8 @@ with stat_builder_container:
         height=grid_height,
         theme="streamlit",
         data_return_mode=DataReturnMode.AS_INPUT,
+        reload_data=True,  # force table to refresh when data changes
+        fit_columns_on_grid_load=True,
         # Change update_mode to suppress automatic grid update on every rerun
         update_mode=GridUpdateMode.VALUE_CHANGED, # Or even GridUpdateMode.MODEL_CHANGED
         allow_unsafe_jscode=True,
