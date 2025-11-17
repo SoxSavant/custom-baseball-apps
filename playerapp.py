@@ -207,17 +207,22 @@ player_teams_raw = (
     .unique()
     .tolist()
 )
-placeholders = {"TOT", "---", "--", ""}
+placeholders = {"TOT", "- - -", "---", "--", ""}
 player_teams = [t for t in player_teams_raw if t not in placeholders]
 # If no clean teams, fall back to TOT (if present) or the raw team value
 if not player_teams:
-    if "TOT" in player_teams_raw:
+    if "- - -" in player_teams_raw:
+        player_teams = ["2+ Tms"]
+    elif "TOT" in player_teams_raw:
         player_teams = ["TOT"]
     else:
         raw_team = str(player_row.get("Team", "N/A")).upper()
         player_teams = [raw_team] if raw_team not in placeholders else ["N/A"]
 
-player_team_display = ", ".join(player_teams)
+if len(player_teams) > 1:
+    player_team_display = f"{len(player_teams)} Tms"
+else:
+    player_team_display = player_teams[0]
 
 # --------------------- Stat builder setup ---------------------
 numeric_stats = [
@@ -731,7 +736,7 @@ with right_col:
     ax.axis("off")
 
     pdf_buffer = BytesIO()
-    fig.savefig(pdf_buffer, format="pdf",)
+    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=.25)
     pdf_buffer.seek(0)
 
     st.pyplot(fig, use_container_width=False, clear_figure=True)
