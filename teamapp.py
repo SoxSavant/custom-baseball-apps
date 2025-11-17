@@ -834,7 +834,7 @@ with right_col:
     ax.axis("off")
 
     pdf_buffer = BytesIO()
-    fig.savefig(pdf_buffer, format="pdf", bbox_inches = "tight", pad_inches = .15)
+    fig.savefig(pdf_buffer, format="pdf", bbox_inches = "tight", pad_inches = .05)
     pdf_buffer.seek(0)
 
     st.pyplot(fig, use_container_width=False, clear_figure=True)
