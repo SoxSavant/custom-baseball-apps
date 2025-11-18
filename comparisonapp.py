@@ -236,9 +236,10 @@ def lookup_mlbam_id(full_name: str):
     first_raw = base_tokens[0]
     last_raw = " ".join(base_tokens[1:])
     variants = [
-        (last_raw, first_raw),
+        (last_raw, first_raw),  # raw as-is (keeps accents/dots)
         (normalize_token(last_raw), normalize_token(first_raw)),
         (normalize_token(last_raw).lower(), normalize_token(first_raw).lower()),
+        (last_raw.replace(".", ""), first_raw.replace(".", "")),  # no dots
     ]
 
     for last, first in variants:
