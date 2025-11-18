@@ -144,7 +144,7 @@ STAT_PRESETS = {
 STAT_ALLOWLIST = [
     "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
 ]
@@ -197,7 +197,7 @@ with left_col:
         index=default_index,
         key=team_select_key,
     )
-    min_pa = st.number_input("Minimum PA", 0, 800, 502)
+    min_pa = st.number_input("Minimum PA", 0, 800, 500)
 
 stat_builder_container = left_col.container()
 

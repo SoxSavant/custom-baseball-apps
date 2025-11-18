@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import html
 import unicodedata
 from datetime import date
-from io import BytesIO
 from pybaseball import batting_stats, playerid_lookup
 from st_aggrid import (
     AgGrid,
@@ -72,7 +71,7 @@ st.markdown(
         .compare-card .player-meta {
             color: #555;
             margin: 0 0 0.3rem 0;
-            font-size: 0.95rem;
+            font-size: 1.3rem;
         }
         .compare-table {
             width: 100%;
@@ -139,6 +138,20 @@ with meta_col:
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
 STAT_PRESETS = {
+    "Stathead": [
+        "WAR",
+        "G",
+        "PA",
+        "H",
+        "HR",
+        "RBI",
+        "SB",
+        "AVG",
+        "OBP",
+        "SLG",
+        "OPS",
+        "wRC+",
+    ],
     "Statcast": [
         "WAR",
         "Off",
@@ -193,12 +206,13 @@ STAT_PRESETS = {
 STAT_ALLOWLIST = [
     "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
 ]
 
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
+HEADSHOT_OVERRIDES = {}
 
 
 @st.cache_data(show_spinner=True, ttl=900)
@@ -222,6 +236,13 @@ def lookup_mlbam_id(full_name: str):
         except Exception:
             return tok
 
+    def clean_full(val: str) -> str:
+        try:
+            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
+        except Exception:
+            pass
+        return "".join(ch for ch in val if ch.isalnum()).lower()
+
     def strip_suffix(tokens: list[str]) -> list[str]:
         toks = tokens.copy()
         while toks and toks[-1].lower() in suffixes:
@@ -235,13 +256,31 @@ def lookup_mlbam_id(full_name: str):
 
     first_raw = base_tokens[0]
     last_raw = " ".join(base_tokens[1:])
+    target_clean = clean_full(first_raw + last_raw)
+
+    def initial_forms(token: str) -> list[str]:
+        forms = []
+        if not token:
+            return forms
+        stripped = token.replace(".", "")
+        if stripped and stripped.isupper() and 1 <= len(stripped) <= 4:
+            dotted = ".".join(list(stripped)) + "."
+            spaced = " ".join(list(stripped))
+            forms.extend([dotted, spaced, stripped, stripped + "."])
+        return forms
+
+    first_forms = initial_forms(first_raw)
     variants = [
         (last_raw, first_raw),  # raw as-is (keeps accents/dots)
         (normalize_token(last_raw), normalize_token(first_raw)),
         (normalize_token(last_raw).lower(), normalize_token(first_raw).lower()),
         (last_raw.replace(".", ""), first_raw.replace(".", "")),  # no dots
     ]
+    for form in first_forms:
+        variants.append((last_raw, form))
+        variants.append((normalize_token(last_raw), normalize_token(form)))
 
+    first_hit_mlbam = None
     for last, first in variants:
         try:
             lookup_df = playerid_lookup(last, first)
@@ -249,15 +288,92 @@ def lookup_mlbam_id(full_name: str):
             continue
         if lookup_df is None or lookup_df.empty:
             continue
-        mlbam = lookup_df.iloc[0].get("key_mlbam")
-        try:
-            return int(mlbam) if pd.notna(mlbam) else None
-        except Exception:
-            continue
+        for _, row in lookup_df.iterrows():
+            combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
+            mlbam = row.get("key_mlbam")
+            if combo == target_clean and pd.notna(mlbam):
+                try:
+                    return int(mlbam)
+                except Exception:
+                    continue
+            if first_hit_mlbam is None and pd.notna(mlbam):
+                try:
+                    first_hit_mlbam = int(mlbam)
+                except Exception:
+                    pass
+
+    # Fallback: search by last name only, then match cleaned full name
+    try:
+        lookup_df = playerid_lookup(last_raw, None)
+    except Exception:
+        lookup_df = None
+    if lookup_df is not None and not lookup_df.empty:
+        for _, row in lookup_df.iterrows():
+            combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
+            mlbam = row.get("key_mlbam")
+            if combo == target_clean and pd.notna(mlbam):
+                try:
+                    return int(mlbam)
+                except Exception:
+                    continue
+            if first_hit_mlbam is None and pd.notna(mlbam):
+                try:
+                    first_hit_mlbam = int(mlbam)
+                except Exception:
+                    pass
+
+    if first_hit_mlbam:
+        return first_hit_mlbam
     return None
 
 
 def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
+    id_cols = ["mlbamid", "mlbam_id", "mlbam", "MLBID", "MLBAMID", "key_mlbam"]
+    fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
+    for col in id_cols:
+        if col in df.columns:
+            vals = df.loc[df["Name"] == name, col].dropna()
+            if not vals.empty:
+                try:
+                    mlbam = int(vals.iloc[0])
+                    return HEADSHOT_BASE.format(mlbam=mlbam)
+                except Exception:
+                    pass
+
+    # If we have a FanGraphs id, try to resolve MLBAM via reverse lookup
+    for col in fg_cols:
+        if col in df.columns:
+            vals = df.loc[df["Name"] == name, col].dropna()
+            if not vals.empty:
+                try:
+                    fg_id = int(vals.iloc[0])
+                except Exception:
+                    fg_id = None
+                if fg_id:
+                    try:
+                        from pybaseball import playerid_reverse_lookup
+                        rev = playerid_reverse_lookup([fg_id], key_type="fangraphs")
+                        if rev is not None and not rev.empty:
+                            mlbam = rev.iloc[0].get("key_mlbam")
+                            if pd.notna(mlbam):
+                                return HEADSHOT_BASE.format(mlbam=int(mlbam))
+                    except Exception:
+                        pass
+
+    def clean_name(val: str) -> str:
+        if not val:
+            return ""
+        try:
+            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
+        except Exception:
+            pass
+        return "".join(ch for ch in val if ch.isalnum() or ch.isspace()).strip().lower()
+
+    target_clean = clean_name(name)
+    if target_clean:
+        override = HEADSHOT_OVERRIDES.get(target_clean.upper())
+        if override:
+            return HEADSHOT_BASE.format(mlbam=override)
     candidate_cols = [
         "mlbamid", "MLBID", "mlbam_id", "mlbam", "key_mlbam", "MLBAMID", "playerid"
     ]
@@ -270,6 +386,22 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
                     return HEADSHOT_BASE.format(mlbam=mlbam)
                 except Exception:
                     pass
+    # Try matching by cleaned name in the df
+    if "Name" in df.columns:
+        df_clean = df.copy()
+        df_clean["__clean_name"] = df_clean["Name"].astype(str).apply(clean_name)
+        matches = df_clean[df_clean["__clean_name"] == target_clean]
+        if not matches.empty:
+            for col in candidate_cols:
+                if col in matches.columns:
+                    vals = matches[col].dropna()
+                    if not vals.empty:
+                        try:
+                            mlbam = int(vals.iloc[0])
+                            return HEADSHOT_BASE.format(mlbam=mlbam)
+                        except Exception:
+                            pass
+
     mlbam_fallback = lookup_mlbam_id(name)
     if mlbam_fallback:
         return HEADSHOT_BASE.format(mlbam=mlbam_fallback)
@@ -351,7 +483,7 @@ def prep_df(season: int) -> pd.DataFrame:
         return frame
     frame["PA"] = pd.to_numeric(frame["PA"], errors="coerce")
     frame["Team"] = frame["Team"].astype(str).str.upper()
-    frame["Name"] = frame["Name"].astype(str).str.replace(".", "", regex=False).str.strip()
+    frame["Name"] = frame["Name"].astype(str).str.strip()
     if "Contact%" in frame.columns:
         contact = pd.to_numeric(frame["Contact%"], errors="coerce")
         needs_percent_scale = contact.dropna().abs().le(1).mean() > 0.9 if contact.notna().any() else False
@@ -433,7 +565,7 @@ if not stat_options:
     st.error("No numeric stats available to display.")
     st.stop()
 
-default_preset_name = "Statcast"
+default_preset_name = "Stathead"
 stat_preset_key = "comp_stat_preset_select"
 preset_options = list(STAT_PRESETS.keys())
 stat_state_key = "comp_stat_config"
@@ -871,61 +1003,13 @@ with right_col:
         rows.extend([
             "    </tbody>",
             "  </table>",
+            "  <div style=\"display:flex; justify-content:space-between; margin-top:0.35rem; color:#555; font-size:0.9rem;\">",
+            "    <div>By: Sox_Savant</div>",
+            "    <div>Data: FanGraphs</div>",
+            "  </div>",
             "</div>",
         ])
-        st.markdown("\n".join(rows), unsafe_allow_html=True)
+        rows_html = "\n".join(rows)
+        st.markdown(rows_html, unsafe_allow_html=True)
 
-        # -------- Download as PDF --------
-        pdf_buffer = BytesIO()
-        col_labels = [player_a, "Stat", player_b]
-        cell_text = []
-        cell_colors = []
-        for _, row in table_df.iterrows():
-            stat_label = row["Stat"]
-            best = winner_map.get(stat_label)
-            a_val = row[player_a]
-            b_val = row[player_b]
-            cell_text.append([a_val, stat_label, b_val])
-            a_color = "#E5F1E4" if best == player_a else "#ffffff"
-            b_color = "#E5F1E4" if best == player_b else "#ffffff"
-            cell_colors.append([a_color, "#fafafa", b_color])
-
-        fig, ax = plt.subplots(figsize=(8.5, 0.55 * (len(table_df) + 2)))
-        ax.axis("off")
-        table = ax.table(
-            cellText=cell_text,
-            cellColours=cell_colors,
-            colLabels=col_labels,
-            cellLoc="center",
-            loc="center",
-        )
-        table.auto_set_font_size(False)
-        table.set_fontsize(10)
-        table.scale(1, 1.3)
-
-        # Bold the header row
-        for col_idx in range(len(col_labels)):
-            cell = table[0, col_idx]
-            cell.set_facecolor("#f1f1f1")
-            cell.get_text().set_color("#7b0d0d")
-            cell.get_text().set_fontweight("bold")
-
-        # Bold stat names and winners
-        for i in range(1, len(cell_text) + 1):
-            stat_cell = table[i, 1]
-            stat_cell.get_text().set_fontweight("bold")
-            if cell_colors[i - 1][0] != "#ffffff":
-                table[i, 0].get_text().set_fontweight("bold")
-            if cell_colors[i - 1][2] != "#ffffff":
-                table[i, 2].get_text().set_fontweight("bold")
-
-        plt.tight_layout()
-        fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight")
-        pdf_buffer.seek(0)
-
-        st.download_button(
-            "Download PDF",
-            data=pdf_buffer,
-            file_name=f"{player_a.replace(' ', '_')}_{year_a}_vs_{player_b.replace(' ', '_')}_{year_b}.pdf",
-            mime="application/pdf",
-        )
+        # PDF export removed; please screenshot the card if needed.
