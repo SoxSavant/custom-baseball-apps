@@ -14,9 +14,6 @@ from st_aggrid import (
     JsCode,
 )
 
-from streamlit.elements.lib import policies
-policies._LOGGER.disabled = True
-
 plt.rcdefaults()
 
 st.set_page_config(page_title="Custom Savant Page App", layout="wide")
