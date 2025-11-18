@@ -29,6 +29,9 @@ st.markdown(
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
         .viewerBadge_link__qRi_k {display: none;}
+        /* Hide slider end labels */
+        [data-testid="stTickBarMin"],
+        [data-testid="stTickBarMax"] {display: none;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -543,14 +546,12 @@ with stat_builder_container:
         height=grid_height,
         theme="streamlit",
         data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=True,  # force table to refresh when data changes
+        reload_data=False,
         fit_columns_on_grid_load=True,
-        # Change update_mode to suppress automatic grid update on every rerun
-        update_mode=GridUpdateMode.VALUE_CHANGED, # Or even GridUpdateMode.MODEL_CHANGED
+        update_mode=GridUpdateMode.MODEL_CHANGED,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
         key="stat_builder_grid",
-        # IMPORTANT: Keep update_on to force a rerun ONLY on these user interactions
         update_on=["rowDragEnd", "cellValueChanged"], 
     )
 

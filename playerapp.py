@@ -25,6 +25,9 @@ st.markdown(
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
         .viewerBadge_link__qRi_k {display: none;}
+        /* Hide slider end labels */
+        [data-testid="stTickBarMin"],
+        [data-testid="stTickBarMax"] {display: none;}
         /* Keep row selector column hidden without touching data columns */
         div.ag-header-cell[col-id="ag-RowSelector"],
         div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
@@ -514,9 +517,9 @@ with stat_builder_container:
         width="100%",
         theme="streamlit",
         data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=True,
+        reload_data=False,
         fit_columns_on_grid_load=True,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
         key="stat_grid",
