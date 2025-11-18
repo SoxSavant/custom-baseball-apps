@@ -574,6 +574,7 @@ add_select_key = "comp_add_stat_select"
 remove_select_key = "comp_remove_stat_select"
 add_reset_key = "comp_reset_add_select"
 remove_reset_key = "comp_reset_remove_select"
+stat_version_key = "comp_stat_config_version"
 
 # --- AG Grid Checkbox Renderer JS ---
 show_checkbox_renderer = JsCode(
@@ -608,6 +609,10 @@ show_checkbox_renderer = JsCode(
 # --- End AG Grid Checkbox Renderer JS ---
 
 
+def bump_stat_config_version():
+    st.session_state[stat_version_key] = st.session_state.get(stat_version_key, 0) + 1
+
+
 def add_stat_callback(stat_key: str, select_key: str, reset_key: str, sentinel: str):
     choice = st.session_state.get(select_key)
     if not choice or choice == sentinel:
@@ -623,6 +628,7 @@ def add_stat_callback(stat_key: str, select_key: str, reset_key: str, sentinel: 
     if not any(row["Stat"] == choice for row in config):
         config.append({"Stat": choice, "Show": True})
     st.session_state[stat_key] = config
+    bump_stat_config_version()
     st.session_state[manual_stat_update_key] = True
     st.session_state[reset_key] = True
 
@@ -641,6 +647,7 @@ def remove_stat_callback(stat_key: str, select_key: str, reset_key: str, sentine
     config = normalize_stat_rows(config, preset_base_config)
     new_config = [row for row in config if row.get("Stat") != choice]
     st.session_state[stat_key] = new_config or [row.copy() for row in preset_base_config]
+    bump_stat_config_version()
     st.session_state[manual_stat_update_key] = True
     st.session_state[reset_key] = True
 
@@ -654,6 +661,7 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
     if not filtered_stats:
         return
     st.session_state[stat_key] = [{"Stat": stat, "Show": True} for stat in filtered_stats]
+    bump_stat_config_version()
     st.session_state[manual_stat_update_key] = True
     st.session_state[add_reset_key] = True
     st.session_state[remove_reset_key] = True
@@ -695,6 +703,9 @@ if stat_state_key not in st.session_state:
         preset_base_candidates = [stat_options[0]]
     preset_base_config = [{"Stat": stat, "Show": True} for stat in preset_base_candidates]
     st.session_state[stat_state_key] = preset_base_config
+    st.session_state[stat_version_key] = 0
+elif stat_version_key not in st.session_state:
+    st.session_state[stat_version_key] = 0
 
 current_preset_for_base = st.session_state.get(stat_preset_key, default_preset_name)
 preset_base_candidates = [stat for stat in STAT_PRESETS[current_preset_for_base] if stat in stat_options]
@@ -831,6 +842,7 @@ with stat_builder_container:
     grid_options = gb.build()
 
     grid_height = min(480, 90 + len(stat_config_df) * 44)
+    grid_key = f"comp_stat_grid_{st.session_state.get(stat_version_key, 0)}"
     grid_response = AgGrid(
         stat_config_df,
         gridOptions=grid_options,
@@ -838,12 +850,12 @@ with stat_builder_container:
         width="100%",
         theme="streamlit",
         data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=False,
+        reload_data=True,
         fit_columns_on_grid_load=True,
         update_mode=GridUpdateMode.VALUE_CHANGED,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
-        key="comp_stat_grid",
+        key=grid_key,
         update_on=["rowDragEnd", "cellValueChanged"],
     )
 
