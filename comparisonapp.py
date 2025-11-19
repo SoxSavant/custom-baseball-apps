@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import html
 import unicodedata
+import re
 from datetime import date
 from pybaseball import batting_stats, playerid_lookup
 from st_aggrid import (
@@ -13,6 +14,7 @@ from st_aggrid import (
     DataReturnMode,
     JsCode,
 )
+import requests
 
 st.set_page_config(page_title="Player Comparison App", layout="wide")
 
@@ -62,6 +64,9 @@ st.markdown(
             border-radius: 4px;
             padding: 4px;
             width: 230px;
+            max-height: 230px;
+            height: auto;
+            object-fit: contain;
         }
         .compare-card .player-name {
             font-size: 1.35rem;
@@ -125,6 +130,7 @@ title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Player Comparison")
 with meta_col:
+    loading_placeholder = st.empty()
     st.markdown(
         """
         <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
@@ -211,20 +217,83 @@ STAT_ALLOWLIST = [
     "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
 ]
 
-HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
-HEADSHOT_OVERRIDES = {}
+HEADSHOT_BASES = [
+    # Standard silo path (real photos when they exist)
+    "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
+    # Generic fallback path with slash
+    "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
+    # Alternate path provided (kept last to avoid overriding real photos)
+    "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}headshot/67/current",
+]
+HEADSHOT_BREF_BASES = [
+    "https://content-static.baseball-reference.com/req/202406/images/headshots/{folder}/{bref_id}.jpg",
+    "https://content-static.baseball-reference.com/req/202310/images/headshots/{folder}/{bref_id}.jpg",
+    "https://www.baseball-reference.com/req/202108020/images/headshots/{folder}/{bref_id}.jpg",
+]
+HEADSHOT_OVERRIDES = {
+    "HONUS WAGNER": 123784,  # explicit MLB id for known missing mlbam lookup
+}
+HEADSHOT_BREF_OVERRIDES = {
+    "HONUS WAGNER": "wagneho01",
+}
+HEADSHOT_CHECK_TIMEOUT = 1.0
+HEADSHOT_USER_AGENT = "headshot-fetcher/1.0"
+HEADSHOT_PLACEHOLDER = (
+    "data:image/svg+xml;base64,"
+    "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
+    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
+    "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
+    "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
+    "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
+    "YycvPgo8L3N2Zz4="
+)
 
 
-@st.cache_data(show_spinner=True, ttl=900)
-def load_batting(y: int) -> pd.DataFrame:
+@st.cache_data(show_spinner=False, ttl=900)
+def load_year(y: int) -> pd.DataFrame:
+    """Cached single-year fetch."""
     return batting_stats(y, y, qual=0)
 
 
+@st.cache_data(show_spinner=False, ttl=900)
+def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
+    """Load aggregated batting stats for a single year or a span of years."""
+    start = min(start_year, end_year)
+    end = max(start_year, end_year)
+    try:
+        df = batting_stats(start, end, qual=0)
+        if df is not None and not df.empty:
+            return df
+    except Exception:
+        # Fall back silently to per-year fetches
+        pass
+
+    # Fallback: fetch each year individually and combine what succeeds (cached per year)
+    frames = []
+    failed_years = []
+    for y in range(start, end + 1):
+        try:
+            yearly = load_year(y)
+            if yearly is not None and not yearly.empty:
+                frames.append(yearly)
+            else:
+                failed_years.append(y)
+        except Exception:
+            failed_years.append(y)
+    if frames:
+        if failed_years:
+            st.info(f"Loaded partial data; skipped years: {', '.join(map(str, failed_years))}")
+        return pd.concat(frames, ignore_index=True)
+
+    st.error(f"Could not load batting data for {start}-{end}. Please try another span.")
+    return pd.DataFrame()
+
+
 @st.cache_data(show_spinner=False)
-def lookup_mlbam_id(full_name: str):
-    """Best-effort MLBAM lookup using pybaseball's playerid_lookup."""
+def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
+    """Best-effort MLBAM lookup using pybaseball's playerid_lookup. Optionally returns bbref id."""
     if not full_name or not full_name.strip():
-        return None
+        return (None, None) if return_bbref else None
     suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
 
     def normalize_token(tok: str) -> str:
@@ -252,7 +321,7 @@ def lookup_mlbam_id(full_name: str):
     parts = full_name.split()
     base_tokens = strip_suffix(parts)
     if len(base_tokens) < 2:
-        return None
+        return (None, None) if return_bbref else None
 
     first_raw = base_tokens[0]
     last_raw = " ".join(base_tokens[1:])
@@ -281,6 +350,36 @@ def lookup_mlbam_id(full_name: str):
         variants.append((normalize_token(last_raw), normalize_token(form)))
 
     first_hit_mlbam = None
+    first_hit_bbref = None
+    best_match_mlbam = None
+    best_match_bbref = None
+
+    def consider_row(row):
+        nonlocal first_hit_mlbam, first_hit_bbref, best_match_mlbam, best_match_bbref
+        combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
+        mlbam_val = row.get("key_mlbam")
+        bbref_val = row.get("key_bbref")
+        if combo == target_clean:
+            if pd.notna(mlbam_val):
+                try:
+                    best_match_mlbam = int(mlbam_val)
+                except Exception:
+                    pass
+            if pd.notna(bbref_val):
+                try:
+                    best_match_bbref = str(bbref_val)
+                except Exception:
+                    pass
+        if first_hit_mlbam is None and pd.notna(mlbam_val):
+            try:
+                first_hit_mlbam = int(mlbam_val)
+            except Exception:
+                pass
+        if first_hit_bbref is None and pd.notna(bbref_val):
+            try:
+                first_hit_bbref = str(bbref_val)
+            except Exception:
+                pass
     for last, first in variants:
         try:
             lookup_df = playerid_lookup(last, first)
@@ -289,18 +388,7 @@ def lookup_mlbam_id(full_name: str):
         if lookup_df is None or lookup_df.empty:
             continue
         for _, row in lookup_df.iterrows():
-            combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
-            mlbam = row.get("key_mlbam")
-            if combo == target_clean and pd.notna(mlbam):
-                try:
-                    return int(mlbam)
-                except Exception:
-                    continue
-            if first_hit_mlbam is None and pd.notna(mlbam):
-                try:
-                    first_hit_mlbam = int(mlbam)
-                except Exception:
-                    pass
+            consider_row(row)
 
     # Fallback: search by last name only, then match cleaned full name
     try:
@@ -309,38 +397,120 @@ def lookup_mlbam_id(full_name: str):
         lookup_df = None
     if lookup_df is not None and not lookup_df.empty:
         for _, row in lookup_df.iterrows():
-            combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
-            mlbam = row.get("key_mlbam")
-            if combo == target_clean and pd.notna(mlbam):
-                try:
-                    return int(mlbam)
-                except Exception:
-                    continue
-            if first_hit_mlbam is None and pd.notna(mlbam):
-                try:
-                    first_hit_mlbam = int(mlbam)
-                except Exception:
-                    pass
+            consider_row(row)
 
-    if first_hit_mlbam:
-        return first_hit_mlbam
+    mlbam_result = best_match_mlbam if best_match_mlbam is not None else first_hit_mlbam
+    bbref_result = best_match_bbref if best_match_bbref is not None else first_hit_bbref
+
+    if return_bbref:
+        return mlbam_result, bbref_result
+    return mlbam_result
+
+
+@st.cache_data(show_spinner=False, ttl=21600)
+def build_mlb_headshot(mlbam: int | str | None) -> str | None:
+    """Try MLB headshot URLs in order; return the first that responds (200)."""
+    if mlbam is None:
+        return None
+    mlbam_val = str(mlbam).strip()
+    if not mlbam_val:
+        return None
+    headers = {"User-Agent": HEADSHOT_USER_AGENT}
+    fallback_url = None
+    for base in HEADSHOT_BASES:
+        try:
+            url = base.format(mlbam=mlbam_val)
+            if fallback_url is None:
+                fallback_url = url
+        except Exception:
+            continue
+        try:
+            resp = requests.head(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, allow_redirects=True)
+            status = resp.status_code
+            if status == 200:
+                return url
+            # Some endpoints reject HEAD; try a lightweight GET
+            if status in (403, 404, 405):
+                resp_get = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, stream=True)
+                if resp_get.status_code == 200:
+                    return url
+        except Exception:
+            continue
+    return fallback_url
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_bbref_headshot(bref_id: str | None) -> str | None:
+    if not bref_id:
+        return None
+    slug = str(bref_id).strip().lower()
+    if not slug:
+        return None
+    first_letter = slug[0]
+    url = f"https://www.baseball-reference.com/players/{first_letter}/{slug}.shtml"
+    headers = {"User-Agent": HEADSHOT_USER_AGENT}
+    try:
+        resp = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT)
+    except Exception:
+        return None
+    if resp.status_code != 200 or not resp.text:
+        return None
+    html_text = resp.text
+    urls = []
+    for pattern in [
+        r'https?://[^"\']*headshots[^"\']*\.(?:jpg|png)',
+        r'//[^"\']*headshots[^"\']*\.(?:jpg|png)',
+    ]:
+        urls.extend(re.findall(pattern, html_text, flags=re.IGNORECASE))
+    for raw in urls:
+        if not raw:
+            continue
+        candidate = raw if raw.startswith("http") else f"https:{raw}"
+        return candidate
     return None
 
 
 def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
     id_cols = ["mlbamid", "mlbam_id", "mlbam", "MLBID", "MLBAMID", "key_mlbam"]
     fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
+    bref_cols = ["key_bbref", "bbref_id", "BBREFID", "bref_id", "BREFID"]
+
+    def build_bref_headshot(bref_id: str | None) -> str | None:
+        if not bref_id:
+            return None
+        raw_slug = str(bref_id).strip()
+        if not raw_slug:
+            return None
+        slug_variants = {raw_slug.lower(), raw_slug.upper()}
+        for slug in slug_variants:
+            folder_variants = {slug[0].lower(), slug[0].upper()} if slug else set()
+            for folder in folder_variants:
+                for base in HEADSHOT_BREF_BASES:
+                    try:
+                        return base.format(folder=folder, bref_id=slug)
+                    except Exception:
+                        continue
+        return None
+
+    def resolve_bref_headshot(bref_id: str | None) -> str | None:
+        direct = build_bref_headshot(bref_id)
+        if direct:
+            return direct
+        return fetch_bbref_headshot(bref_id)
+
     for col in id_cols:
         if col in df.columns:
             vals = df.loc[df["Name"] == name, col].dropna()
             if not vals.empty:
                 try:
                     mlbam = int(vals.iloc[0])
-                    return HEADSHOT_BASE.format(mlbam=mlbam)
+                    headshot = build_mlb_headshot(mlbam)
+                    if headshot:
+                        return headshot
                 except Exception:
                     pass
 
-    # If we have a FanGraphs id, try to resolve MLBAM via reverse lookup
+    # If we have a FanGraphs id, try to resolve MLBAM/BBRef via reverse lookup
     for col in fg_cols:
         if col in df.columns:
             vals = df.loc[df["Name"] == name, col].dropna()
@@ -356,7 +526,14 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
                         if rev is not None and not rev.empty:
                             mlbam = rev.iloc[0].get("key_mlbam")
                             if pd.notna(mlbam):
-                                return HEADSHOT_BASE.format(mlbam=int(mlbam))
+                                headshot = build_mlb_headshot(int(mlbam))
+                                if headshot:
+                                    return headshot
+                            bbref = rev.iloc[0].get("key_bbref")
+                            if pd.notna(bbref):
+                                bref_url = resolve_bref_headshot(str(bbref))
+                                if bref_url:
+                                    return bref_url
                     except Exception:
                         pass
 
@@ -369,11 +546,39 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
             pass
         return "".join(ch for ch in val if ch.isalnum() or ch.isspace()).strip().lower()
 
+    def heuristic_bbref_slug(full_name: str) -> list[str]:
+        """Best-effort guesses for bbref slug when lookup fails (last5 + first2 + 2-digit index)."""
+        cleaned = clean_name(full_name)
+        if not cleaned:
+            return []
+        parts = cleaned.split()
+        if len(parts) < 2:
+            return []
+        first = parts[0]
+        last = parts[-1]
+        if not first or not last:
+            return []
+        base_slug = f"{last[:5]}{first[:2]}"
+        if len(base_slug) < 6:
+            return []
+        slugs = []
+        for i in range(1, 16):  # try 01-15 to account for name collisions
+            slugs.append(f"{base_slug}{i:02d}")
+        return slugs
+
     target_clean = clean_name(name)
     if target_clean:
         override = HEADSHOT_OVERRIDES.get(target_clean.upper())
         if override:
-            return HEADSHOT_BASE.format(mlbam=override)
+            headshot = build_mlb_headshot(override)
+            if headshot:
+                return headshot
+        bref_override = HEADSHOT_BREF_OVERRIDES.get(target_clean.upper())
+        if bref_override:
+            bref_url = resolve_bref_headshot(bref_override)
+            if bref_url:
+                return bref_url
+
     candidate_cols = [
         "mlbamid", "MLBID", "mlbam_id", "mlbam", "key_mlbam", "MLBAMID", "playerid"
     ]
@@ -383,9 +588,20 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
             if not vals.empty:
                 try:
                     mlbam = int(vals.iloc[0])
-                    return HEADSHOT_BASE.format(mlbam=mlbam)
+                    headshot = build_mlb_headshot(mlbam)
+                    if headshot:
+                        return headshot
                 except Exception:
                     pass
+
+    for col in bref_cols:
+        if col in df.columns:
+            vals = df.loc[df["Name"] == name, col].dropna()
+            if not vals.empty:
+                bref_url = resolve_bref_headshot(str(vals.iloc[0]))
+                if bref_url:
+                    return bref_url
+
     # Try matching by cleaned name in the df
     if "Name" in df.columns:
         df_clean = df.copy()
@@ -398,14 +614,33 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
                     if not vals.empty:
                         try:
                             mlbam = int(vals.iloc[0])
-                            return HEADSHOT_BASE.format(mlbam=mlbam)
+                            headshot = build_mlb_headshot(mlbam)
+                            if headshot:
+                                return headshot
                         except Exception:
                             pass
+            for col in bref_cols:
+                if col in matches.columns:
+                    vals = matches[col].dropna()
+                    if not vals.empty:
+                        bref_url = resolve_bref_headshot(str(vals.iloc[0]))
+                        if bref_url:
+                            return bref_url
 
-    mlbam_fallback = lookup_mlbam_id(name)
+    mlbam_fallback, bbref_fallback = lookup_mlbam_id(name, return_bbref=True)
     if mlbam_fallback:
-        return HEADSHOT_BASE.format(mlbam=mlbam_fallback)
-    return None
+        headshot = build_mlb_headshot(mlbam_fallback)
+        if headshot:
+            return headshot
+    if bbref_fallback:
+        bref_url = resolve_bref_headshot(bbref_fallback)
+        if bref_url:
+            return bref_url
+    for slug in heuristic_bbref_slug(name):
+        bref_url = resolve_bref_headshot(slug)
+        if bref_url:
+            return bref_url
+    return HEADSHOT_PLACEHOLDER
 
 
 def get_player_row(df: pd.DataFrame, name: str) -> pd.Series | None:
@@ -418,6 +653,12 @@ def get_player_row(df: pd.DataFrame, name: str) -> pd.Series | None:
 
 
 def get_team_display(df: pd.DataFrame, player_name: str) -> str:
+    # If we carried an explicit display value through aggregation, prefer it
+    if "TeamDisplay" in df.columns:
+        vals = df.loc[df["Name"] == player_name, "TeamDisplay"].dropna().astype(str)
+        if not vals.empty:
+            return vals.iloc[0]
+
     player_teams_raw = (
         df[df["Name"] == player_name]["Team"]
         .dropna()
@@ -451,34 +692,100 @@ with left_col:
 min_pa_key = "comp_min_pa_input"
 min_pa_default = 500
 current_year = date.today().year
-years_desc = list(range(current_year, 1899, -1))
+years_desc = list(range(current_year, 1870, -1))
+single_a_key = "comp_single_year_a"
+single_b_key = "comp_single_year_b"
+single_year_a_key = "comp_year_a_single"
+single_year_b_key = "comp_year_b_single"
 with controls_container:
+    def span_len(is_single: bool, start_key: str, end_key: str, single_key: str) -> int:
+        if is_single:
+            year_val = st.session_state.get(single_key, current_year)
+            return 1 if year_val else 1
+        start_val = st.session_state.get(start_key, current_year)
+        end_val = st.session_state.get(end_key, current_year)
+        try:
+            start_int = int(start_val)
+            end_int = int(end_val)
+        except Exception:
+            return 1
+        return abs(end_int - start_int) + 1
+
+    span_a_guess = span_len(st.session_state.get(single_a_key, True), "comp_year_a_start", "comp_year_a_end", single_year_a_key)
+    span_b_guess = span_len(st.session_state.get(single_b_key, True), "comp_year_b_start", "comp_year_b_end", single_year_b_key)
+    dynamic_min_pa_default = max(span_a_guess, span_b_guess, 1) * 300
+
     min_pa = st.number_input(
         "Minimum PA (for player list)",
         0,
-        800,
-        st.session_state.get(min_pa_key, min_pa_default),
+        20000,
+        st.session_state.get(min_pa_key, dynamic_min_pa_default),
         key=min_pa_key,
     )
     year_col = st.columns(2)
     with year_col[0]:
-        year_a = st.selectbox(
-            "Season (Player A)",
-            years_desc,
-            index=0,
-            key="comp_year_a",
+        single_a = st.checkbox(
+            "Single season (Player A)",
+            value=st.session_state.get(single_a_key, True),
+            key=single_a_key,
         )
+        if single_a:
+            year_a_single = st.selectbox(
+                "Season (Player A)",
+                years_desc,
+                index=0,
+                key=single_year_a_key,
+            )
+            year_a_start = year_a_single
+            year_a_end = year_a_single
+        else:
+            year_a_start = st.selectbox(
+                "Season Start (Player A)",
+                years_desc,
+                index=0,
+                key="comp_year_a_start",
+            )
+            year_a_end = st.selectbox(
+                "Season End (Player A)",
+                years_desc,
+                index=0,
+                key="comp_year_a_end",
+            )
     with year_col[1]:
-        year_b = st.selectbox(
-            "Season (Player B)",
-            years_desc,
-            index=0,
-            key="comp_year_b",
+        single_b = st.checkbox(
+            "Single season (Player B)",
+            value=st.session_state.get(single_b_key, True),
+            key=single_b_key,
         )
+        if single_b:
+            year_b_single = st.selectbox(
+                "Season (Player B)",
+                years_desc,
+                index=0,
+                key=single_year_b_key,
+            )
+            year_b_start = year_b_single
+            year_b_end = year_b_single
+        else:
+            year_b_start = st.selectbox(
+                "Season Start (Player B)",
+                years_desc,
+                index=0,
+                key="comp_year_b_start",
+            )
+            year_b_end = st.selectbox(
+                "Season End (Player B)",
+                years_desc,
+                index=0,
+                key="comp_year_b_end",
+            )
+
+range_a = (min(year_a_start, year_a_end), max(year_a_start, year_a_end))
+range_b = (min(year_b_start, year_b_end), max(year_b_start, year_b_end))
 
 
-def prep_df(season: int) -> pd.DataFrame:
-    frame = load_batting(season).copy()
+def prep_df(start_year: int, end_year: int) -> pd.DataFrame:
+    frame = load_batting(start_year, end_year).copy()
     if frame is None or frame.empty:
         return frame
     frame["PA"] = pd.to_numeric(frame["PA"], errors="coerce")
@@ -493,11 +800,60 @@ def prep_df(season: int) -> pd.DataFrame:
         frame["Whiff%"] = 100 - contact
     else:
         frame["Whiff%"] = np.nan
+    # Aggregate across multiple years so we don't just pick the single highest-PA season
+    if start_year != end_year:
+        # Columns we should sum (counting stats, WAR components)
+        sum_stats = {
+            "G", "PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "SB", "CS",
+            "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
+            "WAR", "Off", "Def", "BsR",
+        }
+        # Columns to PA-weight average (rates and percentages)
+        rate_stats = {
+            "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
+            "wOBA", "xwOBA", "xBA", "xSLG", "wRC+",
+            "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "Whiff%",
+            "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
+            "LA", "EV", "MaxEV",
+        }
+
+        numeric_cols = [col for col in frame.columns if pd.api.types.is_numeric_dtype(frame[col])]
+        groups = []
+        for name, grp in frame.groupby("Name"):
+            team_vals = grp["Team"].dropna().astype(str).str.upper().tolist()
+            placeholders = {"TOT", "- - -", "---", "--", ""}
+            valid_teams = [t for t in team_vals if t not in placeholders]
+            unique_valid = sorted(set(valid_teams))
+            if not unique_valid and "TOT" in team_vals:
+                team_display = "TOT"
+            elif not unique_valid:
+                team_display = "N/A"
+            elif len(unique_valid) == 1:
+                team_display = unique_valid[0]
+            else:
+                team_display = f"{len(unique_valid)} Tms"
+
+            row = {"Name": name, "Team": team_display, "TeamDisplay": team_display}
+            pa_weight = grp["PA"].fillna(0)
+            pa_total = pa_weight.sum()
+            for col in numeric_cols:
+                series = grp[col]
+                if col in sum_stats:
+                    row[col] = series.sum(skipna=True)
+                elif col in rate_stats and pa_total > 0:
+                    row[col] = (series * pa_weight).sum(skipna=True) / pa_total
+                else:
+                    row[col] = series.mean(skipna=True)
+            groups.append(row)
+        frame = pd.DataFrame(groups)
     return frame
 
 
-df_a = prep_df(year_a)
-df_b = prep_df(year_b)
+with st.spinner("Loading player data..."):
+    loading_placeholder.markdown("<div style='text-align:right; color:#7b0d0d; font-weight:700;'>Loading player data...</div>", unsafe_allow_html=True)
+    df_a = prep_df(*range_a)
+    df_b = prep_df(*range_b)
+    loading_placeholder.empty()
 
 if df_a is None or df_a.empty or df_b is None or df_b.empty:
     st.error("No data returned from pybaseball for one of the seasons.")
@@ -527,19 +883,32 @@ if not player_options_a or not player_options_b:
     st.error("No players available to display.")
     st.stop()
 
-default_a = st.session_state.get("comp_player_a", player_options_a[0])
+default_a = st.session_state.get("comp_player_a")
 if default_a not in player_options_a:
     default_a = player_options_a[0]
-default_b = st.session_state.get("comp_player_b", player_options_b[1] if len(player_options_b) > 1 else player_options_b[0])
+    st.session_state["comp_player_a"] = default_a
+
+default_b = st.session_state.get("comp_player_b")
 if default_b not in player_options_b:
-    default_b = player_options_b[0]
+    default_b = player_options_b[1] if len(player_options_b) > 1 else player_options_b[0]
+    st.session_state["comp_player_b"] = default_b
+
+# Ensure session state is initialized before rendering widgets to avoid Streamlit warning
+if "comp_player_a" not in st.session_state:
+    st.session_state["comp_player_a"] = default_a
+if "comp_player_b" not in st.session_state:
+    st.session_state["comp_player_b"] = default_b
+if st.session_state["comp_player_a"] not in player_options_a:
+    st.session_state["comp_player_a"] = player_options_a[0]
+if st.session_state["comp_player_b"] not in player_options_b:
+    st.session_state["comp_player_b"] = player_options_b[1] if len(player_options_b) > 1 else player_options_b[0]
 
 with controls_container:
     sel_a_col, sel_b_col = st.columns(2)
     with sel_a_col:
-        player_a = st.selectbox("Player A", player_options_a, index=player_options_a.index(default_a), key="comp_player_a")
+        player_a = st.selectbox("Player A", player_options_a, key="comp_player_a")
     with sel_b_col:
-        player_b = st.selectbox("Player B", player_options_b, index=player_options_b.index(default_b), key="comp_player_b")
+        player_b = st.selectbox("Player B", player_options_b, key="comp_player_b")
 
 player_a_row = get_player_row(df_a, player_a)
 player_b_row = get_player_row(df_b, player_b)
@@ -549,6 +918,8 @@ if player_a_row is None or player_b_row is None:
 
 player_a_team = get_team_display(df_a, player_a)
 player_b_team = get_team_display(df_b, player_b)
+year_a_label = f"{range_a[0]}" if range_a[0] == range_a[1] else f"{range_a[0]}-{range_a[1]}"
+year_b_label = f"{range_b[0]}" if range_b[0] == range_b[1] else f"{range_b[0]}-{range_b[1]}"
 
 # --------------------- Stat builder setup ---------------------
 stat_exclusions = {"Season"}
@@ -914,6 +1285,9 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
         return f"{float(val):.3f}".lstrip("0")
 
+    if upper_stat in {"WRC+", "OPS+"}:
+        return f"{int(round(float(val)))}"
+
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
@@ -983,12 +1357,12 @@ with right_col:
             "<div class=\"compare-card\">",
             "  <div class=\"headshot-row\">",
             "    <div class=\"headshot-col\">",
-            f"      <div class=\"player-meta\">{esc(str(year_a))} | {esc(str(player_a_team))}</div>",
+            f"      <div class=\"player-meta\">{esc(str(year_a_label))} | {esc(str(player_a_team))}</div>",
             f"      {img_a}",
             f"      <div class=\"player-name\">{esc(player_a)}</div>",
             "    </div>",
             "    <div class=\"headshot-col\">",
-            f"      <div class=\"player-meta\">{esc(str(year_b))} | {esc(str(player_b_team))}</div>",
+            f"      <div class=\"player-meta\">{esc(str(year_b_label))} | {esc(str(player_b_team))}</div>",
             f"      {img_b}",
             f"      <div class=\"player-name\">{esc(player_b)}</div>",
             "    </div>",
@@ -1029,5 +1403,4 @@ with right_col:
         st.markdown(rows_html, unsafe_allow_html=True)
         st.caption("Note: PDF Export wasn't working well so screenshot to save.")
         st.caption("Note: Rookies with accents, dots, or suffixes in their name may not work (no player ID, unable to search by name)")
-
-        # PDF export removed; please screenshot the card if needed.
+        st.caption("Note: Spanning multiple years drastically increases load times... be patient")
