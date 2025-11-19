@@ -3,10 +3,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import html
+import io
 import unicodedata
 import re
 from datetime import date
-from pybaseball import batting_stats, playerid_lookup
+from pybaseball import batting_stats, fielding_stats, playerid_lookup, bwar_bat
+from pybaseball.statcast_fielding import statcast_outs_above_average
 from st_aggrid import (
     AgGrid,
     GridOptionsBuilder,
@@ -50,7 +52,7 @@ st.markdown(
             display: flex;
             align-items: center;
             justify-content: space-around;
-            gap: 14rem;
+            gap: 16rem;
             margin-bottom: .2rem;
         }
         .compare-card .headshot-col {
@@ -163,6 +165,8 @@ STAT_PRESETS = {
         "Off",
         "BsR",
         "Def",
+        "OAA",
+        "FRV",
         "xwOBA",
         "xBA",
         "xSLG",
@@ -192,12 +196,19 @@ STAT_PRESETS = {
         "K%",
         "BB%",
     ],
+    "Fielding": [
+        "DRS",
+        "FRV",
+        "OAA",
+        "ARM",
+    ],
     "Miscellaneous": [
         "K-BB%",
         "O-Swing%",
         "Z-Swing%",
         "Swing%",
         "Contact%",
+        "DRS",
         "WPA",
         "Clutch",
         "Pull%",
@@ -215,7 +226,21 @@ STAT_ALLOWLIST = [
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
+    "FRV", "OAA", "ARM", "RANGE", "DRS", "FRM", "UZR", "bWAR",
 ]
+STATCAST_FIELDING_START_YEAR = 2016
+FIELDING_STATS = ["DRS", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE", "bWAR"]
+SUM_STATS = {
+    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
+    "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
+    "WAR", "Off", "Def", "BsR", "ISO", "GDP", "wRAA", "wRC",
+}
+RATE_STATS = {
+    "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "Whiff%",
+    "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
+    "LA", "EV", "MaxEV", "CSW%", "BB/K",
+}
 
 HEADSHOT_BASES = [
     # Standard silo path (real photos when they exist)
@@ -230,12 +255,6 @@ HEADSHOT_BREF_BASES = [
     "https://content-static.baseball-reference.com/req/202310/images/headshots/{folder}/{bref_id}.jpg",
     "https://www.baseball-reference.com/req/202108020/images/headshots/{folder}/{bref_id}.jpg",
 ]
-HEADSHOT_OVERRIDES = {
-    "HONUS WAGNER": 123784,  # explicit MLB id for known missing mlbam lookup
-}
-HEADSHOT_BREF_OVERRIDES = {
-    "HONUS WAGNER": "wagneho01",
-}
 HEADSHOT_CHECK_TIMEOUT = 1.0
 HEADSHOT_USER_AGENT = "headshot-fetcher/1.0"
 HEADSHOT_PLACEHOLDER = (
@@ -252,7 +271,61 @@ HEADSHOT_PLACEHOLDER = (
 @st.cache_data(show_spinner=False, ttl=900)
 def load_year(y: int) -> pd.DataFrame:
     """Cached single-year fetch."""
-    return batting_stats(y, y, qual=0)
+    return batting_stats(y, y, qual=0, split_seasons=False)
+
+
+def compute_team_display(team_values: list[str]) -> str:
+    placeholders = {"TOT", "- - -", "---", "--", "", "N/A"}
+    teams = [str(t).upper() for t in team_values if str(t).strip()]
+    valid = [t for t in teams if t not in placeholders]
+    if not valid:
+        if any(t == "TOT" for t in teams):
+            return "TOT"
+        if any(t == "- - -" for t in teams):
+            return "2+ Tms"
+        return teams[0] if teams else "N/A"
+    unique_valid = sorted(set(valid))
+    if len(unique_valid) == 1:
+        return unique_valid[0]
+    return f"{len(unique_valid)} Tms"
+
+
+def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
+    result: dict[str, object] = {}
+    if name is None and "Name" in grp.columns:
+        val = grp["Name"].dropna()
+        if not val.empty:
+            name = str(val.iloc[0])
+    if name:
+        result["Name"] = name
+    if "IDfg" in grp.columns:
+        ids = grp["IDfg"].dropna()
+        if not ids.empty:
+            result["IDfg"] = ids.iloc[0]
+    teams = grp["Team"].dropna().astype(str).tolist() if "Team" in grp.columns else []
+    display = compute_team_display(teams)
+    result["Team"] = display
+    result["TeamDisplay"] = display
+    numeric_cols = [
+        col for col in grp.columns
+        if pd.api.types.is_numeric_dtype(grp[col]) and col not in {"IDfg"}
+    ]
+    if "PA" in grp.columns:
+        pa_weight = pd.to_numeric(grp["PA"], errors="coerce").fillna(0)
+    else:
+        pa_weight = pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
+    pa_total = pa_weight.sum()
+    for col in numeric_cols:
+        series = pd.to_numeric(grp[col], errors="coerce")
+        if series.isna().all():
+            continue
+        if col in SUM_STATS:
+            result[col] = series.sum(skipna=True)
+        elif col in RATE_STATS and pa_total > 0:
+            result[col] = (series * pa_weight).sum(skipna=True) / pa_total
+        else:
+            result[col] = series.mean(skipna=True)
+    return result
 
 
 @st.cache_data(show_spinner=False, ttl=900)
@@ -261,32 +334,372 @@ def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
     start = min(start_year, end_year)
     end = max(start_year, end_year)
     try:
-        df = batting_stats(start, end, qual=0)
+        df = batting_stats(start, end, qual=0, split_seasons=False)
         if df is not None and not df.empty:
             return df
     except Exception:
         # Fall back silently to per-year fetches
         pass
 
-    # Fallback: fetch each year individually and combine what succeeds (cached per year)
+    chunk_size = 10
     frames = []
     failed_years = []
-    for y in range(start, end + 1):
+    for chunk_start in range(start, end + 1, chunk_size):
+        chunk_end = min(chunk_start + chunk_size - 1, end)
         try:
-            yearly = load_year(y)
-            if yearly is not None and not yearly.empty:
-                frames.append(yearly)
-            else:
-                failed_years.append(y)
+            chunk_df = batting_stats(
+                chunk_start,
+                chunk_end,
+                qual=0,
+                split_seasons=False,
+            )
         except Exception:
-            failed_years.append(y)
+            chunk_df = None
+        if chunk_df is not None and not chunk_df.empty:
+            frames.append(chunk_df)
+            continue
+        for year in range(chunk_start, chunk_end + 1):
+            try:
+                yearly = load_year(year)
+                if yearly is not None and not yearly.empty:
+                    frames.append(yearly)
+                else:
+                    failed_years.append(year)
+            except Exception:
+                failed_years.append(year)
     if frames:
+        combined = pd.concat(frames, ignore_index=True)
+        grouped_rows = []
+        for name, grp in combined.groupby("Name"):
+            row = aggregate_player_group(grp, name)
+            grouped_rows.append(row)
+        aggregated = pd.DataFrame(grouped_rows)
         if failed_years:
             st.info(f"Loaded partial data; skipped years: {', '.join(map(str, failed_years))}")
-        return pd.concat(frames, ignore_index=True)
+        return aggregated
 
     st.error(f"Could not load batting data for {start}-{end}. Please try another span.")
     return pd.DataFrame()
+
+
+def normalize_statcast_name(raw: str) -> str:
+    if not raw or not isinstance(raw, str):
+        return ""
+    cleaned = raw.replace("\xa0", " ").strip()
+    if "," in cleaned:
+        last, first = cleaned.split(",", 1)
+        full = f"{first.strip()} {last.strip()}"
+    else:
+        full = cleaned
+    try:
+        full = unicodedata.normalize("NFKD", full).encode("ascii", "ignore").decode()
+    except Exception:
+        pass
+    return " ".join(full.split())
+
+
+def reorder_savant_name(raw: str) -> str:
+    if not raw or not isinstance(raw, str):
+        return ""
+    raw = raw.replace("\xa0", " ").strip()
+    if "," in raw:
+        last, first = raw.split(",", 1)
+        return f"{first.strip()} {last.strip()}".strip()
+    return raw
+
+
+def fetch_csv(url: str) -> pd.DataFrame:
+    try:
+        resp = requests.get(url, timeout=30)
+        resp.raise_for_status()
+    except Exception:
+        return pd.DataFrame()
+    try:
+        data = io.StringIO(resp.content.decode("utf-8"))
+        df = pd.read_csv(data)
+    except Exception:
+        return pd.DataFrame()
+    return df
+
+
+def load_savant_frv_year(year: int) -> pd.DataFrame:
+    url = (
+        "https://baseballsavant.mlb.com/leaderboard/fielding-run-value?"
+        f"gameType=Regular&seasonStart={year}&seasonEnd={year}"
+        "&type=fielder&position=&minInnings=0&minResults=1&csv=true"
+    )
+    df = fetch_csv(url)
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.rename(
+        columns={
+            "name": "NameRaw",
+            "total_runs": "FRV",
+            "arm_runs": "ARM",
+            "range_runs": "RANGE",
+        }
+    )
+    df["Name"] = df["NameRaw"].apply(reorder_savant_name)
+    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+    for metric in ["FRV", "ARM", "RANGE"]:
+        df[metric] = pd.to_numeric(df.get(metric), errors="coerce")
+    return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
+
+
+def load_savant_oaa_year(year: int) -> pd.DataFrame:
+    try:
+        df = statcast_outs_above_average(year, "all")
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    name_col = None
+    for col in ["player_name", "last_name, first_name", "name"]:
+        if col in df.columns:
+            name_col = col
+            break
+    if not name_col:
+        return pd.DataFrame()
+    if name_col == "last_name, first_name":
+        df["Name"] = df[name_col].apply(reorder_savant_name)
+    else:
+        df["Name"] = df[name_col].astype(str).str.strip()
+    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+    oaa_col = None
+    for col in ["outs_above_average", "oaa"]:
+        if col in df.columns:
+            oaa_col = col
+            break
+    if not oaa_col:
+        return pd.DataFrame()
+    df["OAA"] = pd.to_numeric(df[oaa_col], errors="coerce")
+    return df[["NameKey", "Name", "OAA"]]
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar_dataset() -> pd.DataFrame:
+    try:
+        data = bwar_bat(return_all=False)
+    except Exception:
+        return pd.DataFrame()
+    if data is None or data.empty:
+        return pd.DataFrame()
+    data = data.copy()
+    data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
+    data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
+    if "pitcher" in data.columns:
+        data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
+    data["Name"] = data["name_common"].astype(str).str.strip()
+    data["NameKey"] = data["Name"].apply(normalize_statcast_name)
+    return data[["NameKey", "Name", "year_ID", "WAR"]]
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_bwar_span(
+    start_year: int,
+    end_year: int,
+    target_names: tuple[str, ...] | None = None,
+) -> pd.DataFrame:
+    data = load_bwar_dataset()
+    if data is None or data.empty:
+        return pd.DataFrame()
+    mask = data["year_ID"].between(start_year, end_year)
+    df = data[mask]
+    if df.empty:
+        return pd.DataFrame()
+    if target_names:
+        keys = {normalize_statcast_name(name) for name in target_names if name}
+        df = df[df["NameKey"].isin(keys)]
+        if df.empty:
+            return pd.DataFrame()
+    agg = df.groupby("NameKey", as_index=False).agg({
+        "Name": "first",
+        "WAR": lambda s: s.sum(min_count=1),
+    })
+    agg = agg.rename(columns={"WAR": "bWAR"})
+    return agg
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_statcast_fielding_span(
+    start_year: int,
+    end_year: int,
+    target_names: tuple[str, ...] | None = None,
+) -> pd.DataFrame:
+    start = min(start_year, end_year)
+    end = max(start_year, end_year)
+    start = max(start, STATCAST_FIELDING_START_YEAR)
+    if start > end:
+        return pd.DataFrame()
+    name_filter = None
+    if target_names:
+        name_filter = {normalize_statcast_name(name) for name in target_names if name}
+    name_filter = None
+    if target_names:
+        name_filter = {normalize_statcast_name(name) for name in target_names if name}
+    frames: list[pd.DataFrame] = []
+    for year in range(start, end + 1):
+        frv = load_savant_frv_year(year)
+        oaa = load_savant_oaa_year(year)
+        if (frv is None or frv.empty) and (oaa is None or oaa.empty):
+            continue
+        if frv is None or frv.empty:
+            yearly = oaa.copy()
+        elif oaa is None or oaa.empty:
+            yearly = frv.copy()
+        else:
+            yearly = pd.merge(
+                frv,
+                oaa,
+                on=["NameKey", "Name"],
+                how="outer",
+            )
+        for metric in ["FRV", "OAA", "ARM", "RANGE"]:
+            if metric not in yearly.columns:
+                yearly[metric] = np.nan
+            else:
+                yearly[metric] = pd.to_numeric(yearly[metric], errors="coerce")
+        if name_filter is not None:
+            yearly = yearly[yearly["NameKey"].isin(name_filter)]
+            if yearly.empty:
+                continue
+        frames.append(yearly)
+    if not frames:
+        return pd.DataFrame()
+    combined = pd.concat(frames, ignore_index=True)
+    def pick_name(series: pd.Series) -> str:
+        for val in series:
+            if isinstance(val, str) and val.strip():
+                return val
+        return ""
+    agg = combined.groupby("NameKey", as_index=False).agg({
+        "Name": pick_name,
+        "FRV": lambda s: s.sum(min_count=1),
+        "OAA": lambda s: s.sum(min_count=1),
+        "ARM": lambda s: s.sum(min_count=1),
+        "RANGE": lambda s: s.sum(min_count=1),
+    })
+    return agg
+
+
+def normalize_display_team(team_value: str) -> str:
+    return compute_team_display([team_value]) if team_value else "N/A"
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> pd.Series | None:
+    try:
+        df = batting_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
+    except Exception:
+        df = None
+    if df is not None and not df.empty:
+        row = df.iloc[0].copy()
+        row["TeamDisplay"] = normalize_display_team(str(row.get("Team", "")).strip())
+        row["Name"] = str(row.get("Name", "")).strip()
+        return row
+    frames = []
+    for year in range(start_year, end_year + 1):
+        try:
+            yearly = batting_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
+        except Exception:
+            yearly = None
+        if yearly is not None and not yearly.empty:
+            frames.append(yearly)
+    if not frames:
+        return None
+    combined = pd.concat(frames, ignore_index=True)
+    aggregated = aggregate_player_group(combined)
+    return pd.Series(aggregated)
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
+    try:
+        df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
+    except Exception:
+        df = None
+    if df is None or df.empty:
+        frames = []
+        for year in range(start_year, end_year + 1):
+            try:
+                yearly = fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
+            except Exception:
+                yearly = None
+            if yearly is not None and not yearly.empty:
+                frames.append(yearly)
+        if not frames:
+            return {}
+        df = pd.concat(frames, ignore_index=True)
+    result: dict[str, float] = {}
+    for key in ["DRS", "UZR", "FRM"]:
+        if key in df.columns:
+            series = pd.to_numeric(df[key], errors="coerce")
+            if not series.isna().all():
+                result[key] = series.sum(skipna=True)
+    return result
+
+
+def build_player_profile(fg_id: int, start_year: int, end_year: int) -> pd.Series | None:
+    batting = load_player_batting_profile(fg_id, start_year, end_year)
+    if batting is None:
+        return None
+    fielding = load_player_fielding_profile(fg_id, start_year, end_year)
+    for key, val in fielding.items():
+        batting[key] = val
+    name_key = normalize_statcast_name(str(batting.get("Name", "")))
+    if name_key:
+        statcast = load_statcast_fielding_span(start_year, end_year, target_names=(name_key,))
+        if statcast is not None and not statcast.empty:
+            match = statcast[statcast["NameKey"] == name_key]
+            if not match.empty:
+                for metric in ["FRV", "OAA", "ARM", "RANGE"]:
+                    value = pd.to_numeric(match[metric].iloc[0], errors="coerce") if metric in match.columns else np.nan
+                    batting[metric] = value
+        bwar = load_bwar_span(start_year, end_year, target_names=(name_key,))
+        if bwar is not None and not bwar.empty:
+            match_bwar = bwar[bwar["NameKey"] == name_key]
+            if not match_bwar.empty:
+                batting["bWAR"] = pd.to_numeric(match_bwar["bWAR"].iloc[0], errors="coerce")
+    for metric in FIELDING_STATS:
+        if metric not in batting.index:
+            batting[metric] = np.nan
+        else:
+            batting[metric] = pd.to_numeric(batting[metric], errors="coerce")
+    return batting
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def lookup_fg_id_by_name(full_name: str) -> int | None:
+    if not full_name or not isinstance(full_name, str):
+        return None
+    tokens = full_name.strip().replace(".", "").split()
+    suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
+    while tokens and tokens[-1].lower() in suffixes:
+        tokens.pop()
+    if len(tokens) < 2:
+        return None
+    last = tokens[-1]
+    first = " ".join(tokens[:-1])
+    try:
+        lookup = playerid_lookup(last, first)
+    except Exception:
+        return None
+    if lookup is None or lookup.empty or "key_fangraphs" not in lookup.columns:
+        return None
+    val = lookup["key_fangraphs"].dropna()
+    if val.empty:
+        return None
+    fg_id = int(val.iloc[0])
+    return fg_id if fg_id > 0 else None
+
+
+def resolve_player_fg_id(name: str, pool_df: pd.DataFrame | None) -> int | None:
+    if pool_df is not None and not pool_df.empty and "IDfg" in pool_df.columns:
+        ids = pool_df.loc[pool_df["Name"] == name, "IDfg"].dropna().astype(int)
+        if not ids.empty:
+            return int(ids.iloc[0])
+    return lookup_fg_id_by_name(name)
 
 
 @st.cache_data(show_spinner=False)
@@ -567,17 +980,6 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
         return slugs
 
     target_clean = clean_name(name)
-    if target_clean:
-        override = HEADSHOT_OVERRIDES.get(target_clean.upper())
-        if override:
-            headshot = build_mlb_headshot(override)
-            if headshot:
-                return headshot
-        bref_override = HEADSHOT_BREF_OVERRIDES.get(target_clean.upper())
-        if bref_override:
-            bref_url = resolve_bref_headshot(bref_override)
-            if bref_url:
-                return bref_url
 
     candidate_cols = [
         "mlbamid", "MLBID", "mlbam_id", "mlbam", "key_mlbam", "MLBAMID", "playerid"
@@ -643,44 +1045,6 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
     return HEADSHOT_PLACEHOLDER
 
 
-def get_player_row(df: pd.DataFrame, name: str) -> pd.Series | None:
-    data = (
-        df[df["Name"] == name]
-        .sort_values("PA", ascending=False)
-        .head(1)
-    )
-    return data.squeeze() if not data.empty else None
-
-
-def get_team_display(df: pd.DataFrame, player_name: str) -> str:
-    # If we carried an explicit display value through aggregation, prefer it
-    if "TeamDisplay" in df.columns:
-        vals = df.loc[df["Name"] == player_name, "TeamDisplay"].dropna().astype(str)
-        if not vals.empty:
-            return vals.iloc[0]
-
-    player_teams_raw = (
-        df[df["Name"] == player_name]["Team"]
-        .dropna()
-        .astype(str)
-        .str.upper()
-        .unique()
-        .tolist()
-    )
-    placeholders = {"TOT", "- - -", "---", "--", ""}
-    player_teams = [t for t in player_teams_raw if t not in placeholders]
-    if not player_teams:
-        if "- - -" in player_teams_raw:
-            player_teams = ["2+ Tms"]
-        elif "TOT" in player_teams_raw:
-            player_teams = ["TOT"]
-        else:
-            player_teams = [str(df.loc[df["Name"] == player_name, "Team"].iloc[0]).upper()]
-    if len(player_teams) > 1:
-        return f"{len(player_teams)} Tms"
-    return player_teams[0]
-
-
 # --------------------- Layout containers ---------------------
 left_col, right_col = st.columns([1.2, 1.55])
 
@@ -711,8 +1075,18 @@ with controls_container:
             return 1
         return abs(end_int - start_int) + 1
 
-    span_a_guess = span_len(st.session_state.get(single_a_key, True), "comp_year_a_start", "comp_year_a_end", single_year_a_key)
-    span_b_guess = span_len(st.session_state.get(single_b_key, True), "comp_year_b_start", "comp_year_b_end", single_year_b_key)
+    span_a_guess = span_len(
+        st.session_state.get(single_a_key, True),
+        "comp_year_a_start",
+        "comp_year_a_end",
+        single_year_a_key,
+    )
+    span_b_guess = span_len(
+        st.session_state.get(single_b_key, True),
+        "comp_year_b_start",
+        "comp_year_b_end",
+        single_year_b_key,
+    )
     dynamic_min_pa_default = max(span_a_guess, span_b_guess, 1) * 300 if max(span_a_guess, span_b_guess, 1) > 1 else min_pa_default
 
     min_pa = st.number_input(
@@ -788,74 +1162,26 @@ def prep_df(start_year: int, end_year: int) -> pd.DataFrame:
     frame = load_batting(start_year, end_year).copy()
     if frame is None or frame.empty:
         return frame
-    frame["PA"] = pd.to_numeric(frame["PA"], errors="coerce")
-    frame["Team"] = frame["Team"].astype(str).str.upper()
-    frame["Name"] = frame["Name"].astype(str).str.strip()
-    if "Contact%" in frame.columns:
-        contact = pd.to_numeric(frame["Contact%"], errors="coerce")
-        needs_percent_scale = contact.dropna().abs().le(1).mean() > 0.9 if contact.notna().any() else False
-        if needs_percent_scale:
-            contact = contact * 100
-        frame["Contact%"] = contact
-        frame["Whiff%"] = 100 - contact
-    else:
-        frame["Whiff%"] = np.nan
-    # Aggregate across multiple years so we don't just pick the single highest-PA season
-    if start_year != end_year:
-        # Columns we should sum (counting stats, WAR components)
-        sum_stats = {
-            "G", "PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "SB", "CS",
-            "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-            "WAR", "Off", "Def", "BsR",
-        }
-        # Columns to PA-weight average (rates and percentages)
-        rate_stats = {
-            "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
-            "wOBA", "xwOBA", "xBA", "xSLG", "wRC+",
-            "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "Whiff%",
-            "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
-            "LA", "EV", "MaxEV",
-        }
-
-        numeric_cols = [col for col in frame.columns if pd.api.types.is_numeric_dtype(frame[col])]
-        groups = []
-        for name, grp in frame.groupby("Name"):
-            team_vals = grp["Team"].dropna().astype(str).str.upper().tolist()
-            placeholders = {"TOT", "- - -", "---", "--", ""}
-            valid_teams = [t for t in team_vals if t not in placeholders]
-            unique_valid = sorted(set(valid_teams))
-            if not unique_valid and "TOT" in team_vals:
-                team_display = "TOT"
-            elif not unique_valid:
-                team_display = "N/A"
-            elif len(unique_valid) == 1:
-                team_display = unique_valid[0]
-            else:
-                team_display = f"{len(unique_valid)} Tms"
-
-            row = {"Name": name, "Team": team_display, "TeamDisplay": team_display}
-            pa_weight = grp["PA"].fillna(0)
-            pa_total = pa_weight.sum()
-            for col in numeric_cols:
-                series = grp[col]
-                if col in sum_stats:
-                    row[col] = series.sum(skipna=True)
-                elif col in rate_stats and pa_total > 0:
-                    row[col] = (series * pa_weight).sum(skipna=True) / pa_total
-                else:
-                    row[col] = series.mean(skipna=True)
-            groups.append(row)
-        frame = pd.DataFrame(groups)
-    return frame
+    subset_cols = ["IDfg", "Name", "Team", "PA"]
+    missing = [col for col in subset_cols if col not in frame.columns]
+    if missing:
+        st.error("Required columns missing from batting data.")
+        return pd.DataFrame()
+    result = frame[subset_cols].copy()
+    result["PA"] = pd.to_numeric(result["PA"], errors="coerce")
+    result["Team"] = result["Team"].astype(str).str.upper()
+    result["Name"] = result["Name"].astype(str).str.strip()
+    result["TeamDisplay"] = result["Team"].apply(lambda t: compute_team_display([t]))
+    return result
 
 
 with loading_placeholder.container():
     with st.spinner("Loading player data..."):
-        df_a = prep_df(*range_a)
-        df_b = prep_df(*range_b)
+        pool_df_a = prep_df(*range_a)
+        pool_df_b = prep_df(*range_b)
 loading_placeholder.empty()
 
-if df_a is None or df_a.empty or df_b is None or df_b.empty:
+if pool_df_a is None or pool_df_a.empty or pool_df_b is None or pool_df_b.empty:
     st.error("No data returned from pybaseball for one of the seasons.")
     st.stop()
 
@@ -863,8 +1189,17 @@ def eligible_players(df: pd.DataFrame) -> pd.DataFrame:
     eligible = df[df["PA"] >= min_pa].copy()
     return eligible if not eligible.empty else df.copy()
 
-eligible_a = eligible_players(df_a)
-eligible_b = eligible_players(df_b)
+def ensure_selection_present(options: list[str], pool: pd.DataFrame, state_key: str) -> list[str]:
+    selected = st.session_state.get(state_key)
+    if not selected or selected in options or pool is None or pool.empty:
+        return options
+    available = pool["Name"].astype(str).tolist()
+    if selected in available:
+        return [selected] + options
+    return options
+
+eligible_a = eligible_players(pool_df_a)
+eligible_b = eligible_players(pool_df_b)
 
 player_options_a = (
     eligible_a.sort_values(["Name", "PA"], ascending=[True, False])
@@ -872,35 +1207,28 @@ player_options_a = (
     .sort_values("Name")["Name"]
     .tolist()
 )
+player_options_a = ensure_selection_present(player_options_a, pool_df_a, "comp_player_a")
 player_options_b = (
     eligible_b.sort_values(["Name", "PA"], ascending=[True, False])
     .drop_duplicates(subset=["Name"], keep="first")
     .sort_values("Name")["Name"]
     .tolist()
 )
+player_options_b = ensure_selection_present(player_options_b, pool_df_b, "comp_player_b")
 
 if not player_options_a or not player_options_b:
     st.error("No players available to display.")
     st.stop()
 
-default_a = st.session_state.get("comp_player_a")
-if default_a not in player_options_a:
-    default_a = player_options_a[0]
-    st.session_state["comp_player_a"] = default_a
-
-default_b = st.session_state.get("comp_player_b")
-if default_b not in player_options_b:
-    default_b = player_options_b[1] if len(player_options_b) > 1 else player_options_b[0]
-    st.session_state["comp_player_b"] = default_b
-
-# Ensure session state is initialized before rendering widgets to avoid Streamlit warning
+# Ensure session state is initialized and selections remain stable
 if "comp_player_a" not in st.session_state:
-    st.session_state["comp_player_a"] = default_a
-if "comp_player_b" not in st.session_state:
-    st.session_state["comp_player_b"] = default_b
-if st.session_state["comp_player_a"] not in player_options_a:
     st.session_state["comp_player_a"] = player_options_a[0]
-if st.session_state["comp_player_b"] not in player_options_b:
+elif st.session_state["comp_player_a"] not in player_options_a:
+    st.session_state["comp_player_a"] = player_options_a[0]
+
+if "comp_player_b" not in st.session_state:
+    st.session_state["comp_player_b"] = player_options_b[1] if len(player_options_b) > 1 else player_options_b[0]
+elif st.session_state["comp_player_b"] not in player_options_b:
     st.session_state["comp_player_b"] = player_options_b[1] if len(player_options_b) > 1 else player_options_b[0]
 
 with controls_container:
@@ -910,14 +1238,23 @@ with controls_container:
     with sel_b_col:
         player_b = st.selectbox("Player B", player_options_b, key="comp_player_b")
 
-player_a_row = get_player_row(df_a, player_a)
-player_b_row = get_player_row(df_b, player_b)
+player_a_fg_id = resolve_player_fg_id(player_a, pool_df_a)
+player_b_fg_id = resolve_player_fg_id(player_b, pool_df_b)
+player_a_row = build_player_profile(player_a_fg_id, *range_a) if player_a_fg_id else None
+player_b_row = build_player_profile(player_b_fg_id, *range_b) if player_b_fg_id else None
 if player_a_row is None or player_b_row is None:
     st.error("Could not load data for one of the selected players.")
     st.stop()
 
-player_a_team = get_team_display(df_a, player_a)
-player_b_team = get_team_display(df_b, player_b)
+df_a = pd.DataFrame([player_a_row])
+df_b = pd.DataFrame([player_b_row])
+for metric in FIELDING_STATS:
+    if metric in df_a.columns:
+        df_a[metric] = pd.to_numeric(df_a[metric], errors="coerce")
+    if metric in df_b.columns:
+        df_b[metric] = pd.to_numeric(df_b[metric], errors="coerce")
+player_a_team = player_a_row.get("TeamDisplay", normalize_display_team(player_a_row.get("Team", "")))
+player_b_team = player_b_row.get("TeamDisplay", normalize_display_team(player_b_row.get("Team", "")))
 year_a_label = f"{range_a[0]}" if range_a[0] == range_a[1] else f"{range_a[0]}-{range_a[1]}"
 year_b_label = f"{range_b[0]}" if range_b[0] == range_b[1] else f"{range_b[0]}-{range_b[1]}"
 player_a_col_label = player_a
@@ -1282,7 +1619,13 @@ def format_stat(stat: str, val) -> str:
         return ""
 
     upper_stat = stat.upper()
-    if upper_stat in {"WAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    if upper_stat == "FRV":
+        return f"{int(round(float(val)))}"
+
+    if upper_stat == "ARM":
+        return f"{int(round(float(val)))}"
+
+    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
         v = float(val)
         if abs(v - round(v)) < 1e-9:
             return f"{int(round(v))}.0"
@@ -1315,6 +1658,7 @@ label_map = {
     "HardHit%": "Hard Hit%",
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",
+    "ARM": "Arm Value",
 }
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
 
@@ -1325,12 +1669,11 @@ for stat in stats_order:
         continue
     a_val = player_a_row.get(stat, np.nan)
     b_val = player_b_row.get(stat, np.nan)
-    if pd.isna(a_val) and pd.isna(b_val):
-        continue
-
     raw_label = label_map.get(stat, stat)
 
-    if pd.isna(a_val):
+    if pd.isna(a_val) and pd.isna(b_val):
+        winner = None
+    elif pd.isna(a_val):
         winner = player_b_col_label
     elif pd.isna(b_val):
         winner = player_a_col_label
