@@ -849,11 +849,11 @@ def prep_df(start_year: int, end_year: int) -> pd.DataFrame:
     return frame
 
 
-with st.spinner("Loading player data..."):
-    loading_placeholder.markdown("<div style='text-align:right; color:#7b0d0d; font-weight:700;'>Loading player data...</div>", unsafe_allow_html=True)
-    df_a = prep_df(*range_a)
-    df_b = prep_df(*range_b)
-    loading_placeholder.empty()
+with loading_placeholder.container():
+    with st.spinner("Loading player data..."):
+        df_a = prep_df(*range_a)
+        df_b = prep_df(*range_b)
+loading_placeholder.empty()
 
 if df_a is None or df_a.empty or df_b is None or df_b.empty:
     st.error("No data returned from pybaseball for one of the seasons.")
@@ -920,6 +920,15 @@ player_a_team = get_team_display(df_a, player_a)
 player_b_team = get_team_display(df_b, player_b)
 year_a_label = f"{range_a[0]}" if range_a[0] == range_a[1] else f"{range_a[0]}-{range_a[1]}"
 year_b_label = f"{range_b[0]}" if range_b[0] == range_b[1] else f"{range_b[0]}-{range_b[1]}"
+player_a_col_label = player_a
+player_b_col_label = player_b
+if player_a_col_label == player_b_col_label:
+    if year_a_label != year_b_label:
+        player_a_col_label = f"{player_a} ({year_a_label})"
+        player_b_col_label = f"{player_b} ({year_b_label})"
+    else:
+        player_a_col_label = f"{player_a} (Player A)"
+        player_b_col_label = f"{player_b} (Player B)"
 
 # --------------------- Stat builder setup ---------------------
 stat_exclusions = {"Season"}
@@ -1322,20 +1331,20 @@ for stat in stats_order:
     raw_label = label_map.get(stat, stat)
 
     if pd.isna(a_val):
-        winner = player_b
+        winner = player_b_col_label
     elif pd.isna(b_val):
-        winner = player_a
+        winner = player_a_col_label
     else:
         better = a_val < b_val if stat in lower_better else a_val > b_val
         if a_val == b_val:
             winner = "Tie"
         else:
-            winner = player_a if better else player_b
+            winner = player_a_col_label if better else player_b_col_label
 
     comparison_rows.append({
         "Stat": raw_label,
-        player_a: format_stat(stat, a_val),
-        player_b: format_stat(stat, b_val),
+        player_a_col_label: format_stat(stat, a_val),
+        player_b_col_label: format_stat(stat, b_val),
     })
     winner_map[raw_label] = winner
 
@@ -1379,10 +1388,10 @@ with right_col:
             raw_label = str(row["Stat"])
             stat_label = esc(raw_label)
             best = winner_map.get(raw_label)
-            a_class = "best" if best in {player_a, "Tie"} else ""
-            b_class = "best" if best in {player_b, "Tie"} else ""
-            a_val = esc(str(row[player_a]))
-            b_val = esc(str(row[player_b]))
+            a_class = "best" if best in {player_a_col_label, "Tie"} else ""
+            b_class = "best" if best in {player_b_col_label, "Tie"} else ""
+            a_val = esc(str(row[player_a_col_label]))
+            b_val = esc(str(row[player_b_col_label]))
             rows.extend([
                 "      <tr>",
                 f"        <td class=\"{a_class}\">{a_val}</td>",
