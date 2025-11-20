@@ -30,9 +30,17 @@ def safe_aggrid(df, **kwargs):
     Retries AG Grid loading up to 3 times to avoid Streamlit component
     handshake failures in production environments like Cloud Run.
     """
+    class _DFProxy(pd.DataFrame):
+        @property
+        def _constructor(self):
+            return _DFProxy
+        def __bool__(self):
+            return True
+
+    data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df
     for attempt in range(3):
         try:
-            return AgGrid(df, **kwargs)
+            return AgGrid(data_arg, **kwargs)
         except Exception:
             if attempt == 2:
                 raise  # rethrow after last attempt
