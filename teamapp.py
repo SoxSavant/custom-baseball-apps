@@ -38,11 +38,6 @@ def safe_aggrid(df, **kwargs):
             return True
 
     data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df
-    # Avoid double-supplying data when GridOptions already contains rowData.
-    if data_arg is not None and "gridOptions" in kwargs:
-        grid_opts = dict(kwargs["gridOptions"])
-        grid_opts.pop("rowData", None)
-        kwargs = {**kwargs, "gridOptions": grid_opts}
     for attempt in range(3):
         try:
             return AgGrid(data_arg, **kwargs)
@@ -874,12 +869,14 @@ with stat_builder_container:
         autoHeight=True,
         flex=1,
     )
+    grid_options = gb.build()
+    grid_options.pop("rowData", None)
     grid_height = min(480, 90 + len(stat_config_df) * 44)
     grid_key = f"stat_builder_grid_{st.session_state.get(stat_version_key, 0)}"
     time.sleep(0.1)
     grid_response = safe_aggrid(
         stat_config_df,
-        gridOptions=gb.build(),
+        gridOptions=grid_options,
         height=grid_height,
         theme=GRID_THEME,
         custom_css=GRID_CUSTOM_CSS,
