@@ -25,29 +25,50 @@ from st_aggrid import (
 
 def safe_aggrid(df, **kwargs):
     """
-    Retries AG Grid loading up to 3 times to avoid Streamlit component
-    handshake failures in production environments like Cloud Run.
+    Ensures AG Grid never sees rowData twice and retries handshake failures.
     """
+    # 1. DEFINE PROXY CLASS (REQUIRED to handle Streamlit/Pandas ambiguity)
     class _DFProxy(pd.DataFrame):
         @property
         def _constructor(self):
             return _DFProxy
         def __bool__(self):
             return True
-
-    grid_opts = kwargs.get("gridOptions", {})
-    if "rowData" in grid_opts and grid_opts["rowData"] is not None:
-        grid_opts["rowData"] = None
-    kwargs["gridOptions"] = grid_opts
-
+            
+    # 2. WRAP DATA
     data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df
+    
+    # 3. ISOLATE and CLEAN gridOptions from kwargs
+    gridOptions = kwargs.pop("gridOptions", {}) # Pull gridOptions out of kwargs
+    
+    if gridOptions:
+        # Crucial: Copy the dictionary before modifying it
+        cleaned_gridOptions = dict(gridOptions) 
+        # Crucial: Delete the 'rowData' key if it exists to resolve the ValueError
+        cleaned_gridOptions.pop("rowData", None) 
+    else:
+        cleaned_gridOptions = None
+
+    # 4. EXECUTE AGGRID with retry logic
     for attempt in range(3):
         try:
-            return AgGrid(data=data_arg, **kwargs)
-        except Exception:
+            return AgGrid(
+                data=data_arg,                # Data passed cleanly here
+                gridOptions=cleaned_gridOptions, # Cleaned options passed here
+                **kwargs                      # All other keyword arguments passed here
+            )
+        except ValueError as e:
+            # Re-raise error if it's NOT the handshake/retryable error
+            if "not found in dataframe" in str(e).lower():
+                 # Example of an exception that is not a component failure
+                 raise
+            if "rowData" not in str(e).lower() and "dataframe must" not in str(e).lower():
+                raise
+            
+            # This is a handshake failure, retry
             if attempt == 2:
-                raise  # rethrow after last attempt
-            time.sleep(0.3)
+                raise # Re-raise on final failure
+            time.sleep(0.25)
 
 
 
