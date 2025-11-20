@@ -10,30 +10,10 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 from io import BytesIO
-os.environ.setdefault("AGGRID_RELEASE", "True")
 from pybaseball import batting_stats, fielding_stats, bwar_bat
 from datetime import date
-from st_aggrid import (
-    AgGrid,
-    GridOptionsBuilder,
-    GridUpdateMode,
-    DataReturnMode,
-    JsCode,
-)
 
 
-def safe_aggrid(df, **kwargs):
-    """
-    Retries AG Grid loading up to 3 times to avoid Streamlit component
-    handshake failures in production environments like Cloud Run.
-    """
-    for attempt in range(3):
-        try:
-            return AgGrid(df, **kwargs)
-        except Exception:
-            if attempt == 2:
-                raise  # rethrow after last attempt
-            time.sleep(0.3)
 
 
 GRID_THEME = "balham"
@@ -459,36 +439,7 @@ add_reset_key = "reset_add_select"
 remove_reset_key = "reset_remove_select"
 stat_version_key = "stat_config_version"
 
-# --- AG Grid Checkbox Renderer JS ---
-show_checkbox_renderer = JsCode(
-    """
-    class ShowCheckboxRenderer {
-        init(params) {
-            this.params = params;
-            this.eGui = document.createElement('div');
-            this.eGui.style.display = 'flex';
-            this.eGui.style.justifyContent = 'center';
-            this.eGui.style.alignItems = 'center';
-            this.eGui.style.height = '100%';
-            this.eGui.style.width = '100%';
-            this.checkbox = document.createElement('input');
-            this.checkbox.type = 'checkbox';
-            this.checkbox.checked = Boolean(params.value);
-            this.checkbox.addEventListener('change', () => {
-                params.node.setDataValue(params.column.colId, this.checkbox.checked);
-            });
-            this.eGui.appendChild(this.checkbox);
-        }
-        getGui() {
-            return this.eGui;
-        }
-        refresh(params) {
-            this.checkbox.checked = Boolean(params.value);
-            return true;
-        }
-    }
-    """
-)
+
 # --- End AG Grid Checkbox Renderer JS ---
 
 # --- Callbacks ---
@@ -694,112 +645,10 @@ with stat_builder_container:
     )
     stat_config_df.insert(0, "Drag", ["↕"] * len(stat_config_df))
 
-    gb = GridOptionsBuilder.from_dataframe(stat_config_df)
-    gb.configure_default_column(
-        editable=True,
-        filter=False,
-        sortable=False,
-        resizable=True,
-    )
-    gb.configure_selection(selection_mode="disabled", use_checkbox=False)
-    gb.configure_grid_options(
-        rowDragManaged=True,
-        rowDragMultiRow=True,
-        rowDragEntireRow=True,
-        animateRows=True,
-        suppressMovableColumns=True,
-        suppressRowClickSelection=True,
-        singleClickEdit=True,
-        stopEditingWhenCellsLoseFocus=True,
-    )
-    gb.configure_column(
-        "Drag",
-        header_name="",
-        rowDrag=True,
-        editable=False,
-        width=70,
-        suppressMenu=True,
-        suppressSizeToFit=True,
-    )
-    gb.configure_column(
-        "Show",
-        header_name="Show",
-        cellRenderer=show_checkbox_renderer,
-        editable=False,
-        width=100,
-        suppressMenu=True,
-    )
-    gb.configure_column(
-        "Stat",
-        header_name="Stat",
-        cellEditor="agSelectCellEditor",
-        cellEditorParams={"values": allowed_add_stats or stat_options},
-        wrapText=True,
-        autoHeight=True,
-        flex=1,
-    )
-    grid_height = min(480, 90 + len(stat_config_df) * 44)
-    grid_key = f"stat_builder_grid_{st.session_state.get(stat_version_key, 0)}"
-    grid_response = safe_aggrid(
-        stat_config_df,
-        gridOptions=gb.build(),
-        height=grid_height,
-        theme=GRID_THEME,
-        custom_css=GRID_CUSTOM_CSS,
-        data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=True,
-        fit_columns_on_grid_load=True,
-        update_mode=GridUpdateMode.MODEL_CHANGED,
-        allow_unsafe_jscode=True,
-        enable_enterprise_modules=False,
-        key=grid_key,
-        update_on=["rowDragEnd", "cellValueChanged"], 
-    )
 
-grid_records = None
-if grid_response and grid_response.data is not None:
-    if isinstance(grid_response.data, pd.DataFrame):
-        grid_df = grid_response.data.copy()
-    else:
-        grid_df = pd.DataFrame(grid_response.data)
-    if "Drag" in grid_df.columns:
-        grid_df = grid_df.drop(columns=["Drag"])
-    if "Stat" in grid_df.columns:
-        # Drop AG Grid placeholder rows that have no stat selected
-        grid_df = grid_df[grid_df["Stat"].astype(str).str.strip().ne("")]
-    grid_records = grid_df.to_dict("records")
 
-# ... (code up to line 664, after grid_records is defined)
 
-manual_override = st.session_state.pop(manual_stat_update_key, False)
 
-# Convert current_stat_config to records for comparison
-current_config_records = [{k: v for k, v in row.items() if k in ["Stat", "Show"]} for row in current_stat_config]
-
-# Determine if the grid data is identical to the current state data
-is_config_identical = (
-    grid_records is not None and 
-    len(grid_records) == len(current_config_records) and 
-    all(a["Stat"] == b["Stat"] and a["Show"] == b["Show"] for a, b in zip(grid_records, current_config_records))
-)
-
-if manual_override:
-    # 1. If add/remove was used, the state is already correct from the callback
-    cleaned_config = current_stat_config.copy()
-elif grid_records and not is_config_identical:
-    # 2. If grid data exists AND it is DIFFERENT from the current state, 
-    #    assume the user edited/dragged and update the state.
-    cleaned_config = normalize_stat_rows(grid_records, preset_base_config)
-else:
-    # 3. Otherwise (Min PA/Team change), stick with the existing state order
-    cleaned_config = current_stat_config.copy()
-
-st.session_state[stat_state_key] = cleaned_config
-
-stats_order = [row["Stat"] for row in cleaned_config if row.get("Show", True)]
-if not stats_order:
-    st.info("Add at least one stat and mark it as shown to build the chart.")
-    st.stop()
 
 # --------------------- Formatting ---------------------
 def format_stat(stat: str, val) -> str:

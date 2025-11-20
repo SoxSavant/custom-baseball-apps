@@ -1,4 +1,3 @@
-import json
 import os
 import time
 import unicodedata
@@ -10,68 +9,15 @@ from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO, StringIO
 from datetime import date
 from pathlib import Path
-import re
 import requests
-os.environ.setdefault("AGGRID_RELEASE", "True")
-from pybaseball import batting_stats, fielding_stats
+from pybaseball import batting_stats, fielding_stats, bwar_bat, playerid_lookup
 from pybaseball.statcast_fielding import statcast_outs_above_average
-from st_aggrid import (
-    AgGrid,
-    GridOptionsBuilder,
-    GridUpdateMode,
-    DataReturnMode,
-)
-
-
-
-
-
-GRID_THEME = "balham"
-GRID_CUSTOM_CSS = {
-    ".ag-root-wrapper": {"border": "1px solid #2d2d2d"},
-    ".ag-root": {"background-color": "#1b1b1d"},
-    ".ag-header": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
-    ".ag-header-row": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
-    ".ag-row": {"color": "#e0e0e0"},
-    ".ag-row-odd": {"background-color": "#1f1f1f"},
-    ".ag-row-even": {"background-color": "#242424"},
-    ".ag-center-cols-viewport": {"background-color": "#1b1b1d"},
-    ".ag-body-viewport": {"background-color": "#1b1b1d"},
-    ".ag-center-cols-container": {"background-color": "#1b1b1d"},
-    ".ag-body-horizontal-scroll-viewport": {"background-color": "#1b1b1d"},
-    ".ag-body-vertical-scroll-viewport": {"background-color": "#1b1b1d"},
-    ".ag-rich-select-popup": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
-    ".ag-rich-select-list": {"background-color": "#1b1b1d"},
-    ".ag-virtual-list-viewport": {"background-color": "#1b1b1d"},
-    ".ag-list-item": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
-    ".ag-list-item.ag-active-item": {"background-color": "#2c2c2c", "color": "#f0f0f0"},
-    ".ag-rich-select-value": {"color": "#f0f0f0"},
-}
 
 plt.rcdefaults()
 
 st.set_page_config(page_title="Custom Savant Page App", layout="wide")
 
-st.markdown(
-    """
-    <style>
-        [data-testid="stToolbar"] {visibility: hidden;}
-        [data-testid="stDecoration"] {display: none;}
-        [data-testid="stStatusWidget"] {display: none;}
-        .viewerBadge_link__qRi_k {display: none;}
-        /* Hide slider end labels */
-        [data-testid="stTickBarMin"],
-        [data-testid="stTickBarMax"] {display: none;}
-        /* Keep row selector column hidden without touching data columns */
-        div.ag-header-cell[col-id="ag-RowSelector"],
-        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
-        div.ag-center-cols-container [col-id="ag-RowSelector"] {
-            display: none !important;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
@@ -81,13 +27,14 @@ with meta_col:
         """
         <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
-            <span style="color: #aaa;">(v 1.0)</span>
+            <span style="color: #aaa;">(v 1.2)</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
+STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
 
 STAT_PRESETS = {
     "Statcast": [
@@ -112,9 +59,6 @@ STAT_PRESETS = {
         "FRV",
         "OAA",
         "ARM",
-        "TZ",
-        "UZR",
-        "FRM",
     ],
     "Standard": [
         "bWAR",
@@ -161,20 +105,13 @@ STAT_ALLOWLIST = [
     "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
 ]
 
-FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM"]
+FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE"]
 STATCAST_FIELDING_START_YEAR = 2016
 LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 
 def normalize_name_key(val: str) -> str:
-    if val is None:
-        return ""
-    txt = str(val).strip()
-    try:
-        txt = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode()
-    except Exception:
-        pass
-    return " ".join(txt.split()).lower()
+    return normalize_statcast_name(val)
 
 
 def local_bwar_signature() -> float:
@@ -184,87 +121,21 @@ def local_bwar_signature() -> float:
         return 0.0
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_local_bwar_data():
-    path = LOCAL_BWAR_FILE
-    if not path.exists():
-        return pd.DataFrame()
+def normalize_statcast_name(raw: str) -> str:
+    if not raw or not isinstance(raw, str):
+        return ""
+    cleaned = raw.replace("\xa0", " ").strip()
+    if "," in cleaned:
+        last, first = cleaned.split(",", 1)
+        full = f"{first.strip()} {last.strip()}"
+    else:
+        full = cleaned
     try:
-        df = pd.read_csv(path)
+        full = unicodedata.normalize("NFKD", full).encode("ascii", "ignore").decode()
     except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    pitcher_col = df.get("pitcher")
-    if pitcher_col is not None:
-        pitcher_mask = (
-            pitcher_col.astype(str)
-            .str.strip()
-            .str.upper()
-            .isin({"Y", "1", "TRUE"})
-        )
-        df = df[~pitcher_mask]
-    df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_name_key)
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["WAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    df = df.dropna(subset=["NameKey", "year_ID", "WAR"])
-    return df[["NameKey", "Name", "year_ID", "WAR"]]
+        pass
+    return " ".join(full.split())
 
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
-    _ = local_sig
-    frames: list[pd.DataFrame] = []
-
-    local = load_local_bwar_data()
-    if local is not None and not local.empty:
-        frames.append(local)
-
-    if not frames:
-        return pd.DataFrame()
-
-    combined = pd.concat(frames, ignore_index=True)
-    combined = combined.dropna(subset=["NameKey", "year_ID", "WAR"])
-    combined = combined.sort_values(["NameKey", "year_ID"])
-    combined = combined.drop_duplicates(subset=["NameKey", "year_ID"], keep="last")
-    combined = combined.rename(columns={"WAR": "bWAR"})
-    return combined.reset_index(drop=True)
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def load_bwar_for_year(year: int) -> pd.DataFrame:
-    data = load_bwar_dataset(local_bwar_signature())
-    if data is None or data.empty:
-        return pd.DataFrame()
-    df_year = data[pd.to_numeric(data["year_ID"], errors="coerce") == year].copy()
-    if df_year.empty:
-        return pd.DataFrame()
-    agg = df_year.groupby("NameKey", as_index=False).agg({
-        "bWAR": lambda s: s.sum(min_count=1),
-        "Name": "first",
-    })
-    return agg
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def load_fielding_year(year: int) -> pd.DataFrame:
-    try:
-        df = fielding_stats(year, year, qual=0, split_seasons=False)
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    df["NameKey"] = df["Name"].astype(str).apply(normalize_name_key)
-    for col in FIELDING_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-        else:
-            df[col] = np.nan
-    agg = df.groupby(["NameKey"], as_index=False)[FIELDING_COLS].sum(min_count=1)
-    return agg
 
 
 def reorder_savant_name(raw: str) -> str:
@@ -309,7 +180,7 @@ def load_savant_frv_year(year: int) -> pd.DataFrame:
         }
     )
     df["Name"] = df["NameRaw"].apply(reorder_savant_name)
-    df["NameKey"] = df["Name"].apply(normalize_name_key)
+    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
     for metric in ["FRV", "ARM", "RANGE"]:
         df[metric] = pd.to_numeric(df.get(metric), errors="coerce")
     return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
@@ -334,7 +205,7 @@ def load_savant_oaa_year(year: int) -> pd.DataFrame:
         df["Name"] = df[name_col].apply(reorder_savant_name)
     else:
         df["Name"] = df[name_col].astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_name_key)
+    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
     oaa_col = None
     for col in ["outs_above_average", "oaa"]:
         if col in df.columns:
@@ -346,32 +217,263 @@ def load_savant_oaa_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "OAA"]]
 
 
-@st.cache_data(show_spinner=False, ttl=900)
-def load_statcast_fielding_year(year: int) -> pd.DataFrame:
-    if year < STATCAST_FIELDING_START_YEAR:
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_local_bwar_data():
+    path = LOCAL_BWAR_FILE
+    if not path.exists():
         return pd.DataFrame()
-    frv = load_savant_frv_year(year)
-    oaa = load_savant_oaa_year(year)
-    if (frv is None or frv.empty) and (oaa is None or oaa.empty):
+    try:
+        df = pd.read_csv(path)
+    except Exception:
         return pd.DataFrame()
-    if frv is None or frv.empty:
-        combined = oaa.copy()
-    elif oaa is None or oaa.empty:
-        combined = frv.copy()
-    else:
-        combined = pd.merge(
-            frv,
-            oaa,
-            on=["NameKey", "Name"],
-            how="outer",
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    pitcher_col = df.get("pitcher")
+    if pitcher_col is not None:
+        pitcher_mask = (
+            pitcher_col.astype(str)
+            .str.strip()
+            .str.upper()
+            .isin({"Y", "1", "TRUE"})
         )
-    for metric in ["FRV", "OAA", "ARM", "RANGE"]:
-        if metric not in combined.columns:
-            combined[metric] = np.nan
-        else:
-            combined[metric] = pd.to_numeric(combined[metric], errors="coerce")
-    agg = combined.groupby("NameKey", as_index=False).agg({
+        df = df[~pitcher_mask]
+    df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
+    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["WAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    df = df.dropna(subset=["NameKey", "year_ID", "WAR"])
+    return df[["NameKey", "Name", "year_ID", "WAR"]]
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
+    _ = local_sig
+    frames: list[pd.DataFrame] = []
+    try:
+        data = bwar_bat(return_all=True)
+    except Exception:
+        data = None
+    if data is not None and not data.empty:
+        data = data.copy()
+        data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
+        data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
+        if "pitcher" in data.columns:
+            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
+        data["Name"] = data["name_common"].astype(str).str.strip()
+        data["NameKey"] = data["Name"].apply(normalize_statcast_name)
+        frames.append(data[["NameKey", "Name", "year_ID", "WAR"]])
+
+    local = load_local_bwar_data()
+    if local is not None and not local.empty:
+        frames.append(local)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined.dropna(subset=["NameKey", "year_ID", "WAR"])
+    combined = combined.sort_values(["NameKey", "year_ID"])
+    combined = combined.drop_duplicates(subset=["NameKey", "year_ID"], keep="last")
+    combined = combined.rename(columns={"WAR": "bWAR"})
+    return combined.reset_index(drop=True)
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_bwar_for_year(year: int) -> pd.DataFrame:
+    data = load_bwar_dataset(local_bwar_signature())
+    if data is None or data.empty:
+        return pd.DataFrame()
+    df_year = data[pd.to_numeric(data["year_ID"], errors="coerce") == year].copy()
+    if df_year.empty:
+        return pd.DataFrame()
+    agg = df_year.groupby("NameKey", as_index=False).agg({
+        "bWAR": lambda s: s.sum(min_count=1),
         "Name": "first",
+    })
+    return agg
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_bwar_span(
+    start_year: int,
+    end_year: int,
+    target_names: tuple[str, ...] | None = None,
+    target_bbref: str | None = None,
+    target_mlbam: int | None = None,
+) -> pd.DataFrame:
+    data = load_bwar_dataset(local_bwar_signature())
+    if data is None or data.empty:
+        return pd.DataFrame()
+    mask = data["year_ID"].between(start_year, end_year)
+    pool = data[mask]
+    if pool.empty:
+        return pd.DataFrame()
+
+    def match_by_names() -> pd.DataFrame:
+        if not target_names:
+            return pd.DataFrame()
+        keys = {normalize_statcast_name(name) for name in target_names if name}
+        if not keys:
+            return pd.DataFrame()
+        return pool[pool["NameKey"].isin(keys)]
+
+    def match_by_bbref() -> pd.DataFrame:
+        if not target_bbref:
+            return pd.DataFrame()
+        slug = str(target_bbref).strip().lower()
+        if not slug:
+            return pd.DataFrame()
+        if "player_ID" not in pool.columns:
+            return pd.DataFrame()
+        return pool[pool["player_ID"].astype(str).str.lower() == slug]
+
+    def match_by_mlbam() -> pd.DataFrame:
+        if target_mlbam is None:
+            return pd.DataFrame()
+        try:
+            mlbam_val = int(target_mlbam)
+        except Exception:
+            return pd.DataFrame()
+        if "mlb_ID" not in pool.columns:
+            return pd.DataFrame()
+        return pool[pool["mlb_ID"] == mlbam_val]
+
+    df = match_by_names()
+    if df.empty:
+        alt = match_by_bbref()
+        if not alt.empty:
+            df = alt
+    if df.empty:
+        alt = match_by_mlbam()
+        if not alt.empty:
+            df = alt
+    if df.empty:
+        return pd.DataFrame()
+    agg = df.groupby("NameKey", as_index=False).agg({
+        "Name": "first",
+        "WAR": lambda s: s.sum(min_count=1),
+    })
+    agg = agg.rename(columns={"WAR": "bWAR"})
+    return agg
+
+
+
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
+    try:
+        df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
+    except Exception:
+        df = None
+    if df is None or df.empty:
+        frames = []
+        for year in range(start_year, end_year + 1):
+            try:
+                yearly = fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
+            except Exception:
+                yearly = None
+            if yearly is not None and not yearly.empty:
+                frames.append(yearly)
+        if not frames:
+            return {}
+        df = pd.concat(frames, ignore_index=True)
+    result: dict[str, float] = {}
+    for key in ["DRS", "TZ", "UZR", "FRM"]:
+        if key in df.columns:
+            series = pd.to_numeric(df[key], errors="coerce")
+            if not series.isna().all():
+                result[key] = series.sum(skipna=True)
+    return result
+
+
+
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_player_fielding_profile_span(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
+    try:
+        df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
+    except Exception:
+        df = None
+    if df is None or df.empty:
+        frames = []
+        for year in range(start_year, end_year + 1):
+            try:
+                yearly = fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
+            except Exception:
+                yearly = None
+            if yearly is not None and not yearly.empty:
+                frames.append(yearly)
+        if not frames:
+            return {}
+        df = pd.concat(frames, ignore_index=True)
+    result: dict[str, float] = {}
+    for key in ["DRS", "TZ", "UZR", "FRM"]:
+        if key in df.columns:
+            series = pd.to_numeric(df[key], errors="coerce")
+            if not series.isna().all():
+                result[key] = series.sum(skipna=True)
+    return result
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_statcast_fielding_span(
+    start_year: int,
+    end_year: int,
+    target_names: tuple[str, ...] | None = None,
+) -> pd.DataFrame:
+    start = min(start_year, end_year)
+    end = max(start_year, end_year)
+    start = max(start, STATCAST_FIELDING_START_YEAR)
+    if start > end:
+        return pd.DataFrame()
+    name_filter = None
+    if target_names:
+        name_filter = {normalize_statcast_name(name) for name in target_names if name}
+    name_filter = None
+    if target_names:
+        name_filter = {normalize_statcast_name(name) for name in target_names if name}
+    frames: list[pd.DataFrame] = []
+    for year in range(start, end + 1):
+        frv = load_savant_frv_year(year)
+        oaa = load_savant_oaa_year(year)
+        if (frv is None or frv.empty) and (oaa is None or oaa.empty):
+            continue
+        if frv is None or frv.empty:
+            yearly = oaa.copy()
+        elif oaa is None or oaa.empty:
+            yearly = frv.copy()
+        else:
+            yearly = pd.merge(
+                frv,
+                oaa,
+                on=["NameKey", "Name"],
+                how="outer",
+            )
+        for metric in ["FRV", "OAA", "ARM", "RANGE"]:
+            if metric not in yearly.columns:
+                yearly[metric] = np.nan
+            else:
+                yearly[metric] = pd.to_numeric(yearly[metric], errors="coerce")
+        if name_filter is not None:
+            yearly = yearly[yearly["NameKey"].isin(name_filter)]
+            if yearly.empty:
+                continue
+        frames.append(yearly)
+    if not frames:
+        return pd.DataFrame()
+    combined = pd.concat(frames, ignore_index=True)
+
+    def pick_name(series: pd.Series) -> str:
+        for val in series:
+            if isinstance(val, str) and val.strip():
+                return val
+        return ""
+
+    agg = combined.groupby("NameKey", as_index=False).agg({
+        "Name": pick_name,
         "FRV": lambda s: s.sum(min_count=1),
         "OAA": lambda s: s.sum(min_count=1),
         "ARM": lambda s: s.sum(min_count=1),
@@ -380,13 +482,48 @@ def load_statcast_fielding_year(year: int) -> pd.DataFrame:
     return agg
 
 
+@st.cache_data(show_spinner=False, ttl=900)
+def load_fielding_year(year: int) -> pd.DataFrame:
+    try:
+        df = fielding_stats(year, year, qual=0, split_seasons=False)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    df["NameKey"] = df["Name"].astype(str).apply(normalize_statcast_name)
+    for col in FIELDING_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        else:
+            df[col] = np.nan
+    agg = df.groupby(["NameKey"], as_index=False)[FIELDING_COLS].sum(min_count=1)
+
+    frv = load_savant_frv_year(year)
+    if frv is not None and not frv.empty:
+        agg = agg.merge(frv[["NameKey", "FRV", "ARM", "RANGE"]], on="NameKey", how="left")
+    oaa = load_savant_oaa_year(year)
+    if oaa is not None and not oaa.empty:
+        agg = agg.merge(oaa[["NameKey", "OAA"]], on="NameKey", how="left")
+
+    for col in FIELDING_COLS:
+        if col not in agg.columns:
+            agg[col] = np.nan
+    return agg
+
+
+# ...existing code...
 @st.cache_data(show_spinner=True, ttl=900)
 def load_batting(y: int) -> pd.DataFrame:
     base = batting_stats(y, y, qual=0)
     if base is None or base.empty:
         return pd.DataFrame()
     df = base.copy()
-    df["NameKey"] = df["Name"].astype(str).apply(normalize_name_key)
+
+    # remove any accidental duplicate column names (prevents merge suffix errors)
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    df["NameKey"] = df["Name"].astype(str).apply(normalize_statcast_name)
 
     bwar_df = load_bwar_for_year(y)
     if bwar_df is not None and not bwar_df.empty:
@@ -394,17 +531,39 @@ def load_batting(y: int) -> pd.DataFrame:
     field_df = load_fielding_year(y)
     if field_df is not None and not field_df.empty:
         df = df.merge(field_df, on="NameKey", how="left")
-    statcast_df = load_statcast_fielding_year(y)
+
+    # Merge statcast fielding metrics (FRV/OAA/ARM/RANGE) safely.
+    statcast_df = load_statcast_fielding_span(y, y)
     if statcast_df is not None and not statcast_df.empty:
-        df = df.merge(statcast_df[["NameKey", "FRV", "OAA", "ARM", "RANGE"]], on="NameKey", how="left")
+        metrics = ["FRV", "OAA", "ARM", "RANGE"]
+        available = [m for m in metrics if m in statcast_df.columns]
+        cols = ["NameKey"] + available
+        if len(available) > 0:
+            sc = statcast_df[cols].copy()
+
+            # Rename any statcast metric columns that already exist in df to avoid merge conflicts.
+            rename_map = {m: f"sc_{m}" for m in available if m in df.columns}
+            if rename_map:
+                sc = sc.rename(columns=rename_map)
+
+            merge_cols = ["NameKey"] + [c for c in sc.columns if c != "NameKey"]
+            df = df.merge(sc[merge_cols], on="NameKey", how="left")
+
+            # For metrics that were merged as sc_<metric>, fill original metric from statcast and drop temp cols.
+            for m in available:
+                sc_col = f"sc_{m}"
+                if sc_col in df.columns:
+                    if m in df.columns:
+                        df[m] = df[m].fillna(df[sc_col])
+                    else:
+                        df[m] = df[sc_col]
+                    df.drop(columns=[sc_col], inplace=True)
+
     for col in ["bWAR"] + FIELDING_COLS:
         if col not in df.columns:
             df[col] = np.nan
-    for col in ["FRV", "OAA", "ARM", "RANGE"]:
-        if col not in df.columns:
-            df[col] = np.nan
     return df
-
+# ...existing code...
 
 # --------------------- Controls ---------------------
 left_col, right_col = st.columns([1.2, 1.5])
@@ -413,29 +572,15 @@ with left_col:
     controls_container = st.container()
     stat_builder_container = st.container()
 
+# Controls (top of left column)
 with controls_container:
-    year = st.slider("Season", 1900, date.today().year, date.today().year)
-
-    # Player input controls (name or FanGraphs ID)
-    player_mode = st.selectbox(
-        "Player Input",
-        ["Name", "FanGraphs ID"],
-        key="player_input_mode",
-    )
+    year = st.number_input("Season", value=date.today().year, step=1, format="%d")
+    player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
+    default_player = st.session_state.get("player_select", "Mookie Betts")
     if player_mode == "Name":
-        player_name_input = st.text_input(
-            "Player Name",
-            st.session_state.get("player_name_input", "Mookie Betts"),
-            key="player_name_input",
-        )
-        player_id_input = st.session_state.get("player_id_input", "")
+        player_input = st.text_input("Player Name", value=default_player, key="player_select")
     else:
-        player_id_input = st.text_input(
-            "Player FanGraphs ID",
-            st.session_state.get("player_id_input", ""),
-            key="player_id_input",
-        )
-        player_name_input = st.session_state.get("player_name_input", "")
+        player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 # --------------------- Data ---------------------
 df = load_batting(year).copy()
 
@@ -463,91 +608,65 @@ if league_for_pct.empty:
     st.error(f"No league hitters ≥ {PCT_PA} PA in {year}.")
     st.stop()
 
-def resolve_player_row(df: pd.DataFrame, mode: str, name_input: str, fg_id_input: str) -> pd.Series | None:
-    name = name_input.strip()
-    fg_raw = str(fg_id_input).strip()
-    if mode == "FanGraphs ID":
-        if not fg_raw:
-            st.warning("Enter a FanGraphs ID or switch to Name input.")
-            return None
-        try:
-            fg_id = int(fg_raw)
-        except Exception:
-            st.error("FanGraphs ID must be an integer.")
-            return None
-        # Try matching in the loaded dataframe first
-        if "IDfg" in df.columns:
-            match = df[pd.to_numeric(df["IDfg"], errors="coerce") == fg_id]
-            if not match.empty:
-                return match.sort_values("PA", ascending=False).head(1).squeeze()
-        # Fallback: fetch directly by FG ID to be resilient
-        try:
-            fetched = batting_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
-        except Exception:
-            fetched = None
-        if fetched is not None and not fetched.empty:
-            fetched = fetched.copy()
-            fetched["Name"] = fetched["Name"].astype(str).str.replace(".", "", regex=False).str.strip()
-            fetched["NameKey"] = fetched["Name"].astype(str).apply(normalize_name_key)
-            # Merge bWAR/fielding by NameKey
-            bwar_df = load_bwar_for_year(year)
-            field_df = load_fielding_year(year)
-            if bwar_df is not None and not bwar_df.empty:
-                fetched = fetched.merge(bwar_df[["NameKey", "bWAR"]], on="NameKey", how="left")
-            if field_df is not None and not field_df.empty:
-                fetched = fetched.merge(field_df, on="NameKey", how="left")
-            for col in ["bWAR"] + FIELDING_COLS:
-                if col not in fetched.columns:
-                    fetched[col] = np.nan
-            return fetched.head(1).squeeze()
-        st.error(f"Could not find data for FG ID {fg_id}.")
-        return None
+player_row = None
+if player_mode == "Name":
+    name_input = player_input.strip()
+    if not name_input:
+        st.error("Enter a player name.")
+        st.stop()
+    matches = df[df["Name"].str.lower() == name_input.lower()]
+    if matches.empty:
+        st.error("Player not found for that name.")
+        st.stop()
+    player_row = matches.sort_values("PA", ascending=False).head(1).squeeze()
+else:
+    try:
+        fg_id = int(str(player_input).strip())
+    except Exception:
+        st.error("Enter a valid FanGraphs ID.")
+        st.stop()
+    id_col = pd.to_numeric(df.get("IDfg"), errors="coerce")
+    matches = df[id_col == fg_id]
+    if matches.empty:
+        st.error("Player not found for that FanGraphs ID.")
+        st.stop()
+    player_row = matches.sort_values("PA", ascending=False).head(1).squeeze()
 
-    # Name mode
-    if not name:
-        st.warning("Enter a player name or switch to FanGraphs ID input.")
-        return None
-    target_key = normalize_name_key(name)
-    if "NameKey" in df.columns:
-        match = df[df["NameKey"] == target_key]
-        if not match.empty:
-            return match.sort_values("PA", ascending=False).head(1).squeeze()
-    # Fallback: exact name match
-    match = df[df["Name"].str.casefold() == name.casefold()]
-    if not match.empty:
-        return match.sort_values("PA", ascending=False).head(1).squeeze()
-    st.error(f"Could not find data for {name}.")
-    return None
-
-
-player_row = resolve_player_row(df, player_mode, player_name_input, player_id_input)
 if player_row is None or player_row.empty or pd.isna(player_row.get("PA", np.nan)):
+    st.error("Selected player has no valid data.")
     st.stop()
-
 player_name = str(player_row.get("Name", "")).strip()
-if not player_name:
-    player_name = player_name_input if player_mode == "Name" else f"FG#{player_id_input or 'N/A'}"
-player_name_key = str(player_row.get("NameKey", normalize_name_key(player_name)))
+player_name_key = normalize_statcast_name(player_name)
+
+fg_id_val = pd.to_numeric(player_row.get("IDfg"), errors="coerce")
+if pd.notna(fg_id_val):
+    fielding_profile = load_player_fielding_profile(int(fg_id_val), year, year)
+    for key, val in fielding_profile.items():
+        player_row[key] = val
+
+statcast_field = load_statcast_fielding_span(year, year, target_names=(player_name_key,))
+if statcast_field is not None and not statcast_field.empty:
+    stat_row = statcast_field.iloc[0]
+    for metric in ["FRV", "OAA", "ARM", "RANGE"]:
+        player_row[metric] = pd.to_numeric(stat_row.get(metric), errors="coerce")
+for metric in ["FRV", "OAA", "ARM", "RANGE"]:
+    if metric not in player_row.index:
+        player_row[metric] = np.nan
+for metric in FIELDING_COLS:
+    if metric not in player_row.index:
+        player_row[metric] = np.nan
+    else:
+        player_row[metric] = pd.to_numeric(player_row[metric], errors="coerce")
 
 # Collect teams the player appeared for this season (exclude TOT aggregate)
-if "NameKey" in df.columns:
-    player_teams_raw = (
-        df[df["NameKey"] == player_name_key]["Team"]
-        .dropna()
-        .astype(str)
-        .str.upper()
-        .unique()
-        .tolist()
-    )
-else:
-    player_teams_raw = (
-        df[df["Name"] == player_name]["Team"]
-        .dropna()
-        .astype(str)
-        .str.upper()
-        .unique()
-        .tolist()
-    )
+player_teams_raw = (
+    df[df["Name"] == player_name]["Team"]
+    .dropna()
+    .astype(str)
+    .str.upper()
+    .unique()
+    .tolist()
+)
 placeholders = {"TOT", "- - -", "---", "--", ""}
 player_teams = [t for t in player_teams_raw if t not in placeholders]
 # If no clean teams, fall back to TOT (if present) or the raw team value
@@ -679,6 +798,27 @@ def normalize_stat_rows(rows, fallback):
     return cleaned
 # --- End Callbacks ---
 
+
+def move_stat_row(delta: int, index: int, fallback):
+    """Move a stat row up/down and persist."""
+    rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
+    target = index + delta
+    if 0 <= target < len(rows):
+        rows[index], rows[target] = rows[target], rows[index]
+        st.session_state[stat_state_key] = rows
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+
+
+def toggle_stat_show(index: int, state_key: str, fallback):
+    """Toggle the Show flag for a row and persist."""
+    rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
+    if 0 <= index < len(rows):
+        rows[index]["Show"] = bool(st.session_state.get(state_key, True))
+        st.session_state[stat_state_key] = rows
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+
 # Initialize state once
 if stat_state_key not in st.session_state:
     st.session_state[stat_preset_key] = default_preset_name
@@ -716,7 +856,7 @@ with stat_builder_container:
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
-        "Drag to reorder. Use the drop downs to add or remove stats."
+        "Use the drop downs to add or remove stats and the arrows to reorder."
         "</div>",
         unsafe_allow_html=True,
     )
@@ -750,6 +890,7 @@ with stat_builder_container:
             key=add_select_key,
             on_change=add_stat_callback,
             args=(stat_state_key, add_select_key, add_reset_key, sentinel_add),
+            format_func=lambda s: STAT_DISPLAY_NAMES.get(s, s) if s != sentinel_add else s,
         )
 
     with remove_col:
@@ -760,128 +901,62 @@ with stat_builder_container:
             key=remove_select_key,
             on_change=remove_stat_callback,
             args=(stat_state_key, remove_select_key, remove_reset_key, sentinel_remove),
+            format_func=lambda s: STAT_DISPLAY_NAMES.get(s, s) if s != sentinel_remove else s,
         )
 
     current_stat_config = normalize_stat_rows(st.session_state.get(stat_state_key, preset_base_config), preset_base_config)
 
-    stat_config_df = pd.DataFrame(current_stat_config)
-    if stat_config_df.empty:
-        stat_config_df = pd.DataFrame(preset_base_config)
-    if "Show" not in stat_config_df.columns:
-        stat_config_df["Show"] = True
-    if "Stat" not in stat_config_df.columns:
-        stat_config_df["Stat"] = preset_base_config[0]["Stat"]
-    stat_config_df = stat_config_df[["Show", "Stat"]].copy()
-    stat_config_df["Show"] = stat_config_df["Show"].apply(
-        lambda val: True
-        if pd.isna(val)
-        else val.strip().lower() in TRUTHY_STRINGS
-        if isinstance(val, str)
-        else bool(val)
-    )
-    stat_config_df.insert(0, "Drag", ["↕"] * len(stat_config_df))
+    st.markdown("#### Order & visibility")
 
-    gb = GridOptionsBuilder()
-    for col in list(stat_config_df.columns):
-        gb.configure_column(col)
+    st.markdown('<div class="stat-table">', unsafe_allow_html=True)
+    st.markdown('<div class="table-header">', unsafe_allow_html=True)
+    header_cols = st.columns([0.25, 0.25, 0.25, 0.25])
+    header_cols[0].markdown("**Up**")
+    header_cols[1].markdown("**Down**")
+    header_cols[2].markdown("**Stat**")
+    header_cols[3].markdown("**Show**")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    gb.configure_default_column(
-        editable=True,
-        filter=False,
-        sortable=False,
-        resizable=True,
-    )
-    gb.configure_selection(selection_mode="disabled", use_checkbox=False)
-    gb.configure_grid_options(
-        rowDragManaged=True,
-        rowDragMultiRow=True,
-        rowDragEntireRow=True,
-        animateRows=True,
-        suppressMovableColumns=True,
-        suppressRowClickSelection=True,
-        singleClickEdit=True,
-        stopEditingWhenCellsLoseFocus=True,
-    )
-    gb.configure_column(
-        "Drag",
-        header_name="",
-        rowDrag=True,
-        editable=False,
-        width=70,
-        suppressMenu=True,
-        suppressSizeToFit=True,
-    )
-    gb.configure_column(
-        "Show",
-        header_name="Show",
-        editable=True,
-        cellRenderer="agCheckboxCellRenderer",
-        cellEditor="agCheckboxCellEditor",
-        width=110,
-    )
-    gb.configure_column(
-        "Stat",
-        header_name="Stat",
-        editable=True,
-        cellEditor="agSelectCellEditor",
-        cellEditorParams={"values": allowed_add_stats or stat_options},
-        flex=1,
-    )
+    for idx, row in enumerate(current_stat_config):
+        st.markdown('<div class="table-row">', unsafe_allow_html=True)
+        up_col, down_col, stat_col, show_col = st.columns([0.25, 0.25, 0.25, 0.25])
+        with up_col:
+            st.button(
+                "▲",
+                key=f"stat_up_{idx}",
+                disabled=idx == 0,
+                on_click=move_stat_row,
+                args=(-1, idx, preset_base_config),
+            )
+        with down_col:
+            st.button(
+                "▼",
+                key=f"stat_down_{idx}",
+                disabled=idx == len(current_stat_config) - 1,
+                on_click=move_stat_row,
+                args=(1, idx, preset_base_config),
+            )
+        with stat_col:
+            stat_name = row.get("Stat", "")
+            display_name = STAT_DISPLAY_NAMES.get(stat_name, stat_name)
+            st.write(display_name)
+        with show_col:
+            checkbox_key = f"stat_show_{idx}"
+            st.checkbox(
+                "",
+                value=bool(row.get("Show", True)),
+                key=checkbox_key,
+                label_visibility="collapsed",
+                on_change=toggle_stat_show,
+                args=(idx, checkbox_key, preset_base_config),
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    grid_options = gb.build()
+    cleaned_config = normalize_stat_rows(st.session_state.get(stat_state_key, current_stat_config), preset_base_config)
+    st.session_state[stat_state_key] = cleaned_config
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    grid_height = min(480, 90 + len(stat_config_df) * 44)
-    grid_key = f"stat_grid_{st.session_state.get(stat_version_key, 0)}"
-    time.sleep(0.1)
-    
-    grid_response = AgGrid(
-        stat_config_df,
-        gridOptions=grid_options,
-        height=grid_height,
-        width="100%",
-        theme="streamlit",
-        data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=True,
-        fit_columns_on_grid_load=True,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
-        allow_unsafe_jscode=True,
-        enable_enterprise_modules=False,
-        key=grid_key,
-        update_on=["rowDragEnd", "cellValueChanged"],
-    )
-
-grid_df = None
-if grid_response and grid_response.data is not None:
-    if isinstance(grid_response.data, pd.DataFrame):
-        grid_df = grid_response.data
-    else:
-        grid_df = pd.DataFrame(grid_response.data)
-    if "Drag" in grid_df.columns:
-        grid_df = grid_df.drop(columns=["Drag"])
-    if "Stat" in grid_df.columns:
-        grid_df = grid_df[grid_df["Stat"].astype(str).str.strip().ne("")]
-    grid_records = grid_df.to_dict("records")
-else:
-    grid_records = []
-
-manual_override = st.session_state.pop(manual_stat_update_key, False)
-current_config_records = [{k: v for k, v in row.items() if k in ["Stat", "Show"]} for row in current_stat_config]
-is_config_identical = (
-    grid_records is not None and
-    len(grid_records) == len(current_config_records) and
-    all(a["Stat"] == b["Stat"] and a["Show"] == b["Show"] for a, b in zip(grid_records, current_config_records))
-)
-
-if manual_override:
-    cleaned_config = current_stat_config.copy()
-elif grid_records and not is_config_identical:
-    cleaned_config = normalize_stat_rows(grid_records, preset_base_config)
-else:
-    cleaned_config = current_stat_config.copy()
-
-st.session_state[stat_state_key] = cleaned_config
-
-stats_order = [row["Stat"] for row in cleaned_config if row.get("Show", True)]
+stats_order = [row["Stat"] for row in st.session_state[stat_state_key] if row.get("Show", True)]
 if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the chart.")
     st.stop()
@@ -892,6 +967,8 @@ def format_stat(stat: str, val) -> str:
         return ""
 
     upper_stat = stat.upper()
+    if upper_stat == "FRV":
+        return f"{float(val):.0f}"
     if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
         v = float(val)
         if abs(v - round(v)) < 1e-9:
@@ -921,8 +998,7 @@ def format_stat(stat: str, val) -> str:
 leaders = []
 
 label_map = {
-    "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
+    **STAT_DISPLAY_NAMES,
     "EV": "Avg Exit Velo",
 }
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
@@ -980,7 +1056,7 @@ with right_col:
 
     fig.text(
         0.5, 0.885,
-        f"{year} {player_name}" + (f" ({player_team_display})" if player_team_display else ""),
+        f"{year} {player_name}" + (f" | {player_team_display}" if player_team_display else ""),
         ha="center", va="center",
         fontsize=22, fontweight="bold"
     )
@@ -1079,6 +1155,3 @@ with right_col:
         file_name=download_name,
         mime="application/pdf",
     )
-    st.caption("If dragging doesn't update in table, drag it again.")
-    st.caption("Find a player's Fangraphs ID in their Fangraphs profile URL")
-    st.caption("TZ records ended in 2001, DRS started in 2002")
