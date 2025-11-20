@@ -183,6 +183,8 @@ STAT_ALLOWLIST = [
     "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
 ]
 
+STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
+
 FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM"]
 LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
@@ -528,6 +530,26 @@ def normalize_stat_rows(rows, fallback):
     return cleaned
 # --- End Callbacks ---
 
+def move_stat_row(delta: int, index: int, fallback):
+    """Move a stat row up/down and persist."""
+    rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
+    target = index + delta
+    if 0 <= target < len(rows):
+        rows[index], rows[target] = rows[target], rows[index]
+        st.session_state[stat_state_key] = rows
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+
+
+def toggle_stat_show(index: int, state_key: str, fallback):
+    """Toggle the Show flag for a row and persist."""
+    rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
+    if 0 <= index < len(rows):
+        rows[index]["Show"] = bool(st.session_state.get(state_key, True))
+        st.session_state[stat_state_key] = rows
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+
 # ====================================================================================
 # FIX: Ensure stat_config persists across Team/PA changes by initializing it only once.
 # ====================================================================================
@@ -628,22 +650,54 @@ with stat_builder_container:
 
     current_stat_config = normalize_stat_rows(st.session_state.get(stat_state_key, preset_base_config), preset_base_config)
 
-    stat_config_df = pd.DataFrame(current_stat_config)
-    if stat_config_df.empty:
-        stat_config_df = pd.DataFrame(preset_base_config)
-    if "Show" not in stat_config_df.columns:
-        stat_config_df["Show"] = True
-    if "Stat" not in stat_config_df.columns:
-        stat_config_df["Stat"] = preset_base_config[0]["Stat"]
-    stat_config_df = stat_config_df[["Show", "Stat"]].copy()
-    stat_config_df["Show"] = stat_config_df["Show"].apply(
-        lambda val: True
-        if pd.isna(val)
-        else val.strip().lower() in TRUTHY_STRINGS
-        if isinstance(val, str)
-        else bool(val)
-    )
-    stat_config_df.insert(0, "Drag", ["↕"] * len(stat_config_df))
+    st.markdown("#### Order & visibility")
+
+    st.markdown('<div class="stat-table">', unsafe_allow_html=True)
+    st.markdown('<div class="table-header">', unsafe_allow_html=True)
+    header_cols = st.columns([0.25, 0.25, 0.25, 0.25])
+    header_cols[0].markdown("**Up**")
+    header_cols[1].markdown("**Down**")
+    header_cols[2].markdown("**Stat**")
+    header_cols[3].markdown("**Show**")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    for idx, row in enumerate(current_stat_config):
+        st.markdown('<div class="table-row">', unsafe_allow_html=True)
+        up_col, down_col, stat_col, show_col = st.columns([0.25, 0.25, 0.25, 0.25])
+        with up_col:
+            st.button(
+                "▲",
+                key=f"stat_up_{idx}",
+                disabled=idx == 0,
+                on_click=move_stat_row,
+                args=(-1, idx, preset_base_config),
+            )
+        with down_col:
+            st.button(
+                "▼",
+                key=f"stat_down_{idx}",
+                disabled=idx == len(current_stat_config) - 1,
+                on_click=move_stat_row,
+                args=(1, idx, preset_base_config),
+            )
+        with stat_col:
+            stat_name = row.get("Stat", "")
+            display_name = STAT_DISPLAY_NAMES.get(stat_name, stat_name)
+            st.write(display_name)
+        with show_col:
+            checkbox_key = f"stat_show_{idx}"
+            st.checkbox(
+                "",
+                value=bool(row.get("Show", True)),
+                key=checkbox_key,
+                label_visibility="collapsed",
+                on_change=toggle_stat_show,
+                args=(idx, checkbox_key, preset_base_config),
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    cleaned_config = normalize_stat_rows(st.session_state.get(stat_state_key, current_stat_config), preset_base_config)
+    st.session_state[stat_state_key] = cleaned_config
 
 stats_order = [row["Stat"] for row in st.session_state[stat_state_key] if row.get("Show", True)]
 if not stats_order:
