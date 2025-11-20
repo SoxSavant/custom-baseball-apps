@@ -24,66 +24,6 @@ from st_aggrid import (
 )
 
 
-def safe_aggrid(df, **kwargs):
-    """
-    Fully bulletproof AG Grid wrapper:
-    - strips any rowData anywhere
-    - handles streamlit rehydration issues (cloud run)
-    - retries handshake failures
-    """
-
-    # --- wrap DF so Streamlit never tries truthiness on it ---
-    class _DFProxy(pd.DataFrame):
-        @property
-        def _constructor(self):
-            return _DFProxy
-        def __bool__(self):
-            return True
-
-    data_arg = _DFProxy(df)
-
-    # --- extract and deep-clean gridOptions ---
-    gridOptions = kwargs.pop("gridOptions", None)
-
-    if gridOptions:
-        # deep copy so Streamlit can't mutate original
-        cleaned = json.loads(json.dumps(gridOptions))
-
-        # absolute protection: remove rowData EVERYWHERE
-        def strip_rowdata(obj):
-            if isinstance(obj, dict):
-                obj.pop("rowData", None)
-                for k, v in obj.items():
-                    strip_rowdata(v)
-            elif isinstance(obj, list):
-                for item in obj:
-                    strip_rowdata(item)
-
-        strip_rowdata(cleaned)
-        gridOptions = cleaned
-    else:
-        gridOptions = {}
-
-    # --- retry logic for handshake failures only ---
-    for attempt in range(3):
-        try:
-            return AgGrid(
-                data=data_arg,
-                gridOptions=gridOptions,
-                **kwargs
-            )
-        except ValueError as e:
-            msg = str(e).lower()
-
-            # only retry if it's the AG Grid handshake / rowData issue
-            if "rowdata" not in msg and "handshake" not in msg:
-                raise
-
-            if attempt == 2:
-                raise
-
-            time.sleep(0.25)
-
 
 
 
@@ -924,20 +864,21 @@ with stat_builder_container:
     grid_height = min(480, 90 + len(stat_config_df) * 44)
     grid_key = f"stat_grid_{st.session_state.get(stat_version_key, 0)}"
     time.sleep(0.1)
-    grid_response = safe_aggrid(
-        stat_config_df,
-        gridOptions=grid_options,
-        height=grid_height,
-        width="100%",
-        theme=GRID_THEME,
-        custom_css=GRID_CUSTOM_CSS,
-        data_return_mode=DataReturnMode.AS_INPUT,
-        fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True,
-        enable_enterprise_modules=False,
-        key=grid_key,
-        update_on=["selectionChanged"],
-    )
+    
+    grid_response = AgGrid(
+    stat_config_df,
+    gridOptions=grid_options,
+    height=grid_height,
+    width="100%",
+    theme=GRID_THEME,
+    custom_css=GRID_CUSTOM_CSS,
+    data_return_mode=DataReturnMode.AS_INPUT,
+    fit_columns_on_grid_load=True,
+    allow_unsafe_jscode=True,
+    enable_enterprise_modules=False,
+    key=grid_key,
+    update_on=["selectionChanged"],
+)
 
 grid_df = None
 if grid_response and grid_response.data is not None:
