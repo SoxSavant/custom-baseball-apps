@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,6 +22,20 @@ from st_aggrid import (
     JsCode,
 )
 import requests
+
+
+def safe_aggrid(df, **kwargs):
+    """
+    Retries AG Grid loading up to 3 times to avoid Streamlit component
+    handshake failures in production environments like Cloud Run.
+    """
+    for attempt in range(3):
+        try:
+            return AgGrid(df, **kwargs)
+        except Exception:
+            if attempt == 2:
+                raise  # rethrow after last attempt
+            time.sleep(0.3)
 
 st.set_page_config(page_title="Player Comparison App", layout="wide")
 
@@ -1703,7 +1718,7 @@ with stat_builder_container:
 
     grid_height = min(480, 90 + len(stat_config_df) * 44)
     grid_key = f"comp_stat_grid_{st.session_state.get(stat_version_key, 0)}"
-    grid_response = AgGrid(
+    grid_response = safe_aggrid(
         stat_config_df,
         gridOptions=grid_options,
         height=grid_height,
