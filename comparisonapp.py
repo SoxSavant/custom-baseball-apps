@@ -12,7 +12,7 @@ import json
 os.environ.setdefault("AGGRID_RELEASE", "True")
 from datetime import date
 from pathlib import Path
-from pybaseball import batting_stats, fielding_stats, playerid_lookup, bwar_bat
+from pybaseball import batting_stats, fielding_stats, playerid_lookup
 from pybaseball.statcast_fielding import statcast_outs_above_average
 from st_aggrid import (
     AgGrid,
@@ -590,23 +590,6 @@ def load_local_bwar_data() -> pd.DataFrame:
 def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     _ = local_sig  # cache key
     frames: list[pd.DataFrame] = []
-    try:
-        data = bwar_bat(return_all=True)
-    except Exception:
-        data = None
-    if data is not None and not data.empty:
-        data = data.copy()
-        data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
-        data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
-        if "pitcher" in data.columns:
-            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
-        data["Name"] = data["name_common"].astype(str).str.strip()
-        data["NameKey"] = data["Name"].apply(normalize_statcast_name)
-        player_series = data["player_ID"] if "player_ID" in data.columns else pd.Series("", index=data.index)
-        data["player_ID"] = player_series.astype(str).str.strip().str.lower()
-        mlb_series = data["mlb_ID"] if "mlb_ID" in data.columns else pd.Series(np.nan, index=data.index)
-        data["mlb_ID"] = pd.to_numeric(mlb_series, errors="coerce")
-        frames.append(data[["NameKey", "Name", "year_ID", "WAR", "player_ID", "mlb_ID"]])
 
     local = load_local_bwar_data()
     if local is not None and not local.empty:
@@ -1785,7 +1768,6 @@ with stat_builder_container:
         theme=GRID_THEME,
         custom_css=GRID_CUSTOM_CSS,
         data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=True,
         fit_columns_on_grid_load=True,
         update_mode=GridUpdateMode.GRID_CHANGED,
         allow_unsafe_jscode=True,

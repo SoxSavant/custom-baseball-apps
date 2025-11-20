@@ -13,7 +13,7 @@ from io import BytesIO, StringIO
 import re
 import requests
 os.environ.setdefault("AGGRID_RELEASE", "True")
-from pybaseball import batting_stats, fielding_stats, bwar_bat
+from pybaseball import batting_stats, fielding_stats
 from pybaseball.statcast_fielding import statcast_outs_above_average
 from datetime import date
 from st_aggrid import (
@@ -276,19 +276,6 @@ def load_local_bwar_data():
 def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     _ = local_sig
     frames: list[pd.DataFrame] = []
-    try:
-        data = bwar_bat(return_all=True)
-    except Exception:
-        data = None
-    if data is not None and not data.empty:
-        data = data.copy()
-        data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
-        data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
-        if "pitcher" in data.columns:
-            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
-        data["Name"] = data["name_common"].astype(str).str.strip()
-        data["NameKey"] = data["Name"].apply(normalize_name_key)
-        frames.append(data[["NameKey", "Name", "year_ID", "WAR"]])
 
     local = load_local_bwar_data()
     if local is not None and not local.empty:
@@ -887,7 +874,6 @@ with stat_builder_container:
         theme=GRID_THEME,
         custom_css=GRID_CUSTOM_CSS,
         data_return_mode=DataReturnMode.AS_INPUT,
-        reload_data=True,
         fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
