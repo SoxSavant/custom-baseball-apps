@@ -37,18 +37,10 @@ def safe_aggrid(df, **kwargs):
             return True
 
     grid_opts = kwargs.get("gridOptions", {})
-    if "rowData" in grid_opts and grid_opts["rowData"] is not None:
-        grid_opts["rowData"] = None
-    kwargs["gridOptions"] = grid_opts
-
-    data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df
-    for attempt in range(3):
-        try:
-            return AgGrid(data=data_arg, **kwargs)
-        except Exception:
-            if attempt == 2:
-                raise  # rethrow after last attempt
-            time.sleep(0.3)
+    # ... (rest of the function)
+    
+    data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df # <- Used here
+    # ... (rest of the function)
 
 
 
