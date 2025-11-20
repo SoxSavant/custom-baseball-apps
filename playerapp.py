@@ -25,50 +25,64 @@ from st_aggrid import (
 
 def safe_aggrid(df, **kwargs):
     """
-    Ensures AG Grid never sees rowData twice and retries handshake failures.
+    Fully bulletproof AG Grid wrapper:
+    - strips any rowData anywhere
+    - handles streamlit rehydration issues (cloud run)
+    - retries handshake failures
     """
-    # 1. DEFINE PROXY CLASS (REQUIRED to handle Streamlit/Pandas ambiguity)
+
+    # --- wrap DF so Streamlit never tries truthiness on it ---
     class _DFProxy(pd.DataFrame):
         @property
         def _constructor(self):
             return _DFProxy
         def __bool__(self):
             return True
-            
-    # 2. WRAP DATA
-    data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df
-    
-    # 3. ISOLATE and CLEAN gridOptions from kwargs
-    gridOptions = kwargs.pop("gridOptions", {}) # Pull gridOptions out of kwargs
-    
-    if gridOptions:
-        # Crucial: Copy the dictionary before modifying it
-        cleaned_gridOptions = dict(gridOptions) 
-        # Crucial: Delete the 'rowData' key if it exists to resolve the ValueError
-        cleaned_gridOptions.pop("rowData", None) 
-    else:
-        cleaned_gridOptions = None
 
-    # 4. EXECUTE AGGRID with retry logic
+    data_arg = _DFProxy(df)
+
+    # --- extract and deep-clean gridOptions ---
+    gridOptions = kwargs.pop("gridOptions", None)
+
+    if gridOptions:
+        # deep copy so Streamlit can't mutate original
+        cleaned = json.loads(json.dumps(gridOptions))
+
+        # absolute protection: remove rowData EVERYWHERE
+        def strip_rowdata(obj):
+            if isinstance(obj, dict):
+                obj.pop("rowData", None)
+                for k, v in obj.items():
+                    strip_rowdata(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    strip_rowdata(item)
+
+        strip_rowdata(cleaned)
+        gridOptions = cleaned
+    else:
+        gridOptions = {}
+
+    # --- retry logic for handshake failures only ---
     for attempt in range(3):
         try:
             return AgGrid(
-                data=data_arg,                # Data passed cleanly here
-                gridOptions=cleaned_gridOptions, # Cleaned options passed here
-                **kwargs                      # All other keyword arguments passed here
+                data=data_arg,
+                gridOptions=gridOptions,
+                **kwargs
             )
         except ValueError as e:
-            # Re-raise error if it's NOT the handshake/retryable error
-            if "not found in dataframe" in str(e).lower():
-                 # Example of an exception that is not a component failure
-                 raise
-            if "rowData" not in str(e).lower() and "dataframe must" not in str(e).lower():
+            msg = str(e).lower()
+
+            # only retry if it's the AG Grid handshake / rowData issue
+            if "rowdata" not in msg and "handshake" not in msg:
                 raise
-            
-            # This is a handshake failure, retry
+
             if attempt == 2:
-                raise # Re-raise on final failure
+                raise
+
             time.sleep(0.25)
+
 
 
 
