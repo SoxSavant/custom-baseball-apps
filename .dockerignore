@@ -1,0 +1,12 @@
+.git
+__pycache__/
+*.pyc
+*.zip
+*.tar.gz
+.env
+.DS_Store
+data/
+datasets/
+*.csv
+*.parquet
+large datasets
