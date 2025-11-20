@@ -1,5 +1,6 @@
 import os
 import time
+import unicodedata
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,8 +8,9 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO
 from datetime import date
+from pathlib import Path
 os.environ.setdefault("AGGRID_RELEASE", "True")
-from pybaseball import batting_stats
+from pybaseball import batting_stats, fielding_stats, bwar_bat
 from st_aggrid import (
     AgGrid,
     GridOptionsBuilder,
@@ -30,6 +32,29 @@ def safe_aggrid(df, **kwargs):
             if attempt == 2:
                 raise  # rethrow after last attempt
             time.sleep(0.3)
+
+
+GRID_THEME = "dark"
+GRID_CUSTOM_CSS = {
+    ".ag-root-wrapper": {"border": "1px solid #2d2d2d"},
+    ".ag-root": {"background-color": "#1b1b1d"},
+    ".ag-header": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
+    ".ag-header-row": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
+    ".ag-row": {"color": "#e0e0e0"},
+    ".ag-row-odd": {"background-color": "#1f1f1f"},
+    ".ag-row-even": {"background-color": "#242424"},
+    ".ag-center-cols-viewport": {"background-color": "#1b1b1d"},
+    ".ag-body-viewport": {"background-color": "#1b1b1d"},
+    ".ag-center-cols-container": {"background-color": "#1b1b1d"},
+    ".ag-body-horizontal-scroll-viewport": {"background-color": "#1b1b1d"},
+    ".ag-body-vertical-scroll-viewport": {"background-color": "#1b1b1d"},
+    ".ag-rich-select-popup": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
+    ".ag-rich-select-list": {"background-color": "#1b1b1d"},
+    ".ag-virtual-list-viewport": {"background-color": "#1b1b1d"},
+    ".ag-list-item": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
+    ".ag-list-item.ag-active-item": {"background-color": "#2c2c2c", "color": "#f0f0f0"},
+    ".ag-rich-select-value": {"color": "#f0f0f0"},
+}
 
 plt.rcdefaults()
 
@@ -75,6 +100,7 @@ TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 STAT_PRESETS = {
     "Statcast": [
         "WAR",
+        "bWAR",
         "Off",
         "BsR",
         "Def",
@@ -89,7 +115,18 @@ STAT_PRESETS = {
         "K%",
         "BB%",
     ],
+    "Fielding": [
+        "DRS",
+        "FRV",
+        "OAA",
+        "ARM",
+        "RANGE",
+        "TZ",
+        "UZR",
+        "FRM",
+    ],
     "Standard": [
+        "bWAR",
         "WAR",
         "PA",
         "AVG",
@@ -125,17 +162,150 @@ STAT_PRESETS = {
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
+    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV", "MaxEV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
+    "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
 ]
+
+FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM"]
+LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
+
+
+def normalize_name_key(val: str) -> str:
+    if val is None:
+        return ""
+    txt = str(val).strip()
+    try:
+        txt = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode()
+    except Exception:
+        pass
+    return " ".join(txt.split()).lower()
+
+
+def local_bwar_signature() -> float:
+    try:
+        return LOCAL_BWAR_FILE.stat().st_mtime
+    except FileNotFoundError:
+        return 0.0
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_local_bwar_data():
+    path = LOCAL_BWAR_FILE
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    pitcher_col = df.get("pitcher")
+    if pitcher_col is not None:
+        pitcher_mask = (
+            pitcher_col.astype(str)
+            .str.strip()
+            .str.upper()
+            .isin({"Y", "1", "TRUE"})
+        )
+        df = df[~pitcher_mask]
+    df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
+    df["NameKey"] = df["Name"].apply(normalize_name_key)
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["WAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    df = df.dropna(subset=["NameKey", "year_ID", "WAR"])
+    return df[["NameKey", "Name", "year_ID", "WAR"]]
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
+    _ = local_sig
+    frames: list[pd.DataFrame] = []
+    try:
+        data = bwar_bat(return_all=True)
+    except Exception:
+        data = None
+    if data is not None and not data.empty:
+        data = data.copy()
+        data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
+        data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
+        if "pitcher" in data.columns:
+            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
+        data["Name"] = data["name_common"].astype(str).str.strip()
+        data["NameKey"] = data["Name"].apply(normalize_name_key)
+        frames.append(data[["NameKey", "Name", "year_ID", "WAR"]])
+
+    local = load_local_bwar_data()
+    if local is not None and not local.empty:
+        frames.append(local)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined.dropna(subset=["NameKey", "year_ID", "WAR"])
+    combined = combined.sort_values(["NameKey", "year_ID"])
+    combined = combined.drop_duplicates(subset=["NameKey", "year_ID"], keep="last")
+    combined = combined.rename(columns={"WAR": "bWAR"})
+    return combined.reset_index(drop=True)
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_bwar_for_year(year: int) -> pd.DataFrame:
+    data = load_bwar_dataset(local_bwar_signature())
+    if data is None or data.empty:
+        return pd.DataFrame()
+    df_year = data[pd.to_numeric(data["year_ID"], errors="coerce") == year].copy()
+    if df_year.empty:
+        return pd.DataFrame()
+    agg = df_year.groupby("NameKey", as_index=False).agg({
+        "bWAR": lambda s: s.sum(min_count=1),
+        "Name": "first",
+    })
+    return agg
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_fielding_year(year: int) -> pd.DataFrame:
+    try:
+        df = fielding_stats(year, year, qual=0, split_seasons=False)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    df["NameKey"] = df["Name"].astype(str).apply(normalize_name_key)
+    for col in FIELDING_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        else:
+            df[col] = np.nan
+    agg = df.groupby(["NameKey"], as_index=False)[FIELDING_COLS].sum(min_count=1)
+    return agg
 
 
 @st.cache_data(show_spinner=True, ttl=900)
 def load_batting(y: int) -> pd.DataFrame:
-    return batting_stats(y, y, qual=0)
+    base = batting_stats(y, y, qual=0)
+    if base is None or base.empty:
+        return pd.DataFrame()
+    df = base.copy()
+    df["NameKey"] = df["Name"].astype(str).apply(normalize_name_key)
+
+    bwar_df = load_bwar_for_year(y)
+    if bwar_df is not None and not bwar_df.empty:
+        df = df.merge(bwar_df[["NameKey", "bWAR"]], on="NameKey", how="left")
+    field_df = load_fielding_year(y)
+    if field_df is not None and not field_df.empty:
+        df = df.merge(field_df, on="NameKey", how="left")
+    for col in ["bWAR"] + FIELDING_COLS:
+        if col not in df.columns:
+            df[col] = np.nan
+    return df
 
 
 # --------------------- Controls ---------------------
@@ -546,7 +716,8 @@ with stat_builder_container:
         gridOptions=grid_options,
         height=grid_height,
         width="100%",
-        theme="streamlit",
+        theme=GRID_THEME,
+        custom_css=GRID_CUSTOM_CSS,
         data_return_mode=DataReturnMode.AS_INPUT,
         reload_data=True,
         fit_columns_on_grid_load=True,
@@ -599,7 +770,7 @@ def format_stat(stat: str, val) -> str:
         return ""
 
     upper_stat = stat.upper()
-    if upper_stat in {"WAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
         v = float(val)
         if abs(v - round(v)) < 1e-9:
             return f"{int(round(v))}.0"

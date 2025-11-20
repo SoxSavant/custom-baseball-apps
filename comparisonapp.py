@@ -37,6 +37,29 @@ def safe_aggrid(df, **kwargs):
                 raise  # rethrow after last attempt
             time.sleep(0.3)
 
+
+GRID_THEME = "dark"
+GRID_CUSTOM_CSS = {
+    ".ag-root-wrapper": {"border": "1px solid #2d2d2d"},
+    ".ag-root": {"background-color": "#1b1b1d"},
+    ".ag-header": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
+    ".ag-header-row": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
+    ".ag-row": {"color": "#e0e0e0"},
+    ".ag-row-odd": {"background-color": "#1f1f1f"},
+    ".ag-row-even": {"background-color": "#242424"},
+    ".ag-center-cols-viewport": {"background-color": "#1b1b1d"},
+    ".ag-body-viewport": {"background-color": "#1b1b1d"},
+    ".ag-center-cols-container": {"background-color": "#1b1b1d"},
+    ".ag-body-horizontal-scroll-viewport": {"background-color": "#1b1b1d"},
+    ".ag-body-vertical-scroll-viewport": {"background-color": "#1b1b1d"},
+    ".ag-rich-select-popup": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
+    ".ag-rich-select-list": {"background-color": "#1b1b1d"},
+    ".ag-virtual-list-viewport": {"background-color": "#1b1b1d"},
+    ".ag-list-item": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
+    ".ag-list-item.ag-active-item": {"background-color": "#2c2c2c", "color": "#f0f0f0"},
+    ".ag-rich-select-value": {"color": "#f0f0f0"},
+}
+
 st.set_page_config(page_title="Player Comparison App", layout="wide")
 
 st.markdown(
@@ -601,6 +624,13 @@ def load_bwar_span(
     if pool.empty:
         return pd.DataFrame()
 
+    def clean_key(val: str) -> str:
+        try:
+            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
+        except Exception:
+            pass
+        return "".join(ch for ch in str(val) if ch.isalnum()).lower()
+
     def match_by_names() -> pd.DataFrame:
         if not target_names:
             return pd.DataFrame()
@@ -608,6 +638,16 @@ def load_bwar_span(
         if not keys:
             return pd.DataFrame()
         return pool[pool["NameKey"].isin(keys)]
+
+    def match_by_clean_name() -> pd.DataFrame:
+        if not target_names:
+            return pd.DataFrame()
+        targets = {clean_key(name) for name in target_names if name}
+        if not targets:
+            return pd.DataFrame()
+        pool_local = pool.copy()
+        pool_local["__clean"] = pool_local["Name"].astype(str).apply(clean_key)
+        return pool_local[pool_local["__clean"].isin(targets)]
 
     def match_by_bbref() -> pd.DataFrame:
         if not target_bbref:
@@ -637,6 +677,10 @@ def load_bwar_span(
             df = alt
     if df.empty:
         alt = match_by_mlbam()
+        if not alt.empty:
+            df = alt
+    if df.empty:
+        alt = match_by_clean_name()
         if not alt.empty:
             df = alt
     if df.empty:
@@ -1723,11 +1767,12 @@ with stat_builder_container:
         gridOptions=grid_options,
         height=grid_height,
         width="100%",
-        theme="streamlit",
+        theme=GRID_THEME,
+        custom_css=GRID_CUSTOM_CSS,
         data_return_mode=DataReturnMode.AS_INPUT,
         reload_data=True,
         fit_columns_on_grid_load=True,
-        update_mode=GridUpdateMode.VALUE_CHANGED,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
         allow_unsafe_jscode=True,
         enable_enterprise_modules=False,
         key=grid_key,
