@@ -34,7 +34,7 @@ def safe_aggrid(df, **kwargs):
             time.sleep(0.3)
 
 
-GRID_THEME = "dark"
+GRID_THEME = "balham"
 GRID_CUSTOM_CSS = {
     ".ag-root-wrapper": {"border": "1px solid #2d2d2d"},
     ".ag-root": {"background-color": "#1b1b1d"},
