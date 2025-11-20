@@ -36,6 +36,11 @@ def safe_aggrid(df, **kwargs):
             return True
 
     data_arg = _DFProxy(df) if isinstance(df, pd.DataFrame) else df
+    # Avoid double-supplying data when GridOptions already contains rowData.
+    if data_arg is not None and "gridOptions" in kwargs:
+        grid_opts = dict(kwargs["gridOptions"])
+        grid_opts.pop("rowData", None)
+        kwargs = {**kwargs, "gridOptions": grid_opts}
     for attempt in range(5):
         try:
             return AgGrid(data_arg, **kwargs)
