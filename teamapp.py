@@ -645,9 +645,10 @@ with stat_builder_container:
     )
     stat_config_df.insert(0, "Drag", ["↕"] * len(stat_config_df))
 
-
-
-
+stats_order = [row["Stat"] for row in st.session_state[stat_state_key] if row.get("Show", True)]
+if not stats_order:
+    st.info("Add at least one stat and mark it as shown to build the chart.")
+    st.stop()
 
 
 # --------------------- Formatting ---------------------
