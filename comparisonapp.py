@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,6 +8,7 @@ import io
 import unicodedata
 import re
 import json
+os.environ.setdefault("AGGRID_RELEASE", "True")
 from datetime import date
 from pathlib import Path
 from pybaseball import batting_stats, fielding_stats, playerid_lookup, bwar_bat
