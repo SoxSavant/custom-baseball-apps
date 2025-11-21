@@ -22,6 +22,10 @@ st.markdown(
     <style>
         :root {
             --stat-col-width: 120px;
+            --headshot-col-width: 220px;
+            --headshot-img-width: 200px;
+            --player-name-size: 1.35rem;
+            --player-meta-size: 1.3rem;
         }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
@@ -59,7 +63,9 @@ st.markdown(
         }
 
         .compare-card .headshot-col {
-            flex: 0 0 220px;
+            flex: 0 1 var(--headshot-col-width);
+            width: var(--headshot-col-width);
+            max-width: var(--headshot-col-width);
             text-align: center;
             padding-top: .1rem;
         }
@@ -68,20 +74,20 @@ st.markdown(
             background: #f2f2f2;
             border-radius: 4px;
             padding: 4px;
-            width: 202px;
-            max-height: 202px;
+            width: var(--headshot-img-width);
+            max-height: var(--headshot-img-width);
             height: auto;
             object-fit: contain;
         }
         .compare-card .player-name {
-            font-size: 1.35rem;
+            font-size: var(--player-name-size);
             font-weight: 800;
             margin: .2rem 0 0 0;
         }
         .compare-card .player-meta {
             color: #555;
             margin: 0 0 0.3rem 0;
-            font-size: 1.3rem;
+            font-size: var(--player-meta-size);
         }
         .compare-table { /* sets the line height, width, font size */
             width: 100%;
@@ -2017,16 +2023,24 @@ else:
     stat_col_width = shared_width
     player_col_width = shared_width
     grid_template = " ".join(["1fr"] * (player_count + 1))
-headshot_width = 200 if player_count == 2 else 150
+if player_count == 2:
+    headshot_width = 200
+    headshot_col_width = 220
+    player_name_size = "1.35rem"
+    player_meta_size = "1.3rem"
+else:
+    headshot_width = 150
+    headshot_col_width = 170
+    player_name_size = "1.1rem"
+    player_meta_size = "1.0rem"
 
 with right_col:
     if table_df.empty:
         st.warning("No stats available to compare.")
     else:
         # Build headshot + table HTML
-        meta_style = ' style="font-size:1.2rem;"' if player_count > 2 else ""
         rows = [
-            f"<div class=\"compare-card\" style=\"--stat-col-width: {stat_col_width};\">",
+            f"<div class=\"compare-card\" style=\"--stat-col-width: {stat_col_width}; --headshot-col-width: {headshot_col_width}px; --headshot-img-width: {headshot_width}px; --player-name-size: {player_name_size}; --player-meta-size: {player_meta_size};\">",
             f"  <div class=\"headshot-row\" style=\"grid-template-columns: {grid_template};\">",
         ]
         if player_count == 2:
@@ -2035,7 +2049,7 @@ with right_col:
             img_html = f'<img src="{esc(pdata["headshot"])}" width="{headshot_width}" />' if pdata["headshot"] else ""
             rows.extend([
                 '    <div class="headshot-col">',
-                f"      <div class=\"player-meta\"{meta_style}>{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
+                f"      <div class=\"player-meta\">{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
                 f"      {img_html}",
                 f"      <div class=\"player-name\">{esc(pdata['display_name'])}</div>",
                 "    </div>",
@@ -2046,7 +2060,7 @@ with right_col:
             img_html = f'<img src="{esc(pdata["headshot"])}" width="{headshot_width}" />' if pdata["headshot"] else ""
             rows.extend([
                 '    <div class="headshot-col">',
-                f"      <div class=\"player-meta\"{meta_style}>{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
+                f"      <div class=\"player-meta\">{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
                 f"      {img_html}",
                 f"      <div class=\"player-name\">{esc(pdata['display_name'])}</div>",
                 "    </div>",
@@ -2057,7 +2071,7 @@ with right_col:
                 img_html = f'<img src="{esc(pdata["headshot"])}" width="{headshot_width}" />' if pdata["headshot"] else ""
                 rows.extend([
                     '    <div class="headshot-col">',
-                    f"      <div class=\"player-meta\"{meta_style}>{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
+                    f"      <div class=\"player-meta\">{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
                     f"      {img_html}",
                     f"      <div class=\"player-name\">{esc(pdata['display_name'])}</div>",
                     "    </div>",
