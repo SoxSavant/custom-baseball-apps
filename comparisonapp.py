@@ -20,6 +20,9 @@ st.set_page_config(page_title="Player Comparison App", layout="wide")
 st.markdown(
     """
     <style>
+        :root {
+            --stat-col-width: 120px;
+        }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -42,14 +45,17 @@ st.markdown(
 
         .compare-card .headshot-row {
             display: grid;
-            grid-template-columns: 1fr 195px 1fr; /* match the stat column width in the middle */
+            grid-auto-flow: column;
+            grid-auto-columns: 1fr;
+            grid-template-columns: var(--stat-col-width) 1fr 1fr; /* default, overridden inline for more players */
             align-items: center;
             justify-items: center;
+            width: 100%;
             margin-bottom: .2rem;
             gap: 0;
         }
         .compare-card .headshot-spacer {
-            width: 0px;
+            width: var(--stat-col-width);
         }
 
         .compare-card .headshot-col {
@@ -116,7 +122,13 @@ st.markdown(
             font-weight: 700;
             background: #fafafa;
             color: #111;
-            width: 60px;
+            width: var(--stat-col-width);
+        }
+        .compare-table col.col-stat {
+            width: var(--stat-col-width);
+        }
+        .compare-table col.col-player {
+            width: auto;
         }
         .compare-table .best { /* highlights the winner in green */
             background: #E5F1E4;
@@ -1389,7 +1401,23 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
 
 
 # --------------------- Layout containers ---------------------
-left_col, right_col = st.columns([1, 1])
+player_mode_options = ["2 players", "3 players", "4 players"]
+player_mode = st.radio(
+    "Players to compare",
+    player_mode_options,
+    index=0,
+    horizontal=True,
+    help="Switch between 2, 3, or 4 player comparison modes.",
+)
+player_count = int(player_mode.split()[0])
+column_weights_map = {
+    "2 players": [1, 1],
+    "3 players": [1, 1.5],
+    "4 players": [1, 2],
+}
+column_weights = column_weights_map.get(player_mode, [1, 1])
+
+left_col, right_col = st.columns(column_weights)
 
 with left_col:
     controls_container = st.container()
@@ -1398,123 +1426,48 @@ with left_col:
 # --------------------- Controls ---------------------
 current_year = date.today().year
 years_desc = list(range(current_year, 1870, -1))
-single_a_key = "comp_single_year_a"
-single_b_key = "comp_single_year_b"
-single_year_a_key = "comp_year_a_single"
-single_year_b_key = "comp_year_b_single"
-with controls_container:
-    year_col = st.columns(2)
-    with year_col[0]:
-        single_a = st.checkbox(
-            "Single season (Player A)",
-            value=st.session_state.get(single_a_key, True),
-            key=single_a_key,
-        )
-        if single_a:
-            year_a_single = st.selectbox(
-                "Season (Player A)",
-                years_desc,
-                index=0,
-                key=single_year_a_key,
-            )
-            year_a_start = year_a_single
-            year_a_end = year_a_single
-        else:
-            year_a_start = st.selectbox(
-                "Season Start (Player A)",
-                years_desc,
-                index=0,
-                key="comp_year_a_start",
-            )
-            year_a_end = st.selectbox(
-                "Season End (Player A)",
-                years_desc,
-                index=0,
-                key="comp_year_a_end",
-            )
-    with year_col[1]:
-        single_b = st.checkbox(
-            "Single season (Player B)",
-            value=st.session_state.get(single_b_key, True),
-            key=single_b_key,
-        )
-        if single_b:
-            year_b_single = st.selectbox(
-                "Season (Player B)",
-                years_desc,
-                index=0,
-                key=single_year_b_key,
-            )
-            year_b_start = year_b_single
-            year_b_end = year_b_single
-        else:
-            year_b_start = st.selectbox(
-                "Season Start (Player B)",
-                years_desc,
-                index=0,
-                key="comp_year_b_start",
-            )
-            year_b_end = st.selectbox(
-                "Season End (Player B)",
-                years_desc,
-                index=0,
-                key="comp_year_b_end",
-            )
+MAX_PLAYERS = 4
+default_names = ["Mookie Betts", "Aaron Judge", "Jarren Duran", "Juan Soto"]
+# If mode increases, prefill new players and default them to single-season
+prev_count = st.session_state.get("comp_prev_player_count", 2)
+if player_count > prev_count:
+    for idx in range(prev_count, player_count):
+        name_key = f"comp_player_{idx}"
+        single_key = f"comp_single_year_{idx}"
+        if not st.session_state.get(name_key):
+            st.session_state[name_key] = default_names[idx] if idx < len(default_names) else ""
+        st.session_state[single_key] = True
+st.session_state["comp_prev_player_count"] = player_count
+# Initialize state for all player slots up-front to avoid missing keys when switching modes.
+for idx in range(MAX_PLAYERS):
+    name_key = f"comp_player_{idx}"
+    id_key = f"comp_player_{idx}_id"
+    mode_key = f"comp_player_{idx}_mode"
+    mlbam_key = f"comp_player_{idx}_mlbam"
+    mlbam_enabled_key = f"comp_player_{idx}_mlbam_enabled"
+    single_key = f"comp_single_year_{idx}"
+    year_single_key = f"comp_year_{idx}_single"
+    year_start_key = f"comp_year_{idx}_start"
+    year_end_key = f"comp_year_{idx}_end"
+    if name_key not in st.session_state:
+        st.session_state[name_key] = default_names[idx] if idx < len(default_names) else ""
+    if id_key not in st.session_state:
+        st.session_state[id_key] = ""
+    if mode_key not in st.session_state:
+        st.session_state[mode_key] = "Name"
+    if mlbam_key not in st.session_state:
+        st.session_state[mlbam_key] = ""
+    if mlbam_enabled_key not in st.session_state:
+        st.session_state[mlbam_enabled_key] = False
+    if single_key not in st.session_state:
+        st.session_state[single_key] = True
+    if year_single_key not in st.session_state:
+        st.session_state[year_single_key] = years_desc[0]
+    if year_start_key not in st.session_state:
+        st.session_state[year_start_key] = years_desc[0]
+    if year_end_key not in st.session_state:
+        st.session_state[year_end_key] = years_desc[0]
 
-range_a = (min(year_a_start, year_a_end), max(year_a_start, year_a_end))
-range_b = (min(year_b_start, year_b_end), max(year_b_start, year_b_end))
-
-
-DEFAULT_PLAYER_A = "Mookie Betts"
-DEFAULT_PLAYER_B = "Aaron Judge"
-if "comp_player_a" not in st.session_state:
-    st.session_state["comp_player_a"] = DEFAULT_PLAYER_A
-if "comp_player_b" not in st.session_state:
-    st.session_state["comp_player_b"] = DEFAULT_PLAYER_B
-if "comp_player_a_id" not in st.session_state:
-    st.session_state["comp_player_a_id"] = ""
-if "comp_player_b_id" not in st.session_state:
-    st.session_state["comp_player_b_id"] = ""
-if "comp_player_a_mlbam" not in st.session_state:
-    st.session_state["comp_player_a_mlbam"] = ""
-if "comp_player_b_mlbam" not in st.session_state:
-    st.session_state["comp_player_b_mlbam"] = ""
-if "comp_player_a_mlbam_enabled" not in st.session_state:
-    st.session_state["comp_player_a_mlbam_enabled"] = False
-if "comp_player_b_mlbam_enabled" not in st.session_state:
-    st.session_state["comp_player_b_mlbam_enabled"] = False
-
-with controls_container:
-    sel_a_col, sel_b_col = st.columns(2)
-    with sel_a_col:
-        player_a_mode = st.selectbox(
-            "Player A Input",
-            ["Name", "FanGraphs ID"],
-            key="comp_player_a_mode",
-        )
-        if player_a_mode == "Name":
-            player_a_name_input = st.text_input("Player A", key="comp_player_a")
-            player_a_id_input = st.session_state.get("comp_player_a_id", "")
-        else:
-            player_a_id_input = st.text_input("Player A FanGraphs ID", key="comp_player_a_id")
-            player_a_name_input = st.session_state.get("comp_player_a", "")
-    with sel_b_col:
-        player_b_mode = st.selectbox(
-            "Player B Input",
-            ["Name", "FanGraphs ID"],
-            key="comp_player_b_mode",
-        )
-        if player_b_mode == "Name":
-            player_b_name_input = st.text_input("Player B", key="comp_player_b")
-            player_b_id_input = st.session_state.get("comp_player_b_id", "")
-        else:
-            player_b_id_input = st.text_input("Player B FanGraphs ID", key="comp_player_b_id")
-            player_b_name_input = st.session_state.get("comp_player_b", "")
-
-player_a_name = player_a_name_input.strip()
-player_b_name = player_b_name_input.strip()
-player_a_id_raw = str(player_a_id_input).strip()
-player_b_id_raw = str(player_b_id_input).strip()
 
 def parse_mlbam_override(raw: str, enabled: bool) -> int | None:
     if not enabled:
@@ -1527,102 +1480,165 @@ def parse_mlbam_override(raw: str, enabled: bool) -> int | None:
     except Exception:
         return None
 
-mlbam_override_a = parse_mlbam_override(
-    st.session_state.get("comp_player_a_mlbam", ""),
-    st.session_state.get("comp_player_a_mlbam_enabled", False),
-)
-mlbam_override_b = parse_mlbam_override(
-    st.session_state.get("comp_player_b_mlbam", ""),
-    st.session_state.get("comp_player_b_mlbam_enabled", False),
-)
 
-if player_a_mode == "Name":
-    if not player_a_name:
-        st.warning("Enter a name for Player A or switch to FanGraphs ID input.")
-        st.stop()
-    player_a_fg_id = resolve_player_fg_id(player_a_name)
-else:
-    if not player_a_id_raw:
-        st.warning("Enter a FanGraphs ID for Player A or switch to name input.")
-        st.stop()
-    try:
-        player_a_fg_id = int(player_a_id_raw)
-    except Exception:
-        player_a_fg_id = None
+with controls_container:
+    year_cols = st.columns(player_count)
+    year_ranges: list[tuple[int, int]] = []
+    for idx in range(player_count):
+        label = chr(ord("A") + idx)
+        single_key = f"comp_single_year_{idx}"
+        year_single_key = f"comp_year_{idx}_single"
+        year_start_key = f"comp_year_{idx}_start"
+        year_end_key = f"comp_year_{idx}_end"
+        with year_cols[idx]:
+            single = st.checkbox(
+                f"Single season (Player {label})",
+                key=single_key,
+            )
+            if single:
+                year_single = st.selectbox(
+                    f"Season (Player {label})",
+                    years_desc,
+                    index=0,
+                    key=year_single_key,
+                )
+                year_start = year_single
+                year_end = year_single
+            else:
+                year_start = st.selectbox(
+                    f"Season Start (Player {label})",
+                    years_desc,
+                    index=0,
+                    key=year_start_key,
+                )
+                year_end = st.selectbox(
+                    f"Season End (Player {label})",
+                    years_desc,
+                    index=0,
+                    key=year_end_key,
+                )
+        year_ranges.append((min(year_start, year_end), max(year_start, year_end)))
 
-if player_b_mode == "Name":
-    if not player_b_name:
-        st.warning("Enter a name for Player B or switch to FanGraphs ID input.")
-        st.stop()
-    player_b_fg_id = resolve_player_fg_id(player_b_name)
-else:
-    if not player_b_id_raw:
-        st.warning("Enter a FanGraphs ID for Player B or switch to name input.")
-        st.stop()
-    try:
-        player_b_fg_id = int(player_b_id_raw)
-    except Exception:
-        player_b_fg_id = None
+    input_cols = st.columns(player_count)
+    player_inputs = []
+    for idx in range(player_count):
+        label = chr(ord("A") + idx)
+        name_key = f"comp_player_{idx}"
+        id_key = f"comp_player_{idx}_id"
+        mode_key = f"comp_player_{idx}_mode"
+        current_name = st.session_state.get(name_key, "")
+        if not current_name and default_names[idx]:
+            current_name = default_names[idx]
+            st.session_state[name_key] = current_name
+        with input_cols[idx]:
+            mode_val = st.selectbox(
+                f"Player {label} Input",
+                ["Name", "FanGraphs ID"],
+                key=mode_key,
+            )
+            if mode_val == "Name":
+                name_input = st.text_input(f"Player {label}", key=name_key, value=current_name)
+                id_input = st.session_state.get(id_key, "")
+            else:
+                id_input = st.text_input(f"Player {label} FanGraphs ID", key=id_key)
+                name_input = st.session_state.get(name_key, "")
+        player_inputs.append({
+            "mode": mode_val,
+            "name_input": name_input.strip(),
+            "id_input": str(id_input).strip(),
+            "years": year_ranges[idx],
+            "mlbam_override": parse_mlbam_override(
+                st.session_state.get(f"comp_player_{idx}_mlbam", ""),
+                st.session_state.get(f"comp_player_{idx}_mlbam_enabled", False),
+            ),
+        })
 
-if not player_a_fg_id or player_a_fg_id <= 0:
-    if player_a_mode == "Name":
-        st.error(f"Could not find data for for {player_a_name}. Check the spelling or use the ID input.")
+players_data = []
+for idx, cfg in enumerate(player_inputs):
+    label = chr(ord("A") + idx)
+    years = cfg["years"]
+    if cfg["mode"] == "Name":
+        if not cfg["name_input"]:
+            st.warning(f"Enter a name for Player {label} or switch to FanGraphs ID input.")
+            st.stop()
+        fg_id = resolve_player_fg_id(cfg["name_input"])
     else:
-        st.error("Player A FanGraphs ID must be a positive integer.")
-    st.stop()
-if not player_b_fg_id or player_b_fg_id <= 0:
-    if player_b_mode == "Name":
-        st.error(f"Could not find data for {player_b_name}. Check the spelling or use the ID input.")
-    else:
-        st.error("Player B FanGraphs ID must be a positive integer.")
-    st.stop()
+        if not cfg["id_input"]:
+            st.warning(f"Enter a FanGraphs ID for Player {label} or switch to name input.")
+            st.stop()
+        try:
+            fg_id = int(cfg["id_input"])
+        except Exception:
+            fg_id = None
 
-player_a_row = build_player_profile(player_a_fg_id, *range_a, mlbam_override=mlbam_override_a)
-player_b_row = build_player_profile(player_b_fg_id, *range_b, mlbam_override=mlbam_override_b)
-if player_a_row is None or player_b_row is None:
-    st.error("Could not load data for one of the selected players.")
-    st.stop()
+    if not fg_id or fg_id <= 0:
+        if cfg["mode"] == "Name":
+            st.error(f"Could not find data for {cfg['name_input'] or f'Player {label}'}. Check the spelling or use the ID input.")
+        else:
+            st.error(f"Player {label} FanGraphs ID must be a positive integer.")
+        st.stop()
 
-player_a_display_name = str(player_a_row.get("Name", "")).strip()
-if not player_a_display_name:
-    player_a_display_name = player_a_name if player_a_mode == "Name" else f"FG#{player_a_fg_id}"
-player_b_display_name = str(player_b_row.get("Name", "")).strip()
-if not player_b_display_name:
-    player_b_display_name = player_b_name if player_b_mode == "Name" else f"FG#{player_b_fg_id}"
+    player_row = build_player_profile(fg_id, *years, mlbam_override=cfg["mlbam_override"])
+    if player_row is None:
+        st.error(f"Could not load data for Player {label}.")
+        st.stop()
 
-df_a = pd.DataFrame([player_a_row])
-df_b = pd.DataFrame([player_b_row])
-for metric in FIELDING_STATS:
-    if metric in df_a.columns:
-        df_a[metric] = pd.to_numeric(df_a[metric], errors="coerce")
-    if metric in df_b.columns:
-        df_b[metric] = pd.to_numeric(df_b[metric], errors="coerce")
-# Attach optional MLB overrides so headshots/other lookups can use them.
-if mlbam_override_a is not None:
-    df_a["mlbam_override"] = mlbam_override_a
-if mlbam_override_b is not None:
-    df_b["mlbam_override"] = mlbam_override_b
-player_a_team = player_a_row.get("TeamDisplay", normalize_display_team(player_a_row.get("Team", "")))
-player_b_team = player_b_row.get("TeamDisplay", normalize_display_team(player_b_row.get("Team", "")))
-year_a_label = f"{range_a[0]}" if range_a[0] == range_a[1] else f"{range_a[0]}-{range_a[1]}"
-year_b_label = f"{range_b[0]}" if range_b[0] == range_b[1] else f"{range_b[0]}-{range_b[1]}"
-player_a_col_label = player_a_display_name
-player_b_col_label = player_b_display_name
-if player_a_col_label == player_b_col_label:
-    if year_a_label != year_b_label:
-        player_a_col_label = f"{player_a_display_name} ({year_a_label})"
-        player_b_col_label = f"{player_b_display_name} ({year_b_label})"
-    else:
-        player_a_col_label = f"{player_a_display_name} (Player A)"
-        player_b_col_label = f"{player_b_display_name} (Player B)"
+    display_name = str(player_row.get("Name", "")).strip()
+    if not display_name:
+        display_name = cfg["name_input"] if cfg["mode"] == "Name" else f"FG#{fg_id}"
+
+    df = pd.DataFrame([player_row])
+    for metric in FIELDING_STATS:
+        if metric in df.columns:
+            df[metric] = pd.to_numeric(df[metric], errors="coerce")
+    if cfg["mlbam_override"] is not None:
+        df["mlbam_override"] = cfg["mlbam_override"]
+
+    team_display = player_row.get("TeamDisplay", normalize_display_team(player_row.get("Team", "")))
+    year_label = f"{years[0]}" if years[0] == years[1] else f"{years[0]}-{years[1]}"
+
+    players_data.append({
+        "fg_id": fg_id,
+        "display_name": display_name,
+        "input_name": cfg["name_input"],
+        "mode": cfg["mode"],
+        "team": team_display,
+        "year_label": year_label,
+        "df": df,
+        "row": player_row,
+        "mlbam_override": cfg["mlbam_override"],
+        "label_char": label,
+    })
+
+# Ensure column labels are unique
+seen_labels = set()
+for idx, pdata in enumerate(players_data):
+    base = pdata["display_name"]
+    label = base
+    if label in seen_labels and pdata["year_label"]:
+        label = f"{base} ({pdata['year_label']})"
+    if label in seen_labels:
+        label = f"{base} (Player {pdata['label_char']})"
+    seen_labels.add(label)
+    pdata["col_label"] = label
+
+dfs = [p["df"] for p in players_data]
 
 # --------------------- Stat builder setup ---------------------
 stat_exclusions = {"Season"}
-numeric_a = [col for col in df_a.columns if pd.api.types.is_numeric_dtype(df_a[col])]
-numeric_b = [col for col in df_b.columns if pd.api.types.is_numeric_dtype(df_b[col])]
-numeric_stats = [col for col in numeric_a if col in numeric_b and col not in stat_exclusions]
+numeric_sets = []
+for df in dfs:
+    numeric_sets.append({col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])})
+if not numeric_sets:
+    st.error("No numeric stats available to display.")
+    st.stop()
+
+if len(numeric_sets) == 1:
+    numeric_stats = list(numeric_sets[0] - stat_exclusions)
+else:
+    numeric_stats = list(set.intersection(*numeric_sets) - stat_exclusions)
 # Ensure Age is available even if represented as a string span.
-if "Age" in df_a.columns and "Age" in df_b.columns and "Age" not in numeric_stats:
+if all("Age" in df.columns for df in dfs) and "Age" not in numeric_stats:
     numeric_stats.append("Age")
 
 preferred_stats = [stat for stat in STAT_ALLOWLIST if stat in numeric_stats]
@@ -1948,100 +1964,140 @@ label_map = {
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
 
 comparison_rows = []
-winner_map: dict[str, str | None] = {}
+winner_map: dict[str, set[str]] = {}
+col_order = [p["col_label"] for p in players_data]
 for stat in stats_order:
-    if stat not in df_a.columns or stat not in df_b.columns:
+    # Skip stats not common to all players
+    if any(stat not in pdata["df"].columns for pdata in players_data):
         continue
-    a_val = player_a_row.get(stat, np.nan)
-    b_val = player_b_row.get(stat, np.nan)
+
     raw_label = label_map.get(stat, stat)
-
-    # Age spans (or any non-numeric values): skip winner comparison
-    num_compare = False
-    if stat.upper() == "AGE":
-        winner = None
-    else:
+    values = []
+    numeric_vals = []
+    has_non_numeric = False
+    for pdata in players_data:
+        val = pdata["row"].get(stat, np.nan)
+        values.append(val)
+        if pd.isna(val):
+            numeric_vals.append(np.nan)
+            continue
         try:
-            a_num = float(a_val)
-            b_num = float(b_val)
-            num_compare = True
+            numeric_vals.append(float(val))
         except Exception:
-            num_compare = False
+            has_non_numeric = True
+            numeric_vals.append(np.nan)
 
-    if pd.isna(a_val) and pd.isna(b_val):
-        winner = None
-    elif pd.isna(a_val):
-        winner = player_b_col_label
-    elif pd.isna(b_val):
-        winner = player_a_col_label
-    elif not num_compare:
-        winner = None
-    else:
-        better = a_num < b_num if stat in lower_better else a_num > b_num
-        if a_val == b_val:
-            winner = "Tie"
-        else:
-            winner = player_a_col_label if better else player_b_col_label
+    winners = set()
+    numeric_candidates = [v for v in numeric_vals if not pd.isna(v)]
+    if numeric_candidates and not has_non_numeric and stat.upper() != "AGE":
+        best_val = min(numeric_candidates) if stat in lower_better else max(numeric_candidates)
+        winners = {
+            col_order[idx]
+            for idx, v in enumerate(numeric_vals)
+            if not pd.isna(v) and abs(v - best_val) < 1e-9
+        }
 
-    comparison_rows.append({
-        "Stat": raw_label,
-        player_a_col_label: format_stat(stat, a_val),
-        player_b_col_label: format_stat(stat, b_val),
-    })
-    winner_map[raw_label] = winner
+    row_dict = {"Stat": raw_label}
+    for idx, pdata in enumerate(players_data):
+        row_dict[pdata["col_label"]] = format_stat(stat, values[idx])
+    comparison_rows.append(row_dict)
+    winner_map[raw_label] = winners
 
-table_df = pd.DataFrame(comparison_rows)
+table_df = pd.DataFrame(comparison_rows, columns=["Stat"] + col_order)
 
-headshot_a = get_headshot_url(player_a_display_name, df_a)
-headshot_b = get_headshot_url(player_b_display_name, df_b)
+for pdata in players_data:
+    pdata["headshot"] = get_headshot_url(pdata["display_name"], pdata["df"])
 esc = html.escape
+# Even column widths for all modes
+if player_count == 2:
+    stat_col_width = "calc(100% / 3)"
+    player_col_width = "calc(100% / 3)"
+    grid_template = "1fr 1fr 1fr"
+else:
+    shared_width = f"calc(100% / {player_count + 1})"
+    stat_col_width = shared_width
+    player_col_width = shared_width
+    grid_template = " ".join(["1fr"] * (player_count + 1))
 
 with right_col:
     if table_df.empty:
         st.warning("No stats available to compare.")
     else:
-        # Build headshot HTML safely before creating the rows list
-        img_a = f'<img src="{esc(headshot_a)}" width="200" />' if headshot_a else ''
-        img_b = f'<img src="{esc(headshot_b)}" width="200" />' if headshot_b else ''
-
+        # Build headshot + table HTML
+        meta_style = ' style="font-size:1.2rem;"' if player_count > 2 else ""
         rows = [
-            "<div class=\"compare-card\">",
-            "  <div class=\"headshot-row\">",
-            "    <div class=\"headshot-col\">",
-            f"      <div class=\"player-meta\">{esc(str(year_a_label))} | {esc(str(player_a_team))}</div>",
-            f"      {img_a}",
-            f"      <div class=\"player-name\">{esc(player_a_display_name)}</div>",
-            "    </div>",
-            "    <div class=\"headshot-spacer\"></div>",
-            "    <div class=\"headshot-col\">",
-            f"      <div class=\"player-meta\">{esc(str(year_b_label))} | {esc(str(player_b_team))}</div>",
-            f"      {img_b}",
-            f"      <div class=\"player-name\">{esc(player_b_display_name)}</div>",
-            "    </div>",
+            f"<div class=\"compare-card\" style=\"--stat-col-width: {stat_col_width};\">",
+            f"  <div class=\"headshot-row\" style=\"grid-template-columns: {grid_template};\">",
+        ]
+        if player_count == 2:
+            # left player
+            pdata = players_data[0]
+            img_html = f'<img src="{esc(pdata["headshot"])}" width="200" />' if pdata["headshot"] else ""
+            rows.extend([
+                '    <div class="headshot-col">',
+                f"      <div class=\"player-meta\"{meta_style}>{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
+                f"      {img_html}",
+                f"      <div class=\"player-name\">{esc(pdata['display_name'])}</div>",
+                "    </div>",
+            ])
+            rows.append("    <div class=\"headshot-spacer\"></div>")
+            # right player
+            pdata = players_data[1]
+            img_html = f'<img src="{esc(pdata["headshot"])}" width="200" />' if pdata["headshot"] else ""
+            rows.extend([
+                '    <div class="headshot-col">',
+                f"      <div class=\"player-meta\"{meta_style}>{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
+                f"      {img_html}",
+                f"      <div class=\"player-name\">{esc(pdata['display_name'])}</div>",
+                "    </div>",
+            ])
+        else:
+            rows.append("    <div class=\"headshot-spacer\"></div>")
+            for pdata in players_data:
+                img_html = f'<img src="{esc(pdata["headshot"])}" width="200" />' if pdata["headshot"] else ""
+                rows.extend([
+                    '    <div class="headshot-col">',
+                    f"      <div class=\"player-meta\"{meta_style}>{esc(str(pdata['year_label']))} | {esc(str(pdata['team']))}</div>",
+                    f"      {img_html}",
+                    f"      <div class=\"player-name\">{esc(pdata['display_name'])}</div>",
+                    "    </div>",
+                ])
+        rows.extend([
             "  </div>",
             "  <table class=\"compare-table\">",
+            "    <colgroup>",
+        ])
+        if player_count == 2:
+            rows.append(f"      <col class=\"col-player\" style=\"width: {player_col_width};\" />")
+            rows.append(f"      <col class=\"col-stat\" style=\"width: {stat_col_width};\" />")
+            rows.append(f"      <col class=\"col-player\" style=\"width: {player_col_width};\" />")
+            render_cols = [players_data[0]["col_label"], "__STAT__", players_data[1]["col_label"]]
+        else:
+            rows.append(f"      <col class=\"col-stat\" style=\"width: {stat_col_width};\" />")
+            for _ in players_data:
+                rows.append(f"      <col class=\"col-player\" style=\"width: {player_col_width};\" />")
+            render_cols = ["__STAT__"] + [p["col_label"] for p in players_data]
+        rows.extend([
+            "    </colgroup>",
             "    <thead>",
-            "      <tr class=\"overall-row\">",
-            "        <th colspan=\"3\">Overall Stats</th>",
+            f"      <tr class=\"overall-row\">",
+            f"        <th colspan=\"{player_count + 1}\">Overall Stats</th>",
             "      </tr>",
             "    </thead>",
             "    <tbody>",
-        ]
-        for _, row in table_df.iterrows():
-            raw_label = str(row["Stat"])
-            stat_label = esc(raw_label)
-            best = winner_map.get(raw_label)
-            a_class = "best" if best in {player_a_col_label, "Tie"} else ""
-            b_class = "best" if best in {player_b_col_label, "Tie"} else ""
-            a_val = esc(str(row[player_a_col_label]))
-            b_val = esc(str(row[player_b_col_label]))
-            rows.extend([
-                "      <tr>",
-                f"        <td class=\"{a_class}\">{a_val}</td>",
-                f"        <td class=\"stat-col\">{stat_label}</td>",
-                f"        <td class=\"{b_class}\">{b_val}</td>",
-                "      </tr>",
-            ])
+        ])
+        for row in comparison_rows:
+            stat_label = esc(str(row["Stat"]))
+            winners = winner_map.get(str(row["Stat"]), set())
+            rows.append("      <tr>")
+            for col_id in render_cols:
+                if col_id == "__STAT__":
+                    rows.append(f"        <td class=\"stat-col\">{stat_label}</td>")
+                else:
+                    val = esc(str(row.get(col_id, "")))
+                    cell_class = "best" if col_id in winners else ""
+                    rows.append(f"        <td class=\"{cell_class}\">{val}</td>")
+            rows.append("      </tr>")
         rows.extend([
             "    </tbody>",
             "  </table>",
@@ -2054,23 +2110,16 @@ with right_col:
         rows_html = "\n".join(rows)
         st.markdown(rows_html, unsafe_allow_html=True)
         with st.expander("Optional MLB ID overrides (use if bWAR/headshot is missing)", expanded=False):
-            override_cols = st.columns(2)
-            with override_cols[0]:
-                st.checkbox("Use MLB ID override", key="comp_player_a_mlbam_enabled")
-                st.text_input(
-                    "Player A MLB ID",
-                    key="comp_player_a_mlbam",
-                    placeholder="e.g. 608070",
-                    disabled=not st.session_state.get("comp_player_a_mlbam_enabled", False),
-                )
-            with override_cols[1]:
-                st.checkbox("Use MLB ID override", key="comp_player_b_mlbam_enabled")
-                st.text_input(
-                    "Player B MLB ID",
-                    key="comp_player_b_mlbam",
-                    placeholder="e.g. 123456",
-                    disabled=not st.session_state.get("comp_player_b_mlbam_enabled", False),
-                )
+            override_cols = st.columns(player_count)
+            for idx, pdata in enumerate(players_data):
+                with override_cols[idx]:
+                    st.checkbox("Use MLB ID override", key=f"comp_player_{idx}_mlbam_enabled")
+                    st.text_input(
+                        f"Player {pdata['label_char']} MLB ID",
+                        key=f"comp_player_{idx}_mlbam",
+                        placeholder="e.g. 608070",
+                        disabled=not st.session_state.get(f"comp_player_{idx}_mlbam_enabled", False),
+                    )
         st.caption("Screenshot to save")
         st.caption("Find a player's Fangraphs/MLB ID in their Fangraphs/MLB profile URL")
         st.caption("TZ records ended in 2001, DRS started in 2002")
