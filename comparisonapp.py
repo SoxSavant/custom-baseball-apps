@@ -45,6 +45,8 @@ st.markdown(
             padding: 1.25rem 1.5rem;
             box-shadow: 0 4px 20px rgba(0,0,0,0.12);
             color: #111111;
+            max-width: 100%;
+            margin: 0 auto;
         }
 
         .compare-card .headshot-row {
@@ -2029,8 +2031,8 @@ if player_count == 2:
     player_name_size = "1.35rem"
     player_meta_size = "1.3rem"
 else:
-    headshot_width = 150
-    headshot_col_width = 170
+    headshot_width = 130
+    headshot_col_width = 145
     player_name_size = "1.1rem"
     player_meta_size = "1.0rem"
 
