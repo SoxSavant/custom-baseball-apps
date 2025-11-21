@@ -631,7 +631,9 @@ def load_local_bwar_data() -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     df = df.copy()
+    # Drop pitcher rows only when they have no plate appearances (true pitchers)
     pitcher_col = df.get("pitcher")
+    pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
     if pitcher_col is not None:
         pitcher_mask = (
             pitcher_col.astype(str)
@@ -639,7 +641,9 @@ def load_local_bwar_data() -> pd.DataFrame:
             .str.upper()
             .isin({"Y", "1", "TRUE"})
         )
-        df = df[~pitcher_mask]
+        no_pa_mask = pa_col.isna() | (pa_col <= 0)
+        drop_mask = pitcher_mask & no_pa_mask
+        df = df[~drop_mask]
     df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
     df["NameKey"] = df["Name"].apply(normalize_statcast_name)
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
@@ -665,7 +669,11 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
         data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
         data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
         if "pitcher" in data.columns:
-            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
+            pitcher_mask = pd.to_numeric(data["pitcher"], errors="coerce").fillna(0) != 0
+            pa_series = pd.to_numeric(data.get("PA"), errors="coerce") if "PA" in data.columns else pd.Series(np.nan, index=data.index)
+            no_pa_mask = pa_series.isna() | (pa_series <= 0)
+            drop_mask = pitcher_mask & no_pa_mask
+            data = data[~drop_mask]
         data["Name"] = data["name_common"].astype(str).str.strip()
         data["NameKey"] = data["Name"].apply(normalize_statcast_name)
         player_series = data["player_ID"] if "player_ID" in data.columns else pd.Series("", index=data.index)
