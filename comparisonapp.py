@@ -211,6 +211,7 @@ STAT_PRESETS = {
         "SLG",
         "OPS",
         "H",
+        "1B",
         "2B",
         "3B",
         "HR",
@@ -245,14 +246,19 @@ STAT_PRESETS = {
         "LD%",
     ],
     "Blank – Create your own": [
-        "WAR",
+        "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
+    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
+    "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
+    "FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "FRM", "UZR", "bWAR", "Age",
     ],
 }
 
 STAT_ALLOWLIST = [
     "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
     "FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "FRM", "UZR", "bWAR", "Age",
@@ -273,14 +279,14 @@ def display_stat_name(stat) -> str:
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "WAR", "Off", "Def", "BsR", "ISO", "GDP", "wRAA", "wRC",
+    "WAR", "Off", "Def", "BsR", "GDP", "wRAA", "wRC",
     "TZ",
 }
 RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "Whiff%",
     "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
-    "LA", "EV", "MaxEV", "CSW%", "BB/K",
+    "LA", "EV", "MaxEV", "CSW%", "BB/K", "ISO",
 }
 
 HEADSHOT_BASES = [
@@ -478,6 +484,63 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total
         else:
             result[col] = series.mean(skipna=True)
+
+    # Manually derive key rate stats from aggregated counting stats.
+    def to_num(val) -> float:
+        try:
+            num = float(val)
+        except Exception:
+            return np.nan
+        return num if pd.notna(num) else np.nan
+
+    h = to_num(result.get("H"))
+    ab = to_num(result.get("AB"))
+    bb = to_num(result.get("BB"))
+    hbp = to_num(result.get("HBP"))
+    sf = to_num(result.get("SF"))
+    doubles = to_num(result.get("2B"))
+    triples = to_num(result.get("3B"))
+    hr = to_num(result.get("HR"))
+
+    if pd.notna(h) and pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
+        singles = h - doubles - triples - hr
+        result["1B"] = singles if (pd.notna(singles) and singles >= 0) else np.nan
+    else:
+        result["1B"] = np.nan
+
+    tb_components = [
+        result.get("1B"),
+        2 * doubles if pd.notna(doubles) else np.nan,
+        3 * triples if pd.notna(triples) else np.nan,
+        4 * hr if pd.notna(hr) else np.nan,
+    ]
+    if all(pd.notna(x) for x in tb_components):
+        result["TB"] = sum(tb_components)
+
+    tb = to_num(result.get("TB"))
+    if pd.notna(ab) and ab > 0 and pd.notna(h):
+        result["AVG"] = h / ab
+    if pd.notna(ab) and ab > 0 and pd.notna(tb):
+        result["SLG"] = tb / ab
+    bb_val = 0 if pd.isna(bb) else bb
+    hbp_val = 0 if pd.isna(hbp) else hbp
+    sf_val = 0 if pd.isna(sf) else sf
+    obp_den = (ab if pd.notna(ab) else 0) + bb_val + hbp_val + sf_val
+    if obp_den > 0:
+        obp_num = (h if pd.notna(h) else 0) + bb_val + hbp_val
+        result["OBP"] = obp_num / obp_den
+    slg_val = result.get("SLG")
+    obp_val = result.get("OBP")
+    if pd.notna(slg_val) and pd.notna(obp_val):
+        result["OPS"] = slg_val + obp_val
+    avg_val = result.get("AVG")
+    if pd.notna(slg_val) and pd.notna(avg_val):
+        result["ISO"] = slg_val - avg_val
+
+    # Explicit PA-weighted wRC+ (handles spans cleanly).
+    if "wRC+" in grp.columns and pa_total > 0:
+        wrc_series = pd.to_numeric(grp["wRC+"], errors="coerce")
+        result["wRC+"] = (wrc_series * pa_weight).sum(skipna=True) / pa_total
     return result
 
 
