@@ -1972,6 +1972,7 @@ label_map = {
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",
     "ARM": "Arm Value",
+    "Contact%": "Whiff%",
 }
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
 
