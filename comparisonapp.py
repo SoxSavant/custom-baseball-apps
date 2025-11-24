@@ -199,7 +199,7 @@ STAT_PRESETS = {
         "Barrel%",
         "HardHit%",
         "O-Swing%",
-        "Whiff%",
+        "Contact%",
         "K%",
         "BB%",
     ],
@@ -254,13 +254,14 @@ STAT_ALLOWLIST = [
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
+    "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
     "FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "FRM", "UZR", "bWAR", "Age",
 ]
 STATCAST_FIELDING_START_YEAR = 2016
 FIELDING_STATS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE", "bWAR"]
 STAT_DISPLAY_NAMES = {
     "WAR": "fWAR",
+    "Contact%": "Whiff%"
 }
 
 
@@ -1416,11 +1417,10 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
 # --------------------- Layout containers ---------------------
 player_mode_options = ["2 players", "3 players", "4 players"]
 player_mode = st.radio(
-    "Players to compare",
+    "",
     player_mode_options,
     index=0,
     horizontal=True,
-    help="Switch between 2, 3, or 4 player comparison modes.",
 )
 player_count = int(player_mode.split()[0])
 column_weights_map = {
