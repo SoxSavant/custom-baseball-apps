@@ -352,9 +352,8 @@ def load_bwar_span(
         return pd.DataFrame()
     agg = df.groupby("NameKey", as_index=False).agg({
         "Name": "first",
-        "WAR": lambda s: s.sum(min_count=1),
+        "bWAR": lambda s: s.sum(min_count=1),
     })
-    agg = agg.rename(columns={"WAR": "bWAR"})
     return agg
 
 
@@ -429,9 +428,6 @@ def load_statcast_fielding_span(
     start = max(start, STATCAST_FIELDING_START_YEAR)
     if start > end:
         return pd.DataFrame()
-    name_filter = None
-    if target_names:
-        name_filter = {normalize_statcast_name(name) for name in target_names if name}
     name_filter = None
     if target_names:
         name_filter = {normalize_statcast_name(name) for name in target_names if name}
@@ -574,7 +570,10 @@ with left_col:
 
 # Controls (top of left column)
 with controls_container:
-    year = st.number_input("Season", value=date.today().year, step=1, format="%d")
+    today = date.today()
+    current_year = today.year
+    default_year = current_year if today.month >= 3 else current_year - 1
+    year = st.number_input("Season", value=default_year, step=1, format="%d")
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     default_player = st.session_state.get("player_select", "Mookie Betts")
     if player_mode == "Name":
@@ -583,6 +582,16 @@ with controls_container:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 # --------------------- Data ---------------------
 df = load_batting(year).copy()
+
+if df is None or df.empty:
+    fallback_df = pd.DataFrame()
+    if year == current_year:
+        fallback_year = year - 1
+        fallback_df = load_batting(fallback_year).copy()
+        if fallback_df is not None and not fallback_df.empty:
+            st.info(f"No data returned for {year}. Showing {fallback_year} instead.")
+            df = fallback_df
+            year = fallback_year
 
 if df is None or df.empty:
     st.error("No data returned from pybaseball.")
