@@ -264,6 +264,7 @@ STAT_ALLOWLIST = [
     "FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "FRM", "UZR", "bWAR", "Age",
 ]
 STATCAST_FIELDING_START_YEAR = 2016
+STATCAST_HITTING_START_YEAR = 2015
 FIELDING_STATS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE", "bWAR"]
 STAT_DISPLAY_NAMES = {
     "WAR": "fWAR",
@@ -288,6 +289,7 @@ RATE_STATS = {
     "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
     "LA", "EV", "MaxEV", "CSW%", "BB/K", "ISO",
 }
+STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}
 
 HEADSHOT_BASES = [
     # Standard silo path (real photos when they exist)
@@ -464,6 +466,12 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     else:
         pa_weight = pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
     pa_total = pa_weight.sum()
+    season_series = pd.to_numeric(grp["Season"], errors="coerce") if "Season" in grp.columns else None
+    statcast_pa_weight = None
+    statcast_pa_total = None
+    if season_series is not None:
+        statcast_pa_weight = pa_weight.where(season_series >= STATCAST_HITTING_START_YEAR, 0)
+        statcast_pa_total = statcast_pa_weight.sum()
     for col in numeric_cols:
         series = pd.to_numeric(grp[col], errors="coerce")
         if series.isna().all():
@@ -481,7 +489,20 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
         elif col in RATE_STATS and pa_total > 0:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total
+            if col in STATCAST_RATE_STATS:
+                if statcast_pa_weight is not None and statcast_pa_total is not None and statcast_pa_total > 0:
+        # Filter to only statcast-era rows
+                    statcast_mask = season_series >= STATCAST_HITTING_START_YEAR
+                    statcast_series = series.where(statcast_mask)
+        # Only calculate if we have actual statcast data
+                    if not statcast_series.isna().all():
+                        result[col] = (statcast_series * statcast_pa_weight).sum(skipna=True) / statcast_pa_total
+                    else:
+                        result[col] = np.nan
+                else:
+                    result[col] = np.nan  # No valid statcast seasons in span
+            else:
+                result[col] = (series * pa_weight).sum(skipna=True) / pa_total
         else:
             result[col] = series.mean(skipna=True)
 

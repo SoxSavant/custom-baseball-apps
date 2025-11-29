@@ -4,6 +4,9 @@ import unicodedata
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # Set backend before importing pyplot
+import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO, StringIO
