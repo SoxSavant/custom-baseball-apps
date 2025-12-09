@@ -236,7 +236,7 @@ STAT_PRESETS = {
     "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%", "Z-Swing%", "Swing%", "Contact%",
     "Whiff%", "Pull%", "Cent%", "Oppo%", "bWAR", "WPA", "Clutch", "FA%", "SI%", "vSI%", "SL%", "vSL%",
-    "CU%", "vCU%", "CH%", "vCH", "F-Strike%", "Stuff+", "Location+", "Pitching+", "LD%",
+    "CU%",  "CH%", "vCU%","vCH", "F-Strike%", "Stuff+", "Location+", "Pitching+", "LD%",
     ]
 }
 
