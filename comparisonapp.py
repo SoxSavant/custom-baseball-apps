@@ -2055,6 +2055,25 @@ def format_stat(stat: str, val) -> str:
 
 
 # --------------------- Comparison table ---------------------
+def transform_stat_value(stat: str, raw_val):
+    """
+    Normalize or derive stat values before formatting/comparison.
+    Whiff% is not provided directly, so derive it from Contact% (100 - Contact%).
+    """
+    if stat == "Contact%":
+        if pd.isna(raw_val):
+            return np.nan
+        try:
+            contact = float(raw_val)
+        except Exception:
+            return np.nan
+        # Contact% may come in as a fraction (0.78) or percentage (78.0).
+        if contact <= 1:
+            contact *= 100
+        return 100 - contact
+    return raw_val
+
+
 label_map = {
     "HardHit%": "Hard Hit%",
     "WAR": "fWAR",
@@ -2062,7 +2081,7 @@ label_map = {
     "ARM": "Arm Value",
     "Contact%": "Whiff%",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
+lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "Contact%"}
 
 comparison_rows = []
 winner_map: dict[str, set[str]] = {}
@@ -2077,7 +2096,8 @@ for stat in stats_order:
     numeric_vals = []
     has_non_numeric = False
     for pdata in players_data:
-        val = pdata["row"].get(stat, np.nan)
+        raw_val = pdata["row"].get(stat, np.nan)
+        val = transform_stat_value(stat, raw_val)
         values.append(val)
         if pd.isna(val):
             numeric_vals.append(np.nan)
