@@ -60,16 +60,6 @@ st.markdown(
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Team Savant Page App")
-with meta_col:
-    st.markdown(
-        """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
-            Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
-            <span style="color: #aaa;">(v 1.1)</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
 CSS_KEY = "stat_builder_css"
 if not st.session_state.get(CSS_KEY):
@@ -304,22 +294,101 @@ def load_fielding_year(year: int) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=True, ttl=900)
 def load_batting(y: int) -> pd.DataFrame:
-    base = batting_stats(y, y, qual=0)
-    if base is None or base.empty:
-        return pd.DataFrame()
-    df = base.copy()
-    df["NameKey"] = df["Name"].astype(str).apply(normalize_name_key)
+    
+    # Strategy 1: Try direct CSV with error handling
+    try:
+        url = f"https://www.fangraphs.com/leaders.aspx?pos=all&stats=bat&lg=all&qual=0&type=8&season={y}&month=0&season1={y}&ind=0&page=1_1000000&rost=0&players=0&export=1"
+        
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        # Try parsing with error_bad_lines=False (pandas < 2.0) or on_bad_lines='skip' (pandas >= 2.0)
+        try:
+            df = pd.read_csv(StringIO(response.text), on_bad_lines='skip', encoding='utf-8')
+        except TypeError:
+            # Fallback for older pandas versions
+            df = pd.read_csv(StringIO(response.text), error_bad_lines=False, encoding='utf-8')
+        
+        if df is not None and not df.empty and len(df) > 10:
+            st.success(f"Loaded {len(df)} players from FanGraphs CSV")
+            return df
+            
+    except Exception as e:
+        st.warning(f"CSV method failed: {str(e)}")
+    
+    # Strategy 2: Try with smaller chunks using pagination
+    try:
+        all_data = []
+        page_size = 100
+        
+        for page in range(1, 4):  # Try first 3 pages
+            url = f"https://www.fangraphs.com/leaders.aspx?pos=all&stats=bat&lg=all&qual=0&type=8&season={y}&month=0&season1={y}&ind=0&page={page}_{page_size}&rost=0&players=0&export=1"
+            
+            response = requests.get(url, timeout=20)
+            if response.status_code == 200:
+                try:
+                    chunk = pd.read_csv(StringIO(response.text), on_bad_lines='skip', encoding='utf-8')
+                    if not chunk.empty:
+                        all_data.append(chunk)
+                except:
+                    pass
+            time.sleep(0.5)  # Be nice to the server
+        
+        if all_data:
+            df = pd.concat(all_data, ignore_index=True).drop_duplicates()
+            st.success(f"Loaded {len(df)} players using pagination")
+            return df
+            
+    except Exception as e:
+        st.warning(f"Pagination method failed: {str(e)}")
+    
+    # Strategy 3: Clear cache and try pybaseball with updated user agent
+    try:
+        from pybaseball import cache
+        cache.purge()
+        
+        # Set a user agent to avoid being blocked
+        import pybaseball
+        if hasattr(pybaseball, 'set_options'):
+            pybaseball.set_options(user_agent='Mozilla/5.0')
+        
+        base = batting_stats(y, y, qual=0)
+        
+        if base is not None and not base.empty:
+            st.success(f"Loaded {len(base)} players from pybaseball")
+            return base.copy()
+            
+    except Exception as e:
+        st.warning(f"Pybaseball method failed: {str(e)}")
+    
+    # Strategy 4: Use Baseball Savant as ultimate fallback
+    try:
+        st.info("Attempting to load from Baseball Savant...")
+        from pybaseball import statcast_batter_exitvelo_barrels
+        
+        savant_data = statcast_batter_exitvelo_barrels(y)
+        
+        if savant_data is not None and not savant_data.empty:
+            st.success(f"Loaded {len(savant_data)} players from Baseball Savant")
+            return savant_data
+            
+    except Exception as e:
+        st.warning(f"Baseball Savant method failed: {str(e)}")
+    
+    # Strategy 5: Try loading from a static backup or sample data
+    st.error("⚠️ All data sources failed. Showing sample data or previous season.")
+    
+    # Try previous year as fallback
+    if y > 2020:
+        try:
+            st.info(f"Trying to load {y-1} season data as fallback...")
+            return load_batting(y - 1)
+        except:
+            pass
+    
+    # Return empty DataFrame with expected columns
+    return pd.DataFrame(columns=['Name', 'Team', 'G', 'PA', 'AB', 'H', 'HR', 'R', 'RBI', 'SB', 'BB', 'SO', 'AVG', 'OBP', 'SLG', 'OPS', 'WAR'])
 
-    bwar_df = load_bwar_for_year(y)
-    if bwar_df is not None and not bwar_df.empty:
-        df = df.merge(bwar_df[["NameKey", "bWAR"]], on="NameKey", how="left")
-    field_df = load_fielding_year(y)
-    if field_df is not None and not field_df.empty:
-        df = df.merge(field_df, on="NameKey", how="left")
-    for col in ["bWAR"] + FIELDING_COLS:
-        if col not in df.columns:
-            df[col] = np.nan
-    return df
 
 def get_teams_for_year(season: int) -> dict[str, str]:
     """Return team mapping for provided season, handling Athletics rename."""
@@ -844,12 +913,6 @@ with right_col:
         fontsize=13, color="#555"
     )
 
-    fig.text(
-        0.2, 0.08,
-        "By: Sox_Savant",
-        ha="center", va="center",
-        fontsize=13, color="#555"
-    )
     fig.text(
         0.75, 0.08,
         "Data: FanGraphs",
