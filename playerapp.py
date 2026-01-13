@@ -95,10 +95,40 @@ STAT_PRESETS = {
         "FB%",
         "LD%",
     ],
+
+    "Every Stat": [
+        "WAR",
+        "bWAR",
+        "Off",
+        "BsR",
+        "Def",
+        "wOBA",
+        "xwOBA",
+        "xBA",
+        "xSLG",
+        "EV",
+        "Barrel%",
+        "HardHit%",
+        "O-Swing%",
+        "Whiff%",
+        "K%",
+        "BB%",
+        "Off", 
+        "Def", 
+        "BsR",
+        "wRC+", 
+        "OPS", "SLG", "OBP", "AVG", "ISO",
+    "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
+    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
+    "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
+
+    ]
+    
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV", "MaxEV",
+    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
