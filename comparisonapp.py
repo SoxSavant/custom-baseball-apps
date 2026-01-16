@@ -300,23 +300,26 @@ STAT_PRESETS = {
         "FB%",
         "LD%",
         "ARM",
-    ],
-}
+        ],
+        # Dynamic presets - computed at runtime when selected
+        "Player A leads": [],
+        "Player B leads": [],
+    }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV", "MaxEV",
+     "WAR", "bWAR","Off", "Def", "BsR",  "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-    "FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "FRM", "UZR", "bWAR", "Age",
+    "Pull%", "FRV", "OAA", "ARM", "DRS", "TZ", "FRM", "UZR", "Age",
 ]
 STATCAST_FIELDING_START_YEAR = 2016
 STATCAST_HITTING_START_YEAR = 2015
 FIELDING_STATS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE", "bWAR"]
 STAT_DISPLAY_NAMES = {
     "WAR": "fWAR",
-    "Contact%": "Whiff%"
+    "Contact%": "Whiff%",
+    "O-Swing%": "Chase%",
 }
 
 
@@ -1569,7 +1572,7 @@ with left_col:
     stat_builder_container = st.container()
 
 # --------------------- Controls ---------------------
-current_year = date.today().year
+current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
 MAX_PLAYERS = 4
 default_names = ["Mookie Betts", "Aaron Judge", "", ""]
@@ -1851,6 +1854,81 @@ def remove_stat_callback(stat_key: str, select_key: str, reset_key: str, sentine
 
 def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[str]):
     preset_name = st.session_state.get(preset_key, default_preset_name)
+
+    def compute_leads_for_player(pidx: int, stats_list: list[str]) -> list[str]:
+        leads = []
+        try:
+            players = players_data
+        except Exception:
+            return []
+        if not players or len(players) < 2:
+            return []
+
+        for stat in stats_list:
+            if stat == "W-L":
+                vals = []
+                for p in players:
+                    if "W" not in p["df"].columns or "L" not in p["df"].columns:
+                        vals.append(np.nan)
+                        continue
+                    w = pd.to_numeric(p["row"].get("W", np.nan), errors="coerce")
+                    l = pd.to_numeric(p["row"].get("L", np.nan), errors="coerce")
+                    if pd.isna(w) or pd.isna(l) or (w + l) <= 0:
+                        vals.append(np.nan)
+                    else:
+                        vals.append(w / (w + l))
+            else:
+                if any(stat not in p["df"].columns for p in players):
+                    continue
+                vals = []
+                for p in players:
+                    raw_v = p["row"].get(stat, np.nan)
+                    # Apply the same transformation used when rendering the table
+                    trans_v = transform_stat_value(stat, raw_v)
+                    try:
+                        num = float(trans_v) if pd.notna(trans_v) else np.nan
+                    except Exception:
+                        num = np.nan
+                    vals.append(num)
+
+            if pd.isna(vals[pidx]):
+                continue
+
+            is_lower_better = stat in globals().get("lower_better", set())
+            better = True
+            for idx, other in enumerate(vals):
+                if idx == pidx:
+                    continue
+                if pd.isna(other):
+                    continue
+                if is_lower_better:
+                    if not (vals[pidx] + 1e-9 < other):
+                        better = False
+                        break
+                else:
+                    if not (vals[pidx] > other + 1e-9):
+                        better = False
+                        break
+            if better:
+                leads.append(stat)
+        return leads
+
+    if preset_name in ("Player A leads", "Player B leads"):
+        pidx = 0 if preset_name == "Player A leads" else 1
+        # Only consider stats that are in the allowlist and exclude Age from lead presets
+        stats_to_check = [s for s in available_stats if s in STAT_ALLOWLIST and s != "Age"]
+        computed = compute_leads_for_player(pidx, stats_to_check)
+        filtered_stats = [s for s in computed if s in stats_to_check]
+        # If no allowlisted lead stats, do nothing
+        if not filtered_stats:
+            return
+        st.session_state[stat_key] = [{"Stat": stat, "Show": True} for stat in filtered_stats]
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+        st.session_state[add_reset_key] = True
+        st.session_state[remove_reset_key] = True
+        return
+
     preset_stats = STAT_PRESETS.get(preset_name, [])
     filtered_stats = [stat for stat in preset_stats if stat in available_stats]
     if not filtered_stats and available_stats:
@@ -2124,6 +2202,7 @@ label_map = {
     "EV": "Avg Exit Velo",
     "ARM": "Arm Value",
     "Contact%": "Whiff%",
+    "O-Swing%": "Chase%",
 }
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "Contact%", "SO"}
 
