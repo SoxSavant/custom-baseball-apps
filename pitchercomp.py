@@ -241,6 +241,8 @@ STAT_PRESETS = {
     # Dynamic presets (empty here) — values are computed when the preset is selected
     "Player A leads": [],
     "Player B leads": [],
+    "Player C leads": [],
+    "Player D leads": [],
 }
 
 STAT_ALLOWLIST = ["WAR", "bWAR",
@@ -2011,22 +2013,38 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
                 leads.append(stat)
         return leads
 
-    if preset_name in ("Player A leads", "Player B leads"):
-        # choose player index 0 for A, 1 for B
-        pidx = 0 if preset_name == "Player A leads" else 1
-        # Only consider stats that are in the allowlist and exclude Age from lead presets
-        stats_to_check = [s for s in available_stats if s in STAT_ALLOWLIST and s != "Age"]
-        computed = compute_leads_for_player(pidx, stats_to_check)
-        filtered_stats = [s for s in computed if s in stats_to_check]
-        # If no leads found among allowlisted stats, do not change the config
-        if not filtered_stats:
+    # Dynamically handle "Player X leads" for X in A..D
+    if preset_name.startswith("Player ") and preset_name.endswith(" leads"):
+        try:
+            letter = preset_name.split()[1]
+            if len(letter) == 1 and letter.isalpha():
+                pidx = ord(letter.upper()) - ord("A")
+            else:
+                pidx = None
+        except Exception:
+            pidx = None
+        # Ensure the player index exists
+        try:
+            players = players_data
+        except Exception:
+            players = []
+        if pidx is None or pidx < 0 or pidx >= len(players):
+            # Player slot not present — fall back to static behavior
+            pass
+        else:
+            # Only consider stats that are in the allowlist and exclude Age
+            stats_to_check = [s for s in available_stats if s in STAT_ALLOWLIST and s != "Age"]
+            computed = compute_leads_for_player(pidx, stats_to_check)
+            filtered_stats = [s for s in computed if s in stats_to_check]
+            # If no leads found among allowlisted stats, do nothing
+            if not filtered_stats:
+                return
+            st.session_state[stat_key] = [{"Stat": stat, "Show": True} for stat in filtered_stats]
+            bump_stat_config_version()
+            st.session_state[manual_stat_update_key] = True
+            st.session_state[add_reset_key] = True
+            st.session_state[remove_reset_key] = True
             return
-        st.session_state[stat_key] = [{"Stat": stat, "Show": True} for stat in filtered_stats]
-        bump_stat_config_version()
-        st.session_state[manual_stat_update_key] = True
-        st.session_state[add_reset_key] = True
-        st.session_state[remove_reset_key] = True
-        return
 
     # Default behavior for static presets
     preset_stats = STAT_PRESETS.get(preset_name, [])
