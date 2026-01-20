@@ -995,9 +995,8 @@ def on_stat_change():
     if not s.get("hl_span", False):
         s["hl_end_year"] = s["hl_start_year"]
 
-if "hl_min_pa" not in st.session_state:
-    # default minimum plate appearances is 502 (single-season convention)
-    st.session_state["hl_min_pa"] = 502
+
+st.session_state["hl_min_pa"] = 502
 
 st.markdown(
     """
@@ -1048,8 +1047,7 @@ with col1:
     else:
         # ensure end == start for single-year default and keep a local var for loads
         end_year = st.session_state["hl_start_year"]
-    # Minimum plate appearances (default 502) shown under the year selectors
-    min_pa = st.number_input("Min PA", min_value=0, max_value=20000, value=st.session_state["hl_min_pa"], key="hl_min_pa")
+   
 
     st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
