@@ -180,7 +180,13 @@ def load_bwar_span(start_year: int, end_year: int, target_names=None):
 
         # Rename to bWAR for consistency
         df["bWAR"] = df["WAR"]
-        return df[["NameKey", "bWAR"]].copy()
+        # Keep mlb and bbref ids as available so enrichment can perform ID-based joins
+        cols = ["NameKey", "bWAR"]
+        if "player_ID" in df.columns:
+            cols.append("player_ID")
+        if "mlb_ID" in df.columns:
+            cols.append("mlb_ID")
+        return df[cols].copy()
     except Exception:
         return pd.DataFrame()
 
@@ -564,6 +570,22 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         # non-critical; ignore
         pass
 
+    # Ensure every aggregated row has an mlbam id when possible. If we didn't
+    # find an mlbam in the grouped rows above, try a name lookup as a fallback.
+    try:
+        if "mlbam" not in result or result.get("mlbam") is None:
+            name_for_lookup = result.get("Name") if "Name" in result else None
+            if name_for_lookup:
+                try:
+                    mlb_lookup = lookup_mlbam_id(str(name_for_lookup))
+                    if mlb_lookup:
+                        result["mlbam"] = mlb_lookup
+                except Exception:
+                    # non-fatal
+                    pass
+    except Exception:
+        pass
+
     # Copy other columns — skip id columns so our chosen mlbam/IDfg are not
     # overwritten by numeric sums across seasons.
     skip_cols = {
@@ -805,79 +827,7 @@ def enrich_leaderboard_players(start_year: int, end_year: int, df: pd.DataFrame,
         combined = combined.copy()
         combined["NameKey"] = combined["Name"].astype(str).apply(normalize_statcast_name)
 
-    # bWAR merge — prefer ID-based joins (mlb_ID / player_ID) and fall back to NameKey
-    names = tuple(out["Name"].dropna().unique())
-    bwar = load_bwar_span(start_year, end_year, target_names=names)
-    # initialize bWAR column
-    out = out.copy()
-    out["bWAR"] = np.nan
-
-    if bwar is None or bwar.empty:
-        # no local bWAR rows found for this span
-        st.info("bWAR: local dataset returned no rows for the selected span")
-    else:
-        # Prepare mlb_ID in the leaderboard frame from common mlbam-like columns
-        mlb_cols = ["mlbam", "MLBID", "key_mlbam", "mlbam_override", "mlbam_id", "MLBAMID"]
-        out["mlb_ID"] = np.nan
-        for c in mlb_cols:
-            if c in out.columns:
-                try:
-                    out.loc[:, "mlb_ID"] = out.loc[:, "mlb_ID"].fillna(pd.to_numeric(out[c], errors="coerce"))
-                except Exception:
-                    # keep going if a particular column cannot be converted
-                    pass
-
-        # Prepare player_ID (bbref) in the leaderboard frame from common bbref-like columns
-        bb_cols = ["player_ID", "key_bbref", "bbref", "playerid"]
-        if "player_ID" not in out.columns:
-            out["player_ID"] = ""
-        for c in bb_cols:
-            if c in out.columns and c != "player_ID":
-                try:
-                    mask_missing = out["player_ID"].astype(str).str.strip() == ""
-                    out.loc[mask_missing, "player_ID"] = out.loc[mask_missing, c].astype(str)
-                except Exception:
-                    pass
-        out["player_ID"] = out["player_ID"].astype(str).str.strip().str.lower()
-
-        # bWAR mappings
-        # mlb_ID mapping (numeric)
-        if "mlb_ID" in bwar.columns:
-            try:
-                bwar_mlbs = bwar.dropna(subset=["mlb_ID"]).copy()
-                bwar_mlbs["mlb_ID"] = pd.to_numeric(bwar_mlbs["mlb_ID"], errors="coerce")
-                mlb_map = bwar_mlbs.dropna(subset=["mlb_ID"]).set_index("mlb_ID")["bWAR"].to_dict()
-                mask_need = out["bWAR"].isna() & out["mlb_ID"].notna()
-                if mask_need.any():
-                    out.loc[mask_need, "bWAR"] = out.loc[mask_need, "mlb_ID"].map(mlb_map)
-            except Exception:
-                st.info("bWAR: error applying mlb_ID-based merge")
-
-        # player_ID (bbref) mapping (string)
-        if "player_ID" in bwar.columns:
-            try:
-                player_map = bwar.dropna(subset=["player_ID"]).set_index("player_ID")["bWAR"].to_dict()
-                mask_need = out["bWAR"].isna() & out["player_ID"].astype(str).str.strip().astype(bool)
-                if mask_need.any():
-                    out.loc[mask_need, "bWAR"] = out.loc[mask_need, "player_ID"].map(player_map)
-            except Exception:
-                st.info("bWAR: error applying player_ID-based merge")
-
-        # Final fallback: join by NameKey
-        try:
-            name_map = bwar.set_index("NameKey")["bWAR"].to_dict()
-            mask_need = out["bWAR"].isna()
-            if mask_need.any():
-                out.loc[mask_need, "bWAR"] = out.loc[mask_need, "NameKey"].map(name_map)
-        except Exception:
-            st.info("bWAR: error applying NameKey-based merge")
-
-        # Report unmatched players so it's visible to the user (no silent failures)
-        unmatched = out[out["bWAR"].isna()]["Name"].dropna().unique()
-        if len(unmatched) > 0:
-            sample = ", ".join(map(str, unmatched[:10]))
-            more = "..." if len(unmatched) > 10 else ""
-            st.info(f"bWAR: no local match for {len(unmatched)} players: {sample}{more}")
+    # bWAR stat removed by user request — no bWAR enrichment performed
 
     # Fielding merge
     try:
@@ -986,7 +936,7 @@ def load_batting(start_year: int, end_year: int, resolve_fg_teams: bool = False)
 # ----------------------------
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",
+    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
@@ -1083,7 +1033,6 @@ with col1:
         start_label,
         min_value=1900,
         max_value=current_year,
-        value=st.session_state["hl_start_year"],
         key="hl_start_year",
         on_change=on_year_change
     )
@@ -1093,7 +1042,6 @@ with col1:
             "End Year",
             min_value=1900,
             max_value=current_year,
-            value=st.session_state["hl_end_year"],
             key="hl_end_year",
             on_change=on_year_change
         )
