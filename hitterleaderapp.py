@@ -7,6 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from pybaseball.statcast_fielding import statcast_outs_above_average
 import io
+from pathlib import Path
 from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
@@ -71,6 +72,58 @@ VALID_TEAMS = {
     "TEX","TOR","WSN"
 }
 
+# Local bWAR file (mirror comparisonapp.py)
+LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
+
+
+def local_bwar_signature() -> float:
+    try:
+        return LOCAL_BWAR_FILE.stat().st_mtime
+    except FileNotFoundError:
+        return 0.0
+
+
+def load_local_bwar_data() -> pd.DataFrame:
+    """Load and normalize the local warhitters2025.txt file into a tidy DataFrame.
+
+    Mirrors the helper from comparisonapp.py so the hitter leaderboard can
+    reliably join bWAR values from the local file.
+    """
+    path = LOCAL_BWAR_FILE
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    # Drop pitcher rows only when they have no plate appearances (true pitchers)
+    pitcher_col = df.get("pitcher")
+    pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
+    if pitcher_col is not None:
+        pitcher_mask = (
+            pitcher_col.astype(str)
+            .str.strip()
+            .str.upper()
+            .isin({"Y", "1", "TRUE"})
+        )
+        no_pa_mask = pa_col.isna() | (pa_col <= 0)
+        drop_mask = pitcher_mask & no_pa_mask
+        df = df[~drop_mask]
+
+    df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
+    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["WAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    player_series = df["player_ID"] if "player_ID" in df.columns else pd.Series("", index=df.index)
+    df["player_ID"] = player_series.astype(str).str.strip().str.lower()
+    mlb_series = df["mlb_ID"] if "mlb_ID" in df.columns else pd.Series(np.nan, index=df.index)
+    df["mlb_ID"] = pd.to_numeric(mlb_series, errors="coerce")
+    df = df.dropna(subset=["NameKey", "year_ID", "WAR"])
+    return df[["NameKey", "Name", "year_ID", "WAR", "player_ID", "mlb_ID"]]
+
 
 def compute_team_display(teams: list[str]) -> str:
     if not teams:
@@ -102,41 +155,13 @@ def load_year(year: int):
 
 @st.cache_data(ttl=900, show_spinner=False)
 def load_bwar(start_year: int, end_year: int) -> pd.DataFrame:
-    try:
-        df = pybaseball.bwar_bat()
-    except Exception:
-        return pd.DataFrame()
-
+    # Load normalized local bWAR dataset and filter to the requested span
+    df = load_local_bwar_data()
     if df is None or df.empty:
         return pd.DataFrame()
 
-    df = df.copy()
-    name_col = None
-    for c in ("Name", "name", "player_name"):
-        if c in df.columns:
-            name_col = c
-            break
-
-    df["Name"] = df.get(name_col, "").astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-
-    if "year_ID" in df.columns:
-        df["year_ID"] = pd.to_numeric(df["year_ID"], errors="coerce")
-    elif "Year" in df.columns:
-        df["year_ID"] = pd.to_numeric(df["Year"], errors="coerce")
-    else:
-        df["year_ID"] = np.nan
-
-    war_col = None
-    for c in ("WAR", "war", "War"):
-        if c in df.columns:
-            war_col = c
-            break
-    df["WAR"] = pd.to_numeric(df[war_col], errors="coerce") if war_col else np.nan
-
     mask = df["year_ID"].between(start_year, end_year)
-    df = df[mask]
-
+    df = df[mask].copy()
     return df
 
 
@@ -305,6 +330,37 @@ def get_player_teams_fangraphs(fg_id: int, start_year: int, end_year: int):
     collapsed = collapse_athletics(unique)
 
     return collapsed
+
+
+@st.cache_data(show_spinner=False, ttl=900)
+def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
+    """Load a player's fielding aggregates (DRS, TZ, UZR, FRM) using pybaseball.
+
+    Returns a dict with any of the keys found summed across the span.
+    """
+    try:
+        df = pybaseball.fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
+    except Exception:
+        df = None
+    if df is None or df.empty:
+        frames = []
+        for year in range(start_year, end_year + 1):
+            try:
+                yearly = pybaseball.fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
+            except Exception:
+                yearly = None
+            if yearly is not None and not yearly.empty:
+                frames.append(yearly)
+        if not frames:
+            return {}
+        df = pd.concat(frames, ignore_index=True)
+    result: dict[str, float] = {}
+    for key in ["DRS", "TZ", "UZR", "FRM"]:
+        if key in df.columns:
+            series = pd.to_numeric(df[key], errors="coerce")
+            if not series.isna().all():
+                result[key] = series.sum(skipna=True)
+    return result
 
 
 # Lightweight headshot helpers (same bases used in comparison app)
@@ -749,16 +805,79 @@ def enrich_leaderboard_players(start_year: int, end_year: int, df: pd.DataFrame,
         combined = combined.copy()
         combined["NameKey"] = combined["Name"].astype(str).apply(normalize_statcast_name)
 
-    # bWAR merge
-    try:
-        names = tuple(out["Name"].dropna().unique())
-        bwar = load_bwar_span(start_year, end_year, target_names=names)
-        if not bwar.empty:
-            out = pd.merge(out, bwar, on="NameKey", how="left")
-        else:
-            out["bWAR"] = np.nan
-    except Exception:
-        out["bWAR"] = np.nan
+    # bWAR merge — prefer ID-based joins (mlb_ID / player_ID) and fall back to NameKey
+    names = tuple(out["Name"].dropna().unique())
+    bwar = load_bwar_span(start_year, end_year, target_names=names)
+    # initialize bWAR column
+    out = out.copy()
+    out["bWAR"] = np.nan
+
+    if bwar is None or bwar.empty:
+        # no local bWAR rows found for this span
+        st.info("bWAR: local dataset returned no rows for the selected span")
+    else:
+        # Prepare mlb_ID in the leaderboard frame from common mlbam-like columns
+        mlb_cols = ["mlbam", "MLBID", "key_mlbam", "mlbam_override", "mlbam_id", "MLBAMID"]
+        out["mlb_ID"] = np.nan
+        for c in mlb_cols:
+            if c in out.columns:
+                try:
+                    out.loc[:, "mlb_ID"] = out.loc[:, "mlb_ID"].fillna(pd.to_numeric(out[c], errors="coerce"))
+                except Exception:
+                    # keep going if a particular column cannot be converted
+                    pass
+
+        # Prepare player_ID (bbref) in the leaderboard frame from common bbref-like columns
+        bb_cols = ["player_ID", "key_bbref", "bbref", "playerid"]
+        if "player_ID" not in out.columns:
+            out["player_ID"] = ""
+        for c in bb_cols:
+            if c in out.columns and c != "player_ID":
+                try:
+                    mask_missing = out["player_ID"].astype(str).str.strip() == ""
+                    out.loc[mask_missing, "player_ID"] = out.loc[mask_missing, c].astype(str)
+                except Exception:
+                    pass
+        out["player_ID"] = out["player_ID"].astype(str).str.strip().str.lower()
+
+        # bWAR mappings
+        # mlb_ID mapping (numeric)
+        if "mlb_ID" in bwar.columns:
+            try:
+                bwar_mlbs = bwar.dropna(subset=["mlb_ID"]).copy()
+                bwar_mlbs["mlb_ID"] = pd.to_numeric(bwar_mlbs["mlb_ID"], errors="coerce")
+                mlb_map = bwar_mlbs.dropna(subset=["mlb_ID"]).set_index("mlb_ID")["bWAR"].to_dict()
+                mask_need = out["bWAR"].isna() & out["mlb_ID"].notna()
+                if mask_need.any():
+                    out.loc[mask_need, "bWAR"] = out.loc[mask_need, "mlb_ID"].map(mlb_map)
+            except Exception:
+                st.info("bWAR: error applying mlb_ID-based merge")
+
+        # player_ID (bbref) mapping (string)
+        if "player_ID" in bwar.columns:
+            try:
+                player_map = bwar.dropna(subset=["player_ID"]).set_index("player_ID")["bWAR"].to_dict()
+                mask_need = out["bWAR"].isna() & out["player_ID"].astype(str).str.strip().astype(bool)
+                if mask_need.any():
+                    out.loc[mask_need, "bWAR"] = out.loc[mask_need, "player_ID"].map(player_map)
+            except Exception:
+                st.info("bWAR: error applying player_ID-based merge")
+
+        # Final fallback: join by NameKey
+        try:
+            name_map = bwar.set_index("NameKey")["bWAR"].to_dict()
+            mask_need = out["bWAR"].isna()
+            if mask_need.any():
+                out.loc[mask_need, "bWAR"] = out.loc[mask_need, "NameKey"].map(name_map)
+        except Exception:
+            st.info("bWAR: error applying NameKey-based merge")
+
+        # Report unmatched players so it's visible to the user (no silent failures)
+        unmatched = out[out["bWAR"].isna()]["Name"].dropna().unique()
+        if len(unmatched) > 0:
+            sample = ", ".join(map(str, unmatched[:10]))
+            more = "..." if len(unmatched) > 10 else ""
+            st.info(f"bWAR: no local match for {len(unmatched)} players: {sample}{more}")
 
     # Fielding merge
     try:
@@ -984,7 +1103,7 @@ with col1:
     # Minimum plate appearances (default 502) shown under the year selectors
     min_pa = st.number_input("Min PA", min_value=0, max_value=20000, value=st.session_state["hl_min_pa"], key="hl_min_pa")
 
-    st.checkbox("Show worst instead", key="hl_sort_worst")
+    st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
 
 df = load_batting(int(start_year), int(end_year))
@@ -1018,6 +1137,17 @@ try:
                         collapsed = collapse_athletics(sorted(set([t for t in vals if t])))
                         df.at[idx, "TeamDisplay"] = compute_team_display(collapsed)
                         df.at[idx, "Team"] = ",".join(collapsed)
+                    # Also fetch per-player fielding aggregates (DRS/TZ/UZR/FRM)
+                    try:
+                        field_vals = load_player_fielding_profile(fg_int, int(start_year), int(end_year))
+                        for fk, fv in field_vals.items():
+                            try:
+                                df.at[idx, fk] = fv
+                            except Exception:
+                                continue
+                    except Exception:
+                        # non-fatal
+                        pass
                 # Ensure mlbam override exists for headshot resolution (fix accents/rookies)
                 name_val = df.at[idx, "Name"] if "Name" in df.columns else None
                 if name_val and ("mlbam_override" not in df.columns or pd.isna(df.at[idx, "mlbam_override"])):
