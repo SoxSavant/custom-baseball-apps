@@ -60,6 +60,16 @@ st.markdown(
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Team Savant Page App")
+with meta_col:
+    st.markdown(
+        """
+        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+            Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
+            <span style="color: #aaa;"></span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 CSS_KEY = "stat_builder_css"
 if not st.session_state.get(CSS_KEY):
