@@ -9,9 +9,10 @@ import matplotlib.image as mpimg
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
-from io import BytesIO
+from io import BytesIO, StringIO
 from pybaseball import batting_stats, fielding_stats, bwar_bat
 from datetime import date
+import requests
 
 
 
