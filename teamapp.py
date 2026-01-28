@@ -428,7 +428,7 @@ def get_team_nickname(full_name: str) -> str:
 left_col, right_col = st.columns([1.2, 1.5])
 
 with left_col:
-    year = st.slider("Season", 1900, date.today().year, date.today().year)
+    year = st.selectbox("Select Year", list(range(2025, 1870, -1)))
     teams_for_year = get_teams_for_year(year)
     team_options = list(teams_for_year.keys())
     team_select_key = "team_abbr_select"
@@ -901,7 +901,7 @@ with right_col:
     )
 
     # Increased height based on number of rows
-    fig_height = 1.7 + len(lead_df) * 0.40
+    fig_height = 1.25 + len(lead_df) * 0.4
     fig, ax = plt.subplots(figsize=(7.5, fig_height))
 
     # Adjust white card space with more breathing room between subtitle and bars

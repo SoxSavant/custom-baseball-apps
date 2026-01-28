@@ -603,7 +603,7 @@ with controls_container:
     today = date.today()
     current_year = today.year
     default_year = current_year if today.month >= 3 else current_year - 1
-    year = st.number_input("Season", value=default_year, step=1, format="%d")
+    year = st.selectbox("Select Year", list(range(2025, 1870, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     default_player = st.session_state.get("player_select", "Mookie Betts")
     if player_mode == "Name":
@@ -1086,8 +1086,8 @@ with right_col:
         ],
     )
 
-    fig_height = 1.7 + len(lead_df) * 0.40
-    fig, ax = plt.subplots(figsize=(7.5, fig_height))
+    fig_height = 1.2 + len(lead_df) * 0.5
+    fig, ax = plt.subplots(figsize=(10, fig_height))
 
     top_pad = 0.12 if len(lead_df) > 6 else 0.14 if len(lead_df) > 4 else 0.4
     ax_height = 0.85 - top_pad
@@ -1117,10 +1117,11 @@ with right_col:
 
     TRACK_H = 0.82
     BAR_H = 0.82
-    LEFT_OFFSET = 3
-    BAR_LENGTH = 45 
-    VALUE_X = LEFT_OFFSET + BAR_LENGTH + 12
-    BUBBLE_SIZE = 700
+    LEFT_OFFSET = 5
+    BAR_LENGTH = 60
+    VALUE_X = LEFT_OFFSET + BAR_LENGTH + 15
+    LABEL_X = 0
+    BUBBLE_SIZE = 900
 
     ax.barh(
         y,
@@ -1175,7 +1176,7 @@ with right_col:
             zorder=2.6,
         )
 
-    ax.set_xlim(-10, VALUE_X)
+    ax.set_xlim(-15, VALUE_X+5)
     ax.set_ylim(-0.5, len(lead_df) - 0.5)
     ax.invert_yaxis()
     ax.set_xticks([])
