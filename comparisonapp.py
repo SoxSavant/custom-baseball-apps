@@ -306,7 +306,7 @@ STAT_ALLOWLIST = [
      "WAR", "bWAR","Off", "Def", "BsR",  "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
     "Pull%", "FRV", "OAA", "ARM", "DRS", "TZ", "FRM", "UZR", "Age",
 ]
 STATCAST_FIELDING_START_YEAR = 2016
