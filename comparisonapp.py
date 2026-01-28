@@ -232,15 +232,11 @@ STAT_PRESETS = {
     "Miscellaneous": [
         "K-BB%",
         "O-Swing%",
-        "Z-Swing%",
-        "Swing%",
         "Contact%",
         "DRS",
         "WPA",
         "Clutch",
         "Pull%",
-        "Cent%",
-        "Oppo%",
         "GB%",
         "FB%",
         "LD%",
@@ -289,8 +285,6 @@ STAT_PRESETS = {
         "SO",
         "K-BB%",
         "O-Swing%",
-        "Z-Swing%",
-        "Swing%",
         "Contact%",
         "DRS",
         "WPA",
@@ -338,8 +332,8 @@ SUM_STATS = {
 }
 RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "Whiff%",
-    "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "Whiff%",
+    "Barrel%", "HardHit%", "Pull%", "GB%", "FB%", "LD%",
     "LA", "EV", "MaxEV", "CSW%", "BB/K", "ISO",
 }
 STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}

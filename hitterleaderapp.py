@@ -12,6 +12,31 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
+@st.cache_data(ttl=3600)
+def preload_all_data(start_year, end_year):
+    if start_year == end_year:
+        return batting_stats(start_year,end_year, qual=0, split_seasons=False)
+    else:
+
+        frames = []
+        for year in range(start_year, end_year + 1):
+            yr_data = batting_stats(year, year, qual=0, split_seasons=False)
+            if not yr_data.empty:
+                yr_data['Season'] = year
+                frames.append(yr_data)
+        
+        if frames:
+            combined = pd.concat(frames, ignore_index=True)
+            # Group by player and aggregate
+            grouped_rows = []
+            for played_id, grp in combined.groupby("IDfg"):
+                name = grp["Name"].iloc[0] if not grp.empty else None
+                row = aggregate_player_group(grp, name)
+                if row is not None and len(row):
+                    grouped_rows.append(row)
+            return pd.DataFrame(grouped_rows)
+        return pd.DataFrame()
+
 st.set_page_config(layout="wide")
 # ----------------------------
 #  Helpers
@@ -842,38 +867,11 @@ def enrich_leaderboard_players(df: pd.DataFrame) -> pd.DataFrame:
         df["TeamDisplay"] = ""
     if "mlbam_override" not in df.columns:
         df["mlbam_override"] = np.nan
-
     return df
 
 
 
-# ----------------------------
-#  Load batting
-# ----------------------------
 
-@st.cache_data(ttl=300, show_spinner=False)
-def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
-    start = min(start_year, end_year)
-    end = max(start_year, end_year)
-
-    if start == end:
-        yearly = batting_stats(start, start, qual=0, split_seasons=False)
-    if yearly.empty:
-        yearly = load_year(start)
-    if yearly.empty:
-        return pd.DataFrame()
-
-    grouped_rows = []
-    for name, grp in yearly.groupby("Name"):
-        row = aggregate_player_group(grp, name)
-        if row is not None and len(row):
-            grouped_rows.append(row)
-
-    aggregated = pd.DataFrame(grouped_rows)
-    if aggregated.empty:
-        return pd.DataFrame()
-
-    return enrich_leaderboard_players(aggregated)
 
 
 # ----------------------------
@@ -960,7 +958,6 @@ stat = st.selectbox(
     "Stat",
     STAT_ALLOWLIST,
     key="hl_stat",
-    on_change=on_stat_change,
     format_func=lambda x: label_map.get(x, x),
 )
 
@@ -984,7 +981,7 @@ with col1:
     if st.session_state.get("hl_span", False):
         end_year = st.number_input(
             "End Year",
-            min_value=1900,
+            min_value=2025,
             max_value=current_year,
             key="hl_end_year",
             on_change=on_year_change
@@ -1003,60 +1000,27 @@ with col1:
     st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
 
-df = load_batting(int(start_year), int(end_year))
-if df.empty:
-    st.error("No data loaded.")
-    st.stop()
+
 
 # Apply Min PA filter (ensure numeric PA)
 min_pa_val = int(st.session_state.get("hl_min_pa", 0))
-if "PA" in df.columns:
-    df = df[df["PA"] >= min_pa_val]
+
+#LOAD DATA
+df = preload_all_data(start_year,end_year)
+
+#Filter out for MIN PA
+df = df[df["PA"] >= min_pa_val]
 
 # Sort and take top N
 df = df.sort_values(by=stat, ascending=st.session_state.get("hl_sort_worst", False))
 df = df.head(10)
 
-# Resolve FanGraphs team names only for the top-10 rows to keep loading fast.
-try:
-    with st.spinner("Resolving teams for top players..."):
-        for idx in df.index:
-            try:
-                fg_id = df.at[idx, "IDfg"] if "IDfg" in df.columns else None
-                if pd.notna(fg_id):
-                    fg_int = int(fg_id)
-                    vals = get_player_teams_fangraphs(fg_int, int(start_year), int(end_year))
-                    if vals:
-                        collapsed = collapse_athletics(sorted(set([t for t in vals if t])))
-                        df.at[idx, "TeamDisplay"] = compute_team_display(collapsed)
-                        df.at[idx, "Team"] = ",".join(collapsed)
-                    # Also fetch per-player fielding aggregates (DRS/TZ/UZR/FRM)
-                    try:
-                        field_vals = load_player_fielding_profile(fg_int, int(start_year), int(end_year))
-                        for fk, fv in field_vals.items():
-                            try:
-                                df.at[idx, fk] = fv
-                            except Exception:
-                                continue
-                    except Exception:
-                        # non-fatal
-                        pass
-                # Ensure mlbam override exists for headshot resolution (fix accents/rookies)
-                name_val = df.at[idx, "Name"] if "Name" in df.columns else None
-                if name_val and ("mlbam_override" not in df.columns or pd.isna(df.at[idx, "mlbam_override"])):
-                    try:
-                        mlbam = lookup_mlbam_id(str(name_val))
-                        if mlbam:
-                            df.at[idx, "mlbam_override"] = mlbam
-                    except Exception:
-                        # non-fatal; continue
-                        pass
-            except Exception:
-                # non-fatal; leave existing Team/TeamDisplay as-is
-                continue
-except Exception:
-    # If spinner or network calls fail, proceed without blocking the UI
-    pass
+if "TeamDisplay" not in df.columns:
+    if "Team" in df.columns:
+        df["TeamDisplay"] = df["Team"].fillna("N/A")
+    else:
+        df["TeamDisplay"] = "N/A"
+
 
 cards = []
 for _, row in df.iterrows():
