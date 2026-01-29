@@ -135,6 +135,8 @@ STAT_ALLOWLIST = [
     "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
 ]
 
+lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
+
 FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE"]
 STATCAST_FIELDING_START_YEAR = 2016
 LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
@@ -892,6 +894,92 @@ with stat_builder_container:
         args=(stat_preset_key, stat_state_key, stat_options),
     )
 
+    if st.button("Sort by percentile (greatest to least)"):
+        # Calculate percentiles for all stats
+        stat_percentiles = {}
+        for stat in stat_options:
+            if stat not in df.columns:
+                continue
+            player_val = player_row.get(stat, np.nan)
+            if pd.isna(player_val):
+                continue
+            league_vals = league_for_pct[stat].dropna()
+            if league_vals.empty:
+                continue
+            pct = (league_vals <= player_val).mean() * 100.0
+            if stat in lower_better:
+                pct = 100 - pct
+            stat_percentiles[stat] = float(np.clip(pct, 0, 100))
+        
+        # Sort current config by percentile
+        current_config = normalize_stat_rows(st.session_state.get(stat_state_key, preset_base_config), preset_base_config)
+        
+        # Sort stats that have percentiles
+        sorted_config = []
+        for row in current_config:
+            stat_name = row.get("Stat")
+            if stat_name in stat_percentiles:
+                sorted_config.append((stat_percentiles[stat_name], row))
+        
+        # Sort by percentile descending
+        sorted_config.sort(key=lambda x: x[0], reverse=True)
+        
+        # Extract just the row dicts
+        new_config = [row for _, row in sorted_config]
+        
+        # Add any stats that didn't have percentiles at the end
+        for row in current_config:
+            if row.get("Stat") not in stat_percentiles:
+                new_config.append(row)
+        
+        st.session_state[stat_state_key] = new_config
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+        st.rerun()
+
+    if st.button("Sort by percentile (least to greatest)"):
+        # Calculate percentiles for all stats
+        stat_percentiles = {}
+        for stat in stat_options:
+            if stat not in df.columns:
+                continue
+            player_val = player_row.get(stat, np.nan)
+            if pd.isna(player_val):
+                continue
+            league_vals = league_for_pct[stat].dropna()
+            if league_vals.empty:
+                continue
+            pct = (league_vals <= player_val).mean() * 100.0
+            if stat in lower_better:
+                pct = 100 - pct
+            stat_percentiles[stat] = float(np.clip(pct, 0, 100))
+        
+        # Sort current config by percentile
+        current_config = normalize_stat_rows(st.session_state.get(stat_state_key, preset_base_config), preset_base_config)
+        
+        # Sort stats that have percentiles
+        sorted_config = []
+        for row in current_config:
+            stat_name = row.get("Stat")
+            if stat_name in stat_percentiles:
+                sorted_config.append((stat_percentiles[stat_name], row))
+        
+        # Sort by percentile descending
+        sorted_config.sort(key=lambda x: x[0], reverse=False)
+        
+        # Extract just the row dicts
+        new_config = [row for _, row in sorted_config]
+        
+        # Add any stats that didn't have percentiles at the end
+        for row in current_config:
+            if row.get("Stat") not in stat_percentiles:
+                new_config.append(row)
+        
+        st.session_state[stat_state_key] = new_config
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+        st.rerun()
+
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
@@ -1040,7 +1128,6 @@ label_map = {
     **STAT_DISPLAY_NAMES,
     "EV": "Avg Exit Velo",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
 
 for stat in stats_order:
     if stat not in df.columns:
