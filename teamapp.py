@@ -425,7 +425,7 @@ def get_team_nickname(full_name: str) -> str:
     return full_name.split(" ", 1)[-1]
 
 # --------------------- Controls ---------------------
-left_col, right_col = st.columns([1.2, 1.5])
+left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
     year = st.selectbox("Select Year", list(range(2025, 1870, -1)))
@@ -1029,7 +1029,7 @@ with right_col:
     ax.axis("off")
 
     st.pyplot(fig, use_container_width=True, clear_figure=False)
-    
+
     pdf_buffer = BytesIO()
     fig.savefig(pdf_buffer, format="pdf", bbox_inches = "tight", pad_inches = .25)
     pdf_buffer.seek(0)
