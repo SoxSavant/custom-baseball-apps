@@ -203,7 +203,6 @@ STAT_PRESETS = {
     "Statcast": [
         "WAR",
         "xERA",
-        "vFA",
         "EV",
         "O-Swing%",
         "Whiff%",
@@ -250,7 +249,7 @@ STAT_PRESETS = {
     ],
     "Every Stat": ["WAR", "bWAR",
     "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9", "Age",
-    "BB/9", "HR/9", "BABIP", "LOB%",  "HR/FB", "vFA", "QS", "CG", "ShO",
+    "BB/9", "HR/9", "BABIP", "LOB%",  "HR/FB", "QS", "CG", "ShO",
     "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%",
     "Whiff%", "WPA"
@@ -264,7 +263,7 @@ STAT_PRESETS = {
 
 STAT_ALLOWLIST = ["WAR", "bWAR",
     "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9", "Age",
-    "BB/9", "HR/9", "BABIP", "LOB%",  "HR/FB", "vFA", "QS", "CG", "ShO",
+    "BB/9", "HR/9", "BABIP", "LOB%",  "HR/FB", "QS", "CG", "ShO",
     "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%",
     "Whiff%", "WPA"
@@ -285,7 +284,7 @@ SUM_STATS = {
 }
 RATE_STATS = {
      "ERA", "xERA", "FIP", "xFIP", "K/9",
-    "BB/9", "HR/9", "BABIP", "LOB%",  "HR/FB", "vFA",
+    "BB/9", "HR/9", "BABIP", "LOB%",  "HR/FB",
    "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%", "Z-Swing%", "Swing%", "Contact%",
     "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch", "FA%", "SI%", "vSI%", "SL%", "vSL%",

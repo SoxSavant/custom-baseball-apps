@@ -7,22 +7,20 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Set backend before importing pyplot
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO, StringIO
 from datetime import date
 from pathlib import Path
 import requests
-from pybaseball import batting_stats, fielding_stats, bwar_bat, playerid_lookup
-from pybaseball.statcast_fielding import statcast_outs_above_average
+from pybaseball import pitching_stats, playerid_lookup, bwar_pitch
 
 plt.rcdefaults()
 
-st.set_page_config(page_title="Custom Savant Page App", layout="wide")
+st.set_page_config(page_title="Pitcher Custom Savant Page", layout="wide")
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Savant Page App")
+    st.title("Pitcher Custom Savant Page")
 with meta_col:
     st.markdown(
         """
@@ -35,56 +33,61 @@ with meta_col:
     )
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
-STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
+STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%", "O-Swing%": "Chase%"}
 
 STAT_PRESETS = {
-    "Statcast": [
+       "My Preference":[
         "WAR",
         "bWAR",
-        "Off",
-        "BsR",
-        "Def",
-        "xwOBA",
-        "xBA",
-        "xSLG",
-        "EV",
-        "Barrel%",
+        "GS",
+        "IP",
+        "ERA",
+        "ERA-",
+        "FIP",
+        "FIP-",
+        "K%",
+        "BB%",
+        "Whiff%",
+        "O-Swing%",
         "HardHit%",
+        "GB%",
+    ],
+    "Stathead": [
+        "bWAR",
+        "WAR",
+        "GS",
+        "IP",
+        "ERA",
+        "ERA-",
+        "SO",
+        "K%",
+        "BB",
+        "BB%",
+    ],
+    "Statcast": [
+        "WAR",
+        "xERA",
+        "EV",
         "O-Swing%",
         "Whiff%",
         "K%",
         "BB%",
-    ],
-    "Fielding": [
-        "DRS",
-        "FRV",
-        "OAA",
-        "ARM",
+        "Barrel%",
+        "HardHit%",
+        "GB%",
     ],
     "Standard": [
-        "bWAR",
         "WAR",
-        "PA",
+        "bWAR",
+        "ERA",
+        "GS",
+        "IP",
         "AVG",
-        "OBP",
-        "SLG",
-        "OPS",
-        "H",
-        "2B",
-        "3B",
-        "HR",
-        "XBH",
-        "RBI",
-        "SB",
-        "R",
-        "K%",
-        "BB%",
+        "WHIP",
+        "HR/9",
+        "K/BB",
     ],
     "Miscellaneous": [
-        "K-BB%",
-        "O-Swing%",
-        "Z-Swing%",
-        "Swing%",
         "WPA",
         "Clutch",
         "Pull%",
@@ -93,51 +96,44 @@ STAT_PRESETS = {
         "GB%",
         "FB%",
         "LD%",
+        "GB/FB",
+        "HR/FB",
     ],
-
-    "Every Stat": [
+    "Plus/Minus Stats": [
+        "ERA-",
+        "FIP-",
+        "Stuff+",
+        "Location+",
+        "Pitching+",
+    ],
+    "Blank – Create your own": [
         "WAR",
-        "bWAR",
-        "Off",
-        "BsR",
-        "Def",
-        "wOBA",
-        "xwOBA",
-        "xBA",
-        "xSLG",
-        "EV",
-        "Barrel%",
-        "HardHit%",
-        "O-Swing%",
-        "Whiff%",
-        "K%",
-        "BB%",
-        "Off", 
-        "Def", 
-        "BsR",
-        "wRC+", 
-        "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "Z-Swing%", "Swing%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-    "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
-
+    ],
+    "Every Stat": [
+        "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+    "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
+    "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
+    "GB%", "SIERA", "O-Swing%", "Whiff%",
+    "WPA", "Clutch",
     ]
-    
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-    "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
+    "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+    "K/9", "BB/9", "HR/9", "BABIP", "vFA", "QS", "CG", "ShO", "SV",
+    "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
+    "GB%", "SIERA", "O-Swing%", "Whiff%",
+    "WPA", "Clutch",
 ]
 
-FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE"]
-STATCAST_FIELDING_START_YEAR = 2016
-LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
+# For pitchers, lower is better for these stats
+lower_better = {
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "WHIP", "BB%", "BB/9", "HR/9", 
+    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB",
+     "LD%", "FB%",
+}
+
+LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 
 
 def normalize_name_key(val: str) -> str:
@@ -167,7 +163,6 @@ def normalize_statcast_name(raw: str) -> str:
     return " ".join(full.split())
 
 
-
 def reorder_savant_name(raw: str) -> str:
     if not raw or not isinstance(raw, str):
         return ""
@@ -178,76 +173,6 @@ def reorder_savant_name(raw: str) -> str:
     return raw
 
 
-def fetch_csv(url: str) -> pd.DataFrame:
-    try:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-    except Exception:
-        return pd.DataFrame()
-    try:
-        data = StringIO(resp.content.decode("utf-8"))
-        df = pd.read_csv(data)
-    except Exception:
-        return pd.DataFrame()
-    return df
-
-
-def load_savant_frv_year(year: int) -> pd.DataFrame:
-    url = (
-        "https://baseballsavant.mlb.com/leaderboard/fielding-run-value?"
-        f"gameType=Regular&seasonStart={year}&seasonEnd={year}"
-        "&type=fielder&position=&minInnings=0&minResults=1&csv=true"
-    )
-    df = fetch_csv(url)
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.rename(
-        columns={
-            "name": "NameRaw",
-            "total_runs": "FRV",
-            "arm_runs": "ARM",
-            "range_runs": "RANGE",
-        }
-    )
-    df["Name"] = df["NameRaw"].apply(reorder_savant_name)
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-    for metric in ["FRV", "ARM", "RANGE"]:
-        df[metric] = pd.to_numeric(df.get(metric), errors="coerce")
-    return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
-
-
-def load_savant_oaa_year(year: int) -> pd.DataFrame:
-    try:
-        df = statcast_outs_above_average(year, "all")
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    name_col = None
-    for col in ["player_name", "last_name, first_name", "name"]:
-        if col in df.columns:
-            name_col = col
-            break
-    if not name_col:
-        return pd.DataFrame()
-    if name_col == "last_name, first_name":
-        df["Name"] = df[name_col].apply(reorder_savant_name)
-    else:
-        df["Name"] = df[name_col].astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-    oaa_col = None
-    for col in ["outs_above_average", "oaa"]:
-        if col in df.columns:
-            oaa_col = col
-            break
-    if not oaa_col:
-        return pd.DataFrame()
-    df["OAA"] = pd.to_numeric(df[oaa_col], errors="coerce")
-    return df[["NameKey", "Name", "OAA"]]
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
 def load_local_bwar_data():
     path = LOCAL_BWAR_FILE
     if not path.exists():
@@ -267,7 +192,8 @@ def load_local_bwar_data():
             .str.upper()
             .isin({"Y", "1", "TRUE"})
         )
-        df = df[~pitcher_mask]
+        # Keep only pitchers
+        df = df[pitcher_mask]
     df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
     df["NameKey"] = df["Name"].apply(normalize_statcast_name)
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
@@ -281,7 +207,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     _ = local_sig
     frames: list[pd.DataFrame] = []
     try:
-        data = bwar_bat(return_all=True)
+        data = bwar_pitch(return_all=True)
     except Exception:
         data = None
     if data is not None and not data.empty:
@@ -289,7 +215,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
         data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
         data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
         if "pitcher" in data.columns:
-            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
+            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) != 0]
         data["Name"] = data["name_common"].astype(str).str.strip()
         data["NameKey"] = data["Name"].apply(normalize_statcast_name)
         frames.append(data[["NameKey", "Name", "year_ID", "WAR"]])
@@ -324,272 +250,46 @@ def load_bwar_for_year(year: int) -> pd.DataFrame:
     return agg
 
 
-@st.cache_data(show_spinner=False, ttl=900)
-def load_bwar_span(
-    start_year: int,
-    end_year: int,
-    target_names: tuple[str, ...] | None = None,
-    target_bbref: str | None = None,
-    target_mlbam: int | None = None,
-) -> pd.DataFrame:
-    data = load_bwar_dataset(local_bwar_signature())
-    if data is None or data.empty:
-        return pd.DataFrame()
-    mask = data["year_ID"].between(start_year, end_year)
-    pool = data[mask]
-    if pool.empty:
-        return pd.DataFrame()
-
-    def match_by_names() -> pd.DataFrame:
-        if not target_names:
-            return pd.DataFrame()
-        keys = {normalize_statcast_name(name) for name in target_names if name}
-        if not keys:
-            return pd.DataFrame()
-        return pool[pool["NameKey"].isin(keys)]
-
-    def match_by_bbref() -> pd.DataFrame:
-        if not target_bbref:
-            return pd.DataFrame()
-        slug = str(target_bbref).strip().lower()
-        if not slug:
-            return pd.DataFrame()
-        if "player_ID" not in pool.columns:
-            return pd.DataFrame()
-        return pool[pool["player_ID"].astype(str).str.lower() == slug]
-
-    def match_by_mlbam() -> pd.DataFrame:
-        if target_mlbam is None:
-            return pd.DataFrame()
-        try:
-            mlbam_val = int(target_mlbam)
-        except Exception:
-            return pd.DataFrame()
-        if "mlb_ID" not in pool.columns:
-            return pd.DataFrame()
-        return pool[pool["mlb_ID"] == mlbam_val]
-
-    df = match_by_names()
-    if df.empty:
-        alt = match_by_bbref()
-        if not alt.empty:
-            df = alt
-    if df.empty:
-        alt = match_by_mlbam()
-        if not alt.empty:
-            df = alt
-    if df.empty:
-        return pd.DataFrame()
-    agg = df.groupby("NameKey", as_index=False).agg({
-        "Name": "first",
-        "bWAR": lambda s: s.sum(min_count=1),
-    })
-    return agg
+def add_whiff_from_contact(df: pd.DataFrame) -> pd.DataFrame:
+    """Add Whiff% column derived from Contact% if present."""
+    if "Contact%" not in df.columns:
+        return df
+    
+    contact = pd.to_numeric(df["Contact%"], errors="coerce")
+    needs_percent_scale = contact.dropna().abs().le(1).mean() > 0.9 if contact.notna().any() else False
+    if needs_percent_scale:
+        contact = contact * 100
+    df["Whiff%"] = 100 - contact
+    return df
 
 
-
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
-    try:
-        df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
-    except Exception:
-        df = None
-    if df is None or df.empty:
-        frames = []
-        for year in range(start_year, end_year + 1):
-            try:
-                yearly = fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
-            except Exception:
-                yearly = None
-            if yearly is not None and not yearly.empty:
-                frames.append(yearly)
-        if not frames:
-            return {}
-        df = pd.concat(frames, ignore_index=True)
-    result: dict[str, float] = {}
-    for key in ["DRS", "TZ", "UZR", "FRM"]:
-        if key in df.columns:
-            series = pd.to_numeric(df[key], errors="coerce")
-            if not series.isna().all():
-                result[key] = series.sum(skipna=True)
-    return result
-
-
-
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def load_player_fielding_profile_span(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
-    try:
-        df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
-    except Exception:
-        df = None
-    if df is None or df.empty:
-        frames = []
-        for year in range(start_year, end_year + 1):
-            try:
-                yearly = fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
-            except Exception:
-                yearly = None
-            if yearly is not None and not yearly.empty:
-                frames.append(yearly)
-        if not frames:
-            return {}
-        df = pd.concat(frames, ignore_index=True)
-    result: dict[str, float] = {}
-    for key in ["DRS", "TZ", "UZR", "FRM"]:
-        if key in df.columns:
-            series = pd.to_numeric(df[key], errors="coerce")
-            if not series.isna().all():
-                result[key] = series.sum(skipna=True)
-    return result
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def load_statcast_fielding_span(
-    start_year: int,
-    end_year: int,
-    target_names: tuple[str, ...] | None = None,
-) -> pd.DataFrame:
-    start = min(start_year, end_year)
-    end = max(start_year, end_year)
-    start = max(start, STATCAST_FIELDING_START_YEAR)
-    if start > end:
-        return pd.DataFrame()
-    name_filter = None
-    if target_names:
-        name_filter = {normalize_statcast_name(name) for name in target_names if name}
-    frames: list[pd.DataFrame] = []
-    for year in range(start, end + 1):
-        frv = load_savant_frv_year(year)
-        oaa = load_savant_oaa_year(year)
-        if (frv is None or frv.empty) and (oaa is None or oaa.empty):
-            continue
-        if frv is None or frv.empty:
-            yearly = oaa.copy()
-        elif oaa is None or oaa.empty:
-            yearly = frv.copy()
-        else:
-            yearly = pd.merge(
-                frv,
-                oaa,
-                on=["NameKey", "Name"],
-                how="outer",
-            )
-        for metric in ["FRV", "OAA", "ARM", "RANGE"]:
-            if metric not in yearly.columns:
-                yearly[metric] = np.nan
-            else:
-                yearly[metric] = pd.to_numeric(yearly[metric], errors="coerce")
-        if name_filter is not None:
-            yearly = yearly[yearly["NameKey"].isin(name_filter)]
-            if yearly.empty:
-                continue
-        frames.append(yearly)
-    if not frames:
-        return pd.DataFrame()
-    combined = pd.concat(frames, ignore_index=True)
-
-    def pick_name(series: pd.Series) -> str:
-        for val in series:
-            if isinstance(val, str) and val.strip():
-                return val
-        return ""
-
-    agg = combined.groupby("NameKey", as_index=False).agg({
-        "Name": pick_name,
-        "FRV": lambda s: s.sum(min_count=1),
-        "OAA": lambda s: s.sum(min_count=1),
-        "ARM": lambda s: s.sum(min_count=1),
-        "RANGE": lambda s: s.sum(min_count=1),
-    })
-    return agg
-
-
-@st.cache_data(show_spinner=False, ttl=900)
-def load_fielding_year(year: int) -> pd.DataFrame:
-    try:
-        df = fielding_stats(year, year, qual=0, split_seasons=False)
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    df["NameKey"] = df["Name"].astype(str).apply(normalize_statcast_name)
-    for col in FIELDING_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-        else:
-            df[col] = np.nan
-    agg = df.groupby(["NameKey"], as_index=False)[FIELDING_COLS].sum(min_count=1)
-
-    frv = load_savant_frv_year(year)
-    if frv is not None and not frv.empty:
-        agg = agg.merge(frv[["NameKey", "FRV", "ARM", "RANGE"]], on="NameKey", how="left")
-    oaa = load_savant_oaa_year(year)
-    if oaa is not None and not oaa.empty:
-        agg = agg.merge(oaa[["NameKey", "OAA"]], on="NameKey", how="left")
-
-    for col in FIELDING_COLS:
-        if col not in agg.columns:
-            agg[col] = np.nan
-    return agg
-
-
-# ...existing code...
 @st.cache_data(show_spinner=True, ttl=900)
-def load_batting(y: int) -> pd.DataFrame:
-    base = batting_stats(y, y, qual=0)
+def load_pitching(y: int) -> pd.DataFrame:
+    try:
+        base = pitching_stats(y, y, qual=0)
+    except Exception:
+        return pd.DataFrame()
+    
     if base is None or base.empty:
         return pd.DataFrame()
+    
     df = base.copy()
-
-    # remove any accidental duplicate column names (prevents merge suffix errors)
     df = df.loc[:, ~df.columns.duplicated()]
-
     df["NameKey"] = df["Name"].astype(str).apply(normalize_statcast_name)
 
+    # Add bWAR
     bwar_df = load_bwar_for_year(y)
     if bwar_df is not None and not bwar_df.empty:
         df = df.merge(bwar_df[["NameKey", "bWAR"]], on="NameKey", how="left")
-    field_df = load_fielding_year(y)
-    if field_df is not None and not field_df.empty:
-        df = df.merge(field_df, on="NameKey", how="left")
-
-    # Merge statcast fielding metrics (FRV/OAA/ARM/RANGE) safely.
-    statcast_df = load_statcast_fielding_span(y, y)
-    if statcast_df is not None and not statcast_df.empty:
-        metrics = ["FRV", "OAA", "ARM", "RANGE"]
-        available = [m for m in metrics if m in statcast_df.columns]
-        cols = ["NameKey"] + available
-        if len(available) > 0:
-            sc = statcast_df[cols].copy()
-
-            # Rename any statcast metric columns that already exist in df to avoid merge conflicts.
-            rename_map = {m: f"sc_{m}" for m in available if m in df.columns}
-            if rename_map:
-                sc = sc.rename(columns=rename_map)
-
-            merge_cols = ["NameKey"] + [c for c in sc.columns if c != "NameKey"]
-            df = df.merge(sc[merge_cols], on="NameKey", how="left")
-
-            # For metrics that were merged as sc_<metric>, fill original metric from statcast and drop temp cols.
-            for m in available:
-                sc_col = f"sc_{m}"
-                if sc_col in df.columns:
-                    if m in df.columns:
-                        df[m] = df[m].fillna(df[sc_col])
-                    else:
-                        df[m] = df[sc_col]
-                    df.drop(columns=[sc_col], inplace=True)
-
-    for col in ["bWAR"] + FIELDING_COLS:
-        if col not in df.columns:
-            df[col] = np.nan
+    
+    # Add Whiff% from Contact%
+    df = add_whiff_from_contact(df)
+    
+    if "bWAR" not in df.columns:
+        df["bWAR"] = np.nan
+    
     return df
-# ...existing code...
+
 
 # --------------------- Controls ---------------------
 left_col, right_col = st.columns([1, 1.3])
@@ -605,19 +305,20 @@ with controls_container:
     default_year = current_year if today.month >= 3 else current_year - 1
     year = st.selectbox("Select Year", list(range(2025, 1870, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
-    default_player = st.session_state.get("player_select", "Mookie Betts")
+    default_player = st.session_state.get("player_select", "Tarik Skubal")
     if player_mode == "Name":
         player_input = st.text_input("Player Name", value=default_player, key="player_select")
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
+
 # --------------------- Data ---------------------
-df = load_batting(year).copy()
+df = load_pitching(year).copy()
 
 if df is None or df.empty:
     fallback_df = pd.DataFrame()
     if year == current_year:
         fallback_year = year - 1
-        fallback_df = load_batting(fallback_year).copy()
+        fallback_df = load_pitching(fallback_year).copy()
         if fallback_df is not None and not fallback_df.empty:
             st.info(f"No data returned for {year}. Showing {fallback_year} instead.")
             df = fallback_df
@@ -627,24 +328,19 @@ if df is None or df.empty:
     st.error("No data returned from pybaseball.")
     st.stop()
 
-df["PA"] = pd.to_numeric(df["PA"], errors="coerce")
+# Basic data cleaning
+for col in ["IP", "G", "GS"]:
+    if col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
 df["Team"] = df["Team"].astype(str).str.upper()
 df["Name"] = df["Name"].astype(str).str.replace(".", "", regex=False).str.strip()
-if "Contact%" in df.columns:
-    contact = pd.to_numeric(df["Contact%"], errors="coerce")
-    needs_percent_scale = contact.dropna().abs().le(1).mean() > 0.9 if contact.notna().any() else False
-    if needs_percent_scale:
-        contact = contact * 100
-    df["Contact%"] = contact
-    df["Whiff%"] = 100 - contact
-else:
-    df["Whiff%"] = np.nan
 
-# League for percentile distribution (Savant uses 340+ PA)
-PCT_PA = 126 if year == 2020 else 340
-league_for_pct = df[df["PA"] >= PCT_PA].copy()
+# League for percentile distribution (use IP >= 40 as minimum)
+PCT_IP = 40
+league_for_pct = df[pd.to_numeric(df.get("IP", 0), errors="coerce") >= PCT_IP].copy()
 if league_for_pct.empty:
-    st.error(f"No league hitters ≥ {PCT_PA} PA in {year}.")
+    st.error(f"No league pitchers ≥ {PCT_IP} IP in {year}.")
     st.stop()
 
 player_row = None
@@ -657,7 +353,7 @@ if player_mode == "Name":
     if matches.empty:
         st.error("Player not found for that name.")
         st.stop()
-    player_row = matches.sort_values("PA", ascending=False).head(1).squeeze()
+    player_row = matches.sort_values("IP", ascending=False).head(1).squeeze()
 else:
     try:
         fg_id = int(str(player_input).strip())
@@ -669,33 +365,14 @@ else:
     if matches.empty:
         st.error("Player not found for that FanGraphs ID.")
         st.stop()
-    player_row = matches.sort_values("PA", ascending=False).head(1).squeeze()
+    player_row = matches.sort_values("IP", ascending=False).head(1).squeeze()
 
-if player_row is None or player_row.empty or pd.isna(player_row.get("PA", np.nan)):
+if player_row is None or player_row.empty or pd.isna(player_row.get("IP", np.nan)):
     st.error("Selected player has no valid data.")
     st.stop()
+
 player_name = str(player_row.get("Name", "")).strip()
 player_name_key = normalize_statcast_name(player_name)
-
-fg_id_val = pd.to_numeric(player_row.get("IDfg"), errors="coerce")
-if pd.notna(fg_id_val):
-    fielding_profile = load_player_fielding_profile(int(fg_id_val), year, year)
-    for key, val in fielding_profile.items():
-        player_row[key] = val
-
-statcast_field = load_statcast_fielding_span(year, year, target_names=(player_name_key,))
-if statcast_field is not None and not statcast_field.empty:
-    stat_row = statcast_field.iloc[0]
-    for metric in ["FRV", "OAA", "ARM", "RANGE"]:
-        player_row[metric] = pd.to_numeric(stat_row.get(metric), errors="coerce")
-for metric in ["FRV", "OAA", "ARM", "RANGE"]:
-    if metric not in player_row.index:
-        player_row[metric] = np.nan
-for metric in FIELDING_COLS:
-    if metric not in player_row.index:
-        player_row[metric] = np.nan
-    else:
-        player_row[metric] = pd.to_numeric(player_row[metric], errors="coerce")
 
 # Collect teams the player appeared for this season (exclude TOT aggregate)
 player_teams_raw = (
@@ -708,7 +385,6 @@ player_teams_raw = (
 )
 placeholders = {"TOT", "- - -", "---", "--", ""}
 player_teams = [t for t in player_teams_raw if t not in placeholders]
-# If no clean teams, fall back to TOT (if present) or the raw team value
 if not player_teams:
     if "- - -" in player_teams_raw:
         player_teams = ["2+ Tms"]
@@ -740,7 +416,7 @@ if not stat_options:
     st.error("No numeric stats available to display.")
     st.stop()
 
-default_preset_name = "Statcast"
+default_preset_name = "My Preference"
 stat_preset_key = "stat_preset_select"
 preset_options = list(STAT_PRESETS.keys())
 stat_state_key = "stat_config"
@@ -835,7 +511,6 @@ def normalize_stat_rows(rows, fallback):
     if not cleaned:
         cleaned = [row.copy() for row in fallback]
     return cleaned
-# --- End Callbacks ---
 
 
 def move_stat_row(delta: int, index: int, fallback):
@@ -857,6 +532,7 @@ def toggle_stat_show(index: int, state_key: str, fallback):
         st.session_state[stat_state_key] = rows
         bump_stat_config_version()
         st.session_state[manual_stat_update_key] = True
+
 
 # Initialize state once
 if stat_state_key not in st.session_state:
@@ -880,6 +556,10 @@ preset_base_config = [{"Stat": stat, "Show": True} for stat in preset_base_candi
 current_stat_config = st.session_state.get(stat_state_key, preset_base_config)
 current_stat_config = normalize_stat_rows(current_stat_config, preset_base_config)
 
+    # Sort by percentile button
+
+
+
 with stat_builder_container:
     prior_preset = st.session_state.get(stat_preset_key, default_preset_name)
     preset_index = preset_options.index(prior_preset) if prior_preset in preset_options else 0
@@ -892,6 +572,92 @@ with stat_builder_container:
         args=(stat_preset_key, stat_state_key, stat_options),
     )
 
+    if st.button("Sort by percentile (greatest to least)"):
+        # Calculate percentiles for all stats
+        stat_percentiles = {}
+        for stat in stat_options:
+            if stat not in df.columns:
+                continue
+            player_val = player_row.get(stat, np.nan)
+            if pd.isna(player_val):
+                continue
+            league_vals = league_for_pct[stat].dropna()
+            if league_vals.empty:
+                continue
+            pct = (league_vals <= player_val).mean() * 100.0
+            if stat in lower_better:
+                pct = 100 - pct
+            stat_percentiles[stat] = float(np.clip(pct, 0, 100))
+        
+        # Sort current config by percentile
+        current_config = normalize_stat_rows(st.session_state.get(stat_state_key, preset_base_config), preset_base_config)
+        
+        # Sort stats that have percentiles
+        sorted_config = []
+        for row in current_config:
+            stat_name = row.get("Stat")
+            if stat_name in stat_percentiles:
+                sorted_config.append((stat_percentiles[stat_name], row))
+        
+        # Sort by percentile descending
+        sorted_config.sort(key=lambda x: x[0], reverse=True)
+        
+        # Extract just the row dicts
+        new_config = [row for _, row in sorted_config]
+        
+        # Add any stats that didn't have percentiles at the end
+        for row in current_config:
+            if row.get("Stat") not in stat_percentiles:
+                new_config.append(row)
+        
+        st.session_state[stat_state_key] = new_config
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+        st.rerun()
+
+    if st.button("Sort by percentile (least to greatest)"):
+        # Calculate percentiles for all stats
+        stat_percentiles = {}
+        for stat in stat_options:
+            if stat not in df.columns:
+                continue
+            player_val = player_row.get(stat, np.nan)
+            if pd.isna(player_val):
+                continue
+            league_vals = league_for_pct[stat].dropna()
+            if league_vals.empty:
+                continue
+            pct = (league_vals <= player_val).mean() * 100.0
+            if stat in lower_better:
+                pct = 100 - pct
+            stat_percentiles[stat] = float(np.clip(pct, 0, 100))
+        
+        # Sort current config by percentile
+        current_config = normalize_stat_rows(st.session_state.get(stat_state_key, preset_base_config), preset_base_config)
+        
+        # Sort stats that have percentiles
+        sorted_config = []
+        for row in current_config:
+            stat_name = row.get("Stat")
+            if stat_name in stat_percentiles:
+                sorted_config.append((stat_percentiles[stat_name], row))
+        
+        # Sort by percentile descending
+        sorted_config.sort(key=lambda x: x[0], reverse=False)
+        
+        # Extract just the row dicts
+        new_config = [row for _, row in sorted_config]
+        
+        # Add any stats that didn't have percentiles at the end
+        for row in current_config:
+            if row.get("Stat") not in stat_percentiles:
+                new_config.append(row)
+        
+        st.session_state[stat_state_key] = new_config
+        bump_stat_config_version()
+        st.session_state[manual_stat_update_key] = True
+        st.rerun()
+
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
@@ -899,6 +665,7 @@ with stat_builder_container:
         "</div>",
         unsafe_allow_html=True,
     )
+
 
     stats_in_config = [row.get("Stat") for row in current_stat_config if row.get("Stat")]
     available_pool = allowed_add_stats if allowed_add_stats else stat_options
@@ -1006,9 +773,8 @@ def format_stat(stat: str, val) -> str:
         return ""
 
     upper_stat = stat.upper()
-    if upper_stat == "FRV":
-        return f"{float(val):.0f}"
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    
+    if upper_stat in {"WAR", "BWAR", "FWAR"}:
         v = float(val)
         if abs(v - round(v)) < 1e-9:
             return f"{int(round(v))}.0"
@@ -1017,11 +783,24 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        return f"{float(val):.3f}".lstrip("0")
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "WHIP", "K/9", "BB/9", "HR/9", "GB/FB"}:
+        return f"{float(val):.2f}"
+
+    if upper_stat in {"ERA-", "FIP-"}:
+        return f"{int(round(float(val)))}"
+
+    if upper_stat == "IP":
+        v = float(val)
+        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
+
+    if upper_stat == "VFA":
+        return f"{float(val):.1f}"
+
+    if upper_stat == "EV":
+        return f"{float(val):.1f}"
 
     if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
+        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
@@ -1040,7 +819,7 @@ label_map = {
     **STAT_DISPLAY_NAMES,
     "EV": "Avg Exit Velo",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
+
 
 for stat in stats_order:
     if stat not in df.columns:
@@ -1086,10 +865,12 @@ with right_col:
         ],
     )
 
-    fig_height = 1.7 + len(lead_df) * 0.4
+    top_margin = 0.15
+
+    fig_height = 1.7 + len(lead_df) * 0.4 + top_margin*1
     fig, ax = plt.subplots(figsize=(7.5, fig_height))
 
-    top_pad = 0.12 if len(lead_df) > 6 else 0.14 if len(lead_df) > 4 else 0.4
+    top_pad = 0.12 if len(lead_df) > 6 else 0.14 if len(lead_df) > 4 else 0.40
     ax_height = 0.85 - top_pad
     ax.set_position([0.08, top_pad, 0.8, ax_height])
 
@@ -1182,26 +963,25 @@ with right_col:
     ax.set_xticks([])
     ax.set_yticks([])
     ax.axis("off")
-    # --- Render figure on page ---
+    
     st.pyplot(fig, use_container_width=True, clear_figure=False)
 
-        # --- Create PDF buffer ---
+    # --- Create PDF buffer ---
     pdf_buffer = BytesIO()
-    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25, dpi=300)
+    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.3, dpi=300)
     pdf_buffer.seek(0)
 
     # --- Download button ---
-    download_name = f"{player_name.replace(' ', '_')}_{year}_savant.pdf"
+    download_name = f"{player_name.replace(' ', '_')}_{year}_pitcher_savant.pdf"
     st.download_button(
-    "Download as PDF",
-    data=pdf_buffer,
-    file_name=download_name,
-    mime="application/pdf",
+        "Download as PDF",
+        data=pdf_buffer,
+        file_name=download_name,
+        mime="application/pdf",
     )
 
     plt.close(fig)
 
     st.caption(
-    "Percentiles based on players with at least 2.1 PA per team game, or 340 PA over a full season"
+        f"Percentiles based on pitchers with at least {PCT_IP} IP"
     )
-
