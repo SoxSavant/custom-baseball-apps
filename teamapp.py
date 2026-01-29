@@ -1028,11 +1028,13 @@ with right_col:
     ax.set_yticks([])
     ax.axis("off")
 
+    st.pyplot(fig, use_container_width=True, clear_figure=False)
+    
     pdf_buffer = BytesIO()
     fig.savefig(pdf_buffer, format="pdf", bbox_inches = "tight", pad_inches = .25)
     pdf_buffer.seek(0)
 
-    st.pyplot(fig, use_container_width=True, clear_figure=True)
+    
     download_name = f"{team_abbr}_{year}_stat_leaders.pdf"
     st.download_button(
         "Download as PDF",

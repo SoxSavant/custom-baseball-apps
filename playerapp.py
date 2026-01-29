@@ -592,7 +592,7 @@ def load_batting(y: int) -> pd.DataFrame:
 # ...existing code...
 
 # --------------------- Controls ---------------------
-left_col, right_col = st.columns([1.2, 1.5])
+left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
     controls_container = st.container()
@@ -1086,8 +1086,8 @@ with right_col:
         ],
     )
 
-    fig_height = 1.2 + len(lead_df) * 0.5
-    fig, ax = plt.subplots(figsize=(10, fig_height))
+    fig_height = 1.7 + len(lead_df) * 0.4
+    fig, ax = plt.subplots(figsize=(7.5, fig_height))
 
     top_pad = 0.12 if len(lead_df) > 6 else 0.14 if len(lead_df) > 4 else 0.4
     ax_height = 0.85 - top_pad
@@ -1183,11 +1183,11 @@ with right_col:
     ax.set_yticks([])
     ax.axis("off")
     # --- Render figure on page ---
-    st.pyplot(fig, use_container_width=True, clear_figure=True)
+    st.pyplot(fig, use_container_width=True, clear_figure=False)
 
         # --- Create PDF buffer ---
     pdf_buffer = BytesIO()
-    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25)
+    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25, dpi=300)
     pdf_buffer.seek(0)
 
     # --- Download button ---
