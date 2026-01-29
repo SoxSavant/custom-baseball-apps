@@ -170,6 +170,22 @@ with meta_col:
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
 STAT_PRESETS = {
+     "My Preference":[
+        "WAR",
+        "bWAR",
+        "GS",
+        "IP",
+        "ERA",
+        "ERA-",
+        "FIP",
+        "FIP-",
+        "K%",
+        "BB%",
+        "Whiff%",
+        "O-Swing%",
+        "HardHit%",
+        "GB%",
+    ],
     "Stathead": [
         "bWAR",
         "WAR",
@@ -1892,7 +1908,7 @@ if not stat_options:
     st.error("No numeric stats available to display.")
     st.stop()
 
-default_preset_name = "Stathead"
+default_preset_name = "My Preference"
 stat_preset_key = "comp_stat_preset_select"
 preset_options = list(STAT_PRESETS.keys())
 stat_state_key = "comp_stat_config"
