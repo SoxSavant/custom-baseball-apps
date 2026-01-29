@@ -13,6 +13,7 @@ from pathlib import Path
 from pybaseball import pitching_stats, playerid_lookup, bwar_pitch
 import requests
 from bs4 import BeautifulSoup
+from io import BytesIO
 
 st.set_page_config(page_title="Player Comparison App", layout="wide")
 
@@ -2549,6 +2550,7 @@ with right_col:
                         placeholder="e.g. 33677",
                         disabled=not st.session_state.get(f"comp_player_{idx}_mlbam_enabled", False),
                     )
+
         st.caption("Screenshot to save")
         st.caption("Find a player's Fangraphs/MLB ID in their Fangraphs/MLB profile URL")
         st.caption("Paul Skenes' name input doesn't work, so enter his Fangraphs ID 33677")

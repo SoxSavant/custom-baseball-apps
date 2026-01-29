@@ -1100,18 +1100,18 @@ full_html = f"""
     background: #ffffff;
     border: 1px solid #d0d0d0;
     border-radius: 12px;
-    padding: 1.3rem;
+    padding: 3rem 4rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
     /* left-align inside the column instead of centering page-wide */
-    margin: 0;
+    margin: 0 auto;
     width: 100%;
-    max-width: none;
+    max-width: 900px;
     box-sizing: border-box;
 }}
 .leaderboard-title {{
     font-weight: 900;
     font-size: 2.1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
     text-align: center;
 }}
 .players-grid {{
@@ -1119,14 +1119,16 @@ full_html = f"""
     grid-template-columns: repeat(5, minmax(0, 1fr));
     /* align items to the left so the grid doesn't get centered */
     justify-content: start;
-    row-gap: 1rem;
+    justify-items: center;
+    row-gap: 2.5rem;
+    column-gap: 4rem;
 }}
 .player-card {{
     text-align: center;
 }}
 .player-card img {{
-    width: 140px;
-    height: 140px;
+    width: 155px;
+    height: 155px;
     object-fit: cover;
     border-radius: 6px;
     border: 1px solid #e0e0e0;
@@ -1134,7 +1136,7 @@ full_html = f"""
 }}
 .player-name {{
     font-weight: 800;
-    margin-top: 0.25rem;
+    margin-top: 0.35rem;
     font-size: 1.3rem;
 }}
 .player-team {{
@@ -1173,7 +1175,7 @@ html, body {{
 """
 
 rows = max(1, (len(cards) + 4) // 5)
-height = min(2200, 260 * rows + 180)
+height = 8000
 
 with col2:
     components.html(full_html, height=height)
