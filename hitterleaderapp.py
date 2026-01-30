@@ -896,7 +896,7 @@ label_map = {
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Hitter Leaderbord")
+    st.title("Custom Hitter Leaderboard")
 with meta_col:
     st.markdown(
         """
