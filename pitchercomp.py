@@ -892,22 +892,6 @@ def reorder_savant_name(raw: str) -> str:
     return raw
 
 
-def fetch_csv(url: str) -> pd.DataFrame:
-    try:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-    except Exception:
-        return pd.DataFrame()
-    try:
-        data = io.StringIO(resp.content.decode("utf-8"))
-        df = pd.read_csv(data)
-    except Exception:
-        return pd.DataFrame()
-    return df
-
-
-
-
 def load_local_bwar_data() -> pd.DataFrame:
     path = LOCAL_BWAR_FILE
     if not path.exists():
