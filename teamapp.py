@@ -39,7 +39,7 @@ GRID_CUSTOM_CSS = {
     ".ag-rich-select-value": {"color": "#f0f0f0"},
 }
 
-plt.rcdefaults()  # ensure default fonts/styles each run
+
 
 st.set_page_config(page_title="Custom Team Savant Page App", layout="wide")
 
@@ -688,6 +688,7 @@ with stat_builder_container:
         args=(stat_preset_key, stat_state_key, stat_options)
     )
 
+
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
@@ -926,7 +927,9 @@ with right_col:
         fontsize=22, fontweight="bold"
     )
 
-    fig.text(
+    if st.session_state.get("hl_show_min_pa", False):
+
+        fig.text(
         0.5, 0.84,
         f"(min {min_pa} PA)",
         ha="center", va="center",
@@ -934,10 +937,17 @@ with right_col:
     )
 
     fig.text(
-        0.75, 0.08,
+        0.2, 0.08,
+        "By: Sox_Savant",
+        ha="center", va="center",
+        fontsize=11, color="#555"
+    )
+
+    fig.text(
+        0.7, 0.08,
         "Data: FanGraphs",
         ha="center", va="center",
-        fontsize=13, color="#555"
+        fontsize=11, color="#555"
     )
     # if logo_img is not None:
     #     imagebox = OffsetImage(logo_img, zoom=0.08)
@@ -990,10 +1000,10 @@ with right_col:
         name_x = LEFT_OFFSET + bar_width / 2
         needs_shift = pct < len(str(name)) * 3.2
         if needs_shift:
-            name_x = bubble_x + (VALUE_X -  bubble_x) * 0.2
+            name_x = bubble_x + (VALUE_X -  bubble_x) * 0.2 - 1
             name_ha = "left"
         else:
-            name_x = LEFT_OFFSET + bar_width / 2 - 1
+            name_x = LEFT_OFFSET + bar_width / 2 - 1 + 2
             name_ha = "center"
 
         ax.text(
