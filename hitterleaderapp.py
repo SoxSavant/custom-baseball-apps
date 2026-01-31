@@ -12,34 +12,95 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-@st.cache_data(ttl=3600)
-def preload_all_data(start_year, end_year):
-    if start_year == end_year:
-        return batting_stats(start_year,end_year, qual=0, split_seasons=False)
-    else:
+st.set_page_config(layout="wide")
 
+# ----------------------------
+#  MEMORY-OPTIMIZED DATA LOADING
+# ----------------------------
+
+@st.cache_data(ttl=3600, max_entries=3)  # Limit cache entries
+def load_filtered_data(start_year, end_year, min_pa=0):
+    """
+    Load ONLY the data we need - filtered by PA threshold BEFORE caching.
+    This is the key optimization: don't cache everything, cache only what's displayed.
+    """
+    if start_year == end_year:
+        df = batting_stats(start_year, end_year, qual=0, split_seasons=False)
+        if not df.empty and min_pa > 0:
+            df = df[pd.to_numeric(df.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
+        
+        # FIX: Create proper TeamDisplay for single-year data
+        # FanGraphs returns "---" or "- - -" for players who played for multiple teams
+        if not df.empty and "Team" in df.columns:
+            def make_team_display(team_val):
+                if pd.isna(team_val):
+                    return "N/A"
+                team_str = str(team_val).strip()
+                # FanGraphs uses these patterns for multi-team players
+                if team_str in {"---", "- - -", "--", "TOT", ""}:
+                    return "2 Teams"
+                # Otherwise normalize the team code
+                normalized = normalize_team_code(team_str, start_year)
+                return normalized if normalized else "N/A"
+            
+            df["TeamDisplay"] = df["Team"].apply(make_team_display)
+        
+        return df
+    else:
         frames = []
         for year in range(start_year, end_year + 1):
             yr_data = batting_stats(year, year, qual=0, split_seasons=False)
             if not yr_data.empty:
+                # Filter EARLY before appending
+                if min_pa > 0:
+                    yr_data = yr_data[pd.to_numeric(yr_data.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
                 yr_data['Season'] = year
                 frames.append(yr_data)
         
         if frames:
             combined = pd.concat(frames, ignore_index=True)
+            # Optimize dtypes BEFORE grouping
+            combined = optimize_dtypes(combined)
+            
             # Group by player and aggregate
             grouped_rows = []
-            for played_id, grp in combined.groupby("IDfg"):
+            for player_id, grp in combined.groupby("IDfg"):
                 name = grp["Name"].iloc[0] if not grp.empty else None
                 row = aggregate_player_group(grp, name)
                 if row is not None and len(row):
                     grouped_rows.append(row)
-            return pd.DataFrame(grouped_rows)
+            
+            result = pd.DataFrame(grouped_rows)
+            # Optimize dtypes again after aggregation
+            return optimize_dtypes(result)
         return pd.DataFrame()
 
-st.set_page_config(layout="wide")
+
+def optimize_dtypes(df):
+    """Convert data types to use less memory"""
+    if df.empty:
+        return df
+    
+    df = df.copy()
+    
+    # Convert float64 to float32 where appropriate
+    float_cols = df.select_dtypes(include=['float64']).columns
+    for col in float_cols:
+        # Keep high precision for rate stats, reduce for counting stats
+        if col not in ['AVG', 'OBP', 'SLG', 'wOBA', 'xwOBA', 'xBA', 'xSLG']:
+            df[col] = df[col].astype('float32')
+    
+    # Convert int64 to int32 where appropriate
+    int_cols = df.select_dtypes(include=['int64']).columns
+    for col in int_cols:
+        if df[col].max() < 2147483647:  # int32 max
+            df[col] = df[col].astype('int32')
+    
+    return df
+
+
 # ----------------------------
-#  Helpers
+#  Helpers (unchanged from original)
 # ----------------------------
 
 def normalize_statcast_name(name: str) -> str:
@@ -61,32 +122,25 @@ def normalize_statcast_name(name: str) -> str:
 def normalize_team_code(team: str, year: int) -> str | None:
     if not team:
         return None
-
     team = team.upper().strip()
-
     if team in {"", "-", "--", "---", "- - -", "TOT"}:
         return None
-
-    # Athletics → year-aware
     if year < 2025:
         if team in {"ATH", "OAK"}:
             return "OAK"
     else:
         if team in {"ATH", "OAK"}:
             return "ATH"
-
     return team
 
 
 def collapse_athletics(teams: list[str]) -> list[str]:
     has_oak = "OAK" in teams
     has_ath = "ATH" in teams
-
     if has_oak and has_ath:
         new_list = [t for t in teams if t not in {"OAK", "ATH"}]
         new_list.append("OAK/ATH")
         return sorted(new_list)
-
     return teams
 
 
@@ -97,57 +151,7 @@ VALID_TEAMS = {
     "TEX","TOR","WSN"
 }
 
-# Local bWAR file (mirror comparisonapp.py)
 LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
-
-
-def local_bwar_signature() -> float:
-    try:
-        return LOCAL_BWAR_FILE.stat().st_mtime
-    except FileNotFoundError:
-        return 0.0
-
-
-def load_local_bwar_data() -> pd.DataFrame:
-    """Load and normalize the local warhitters2025.txt file into a tidy DataFrame.
-
-    Mirrors the helper from comparisonapp.py so the hitter leaderboard can
-    reliably join bWAR values from the local file.
-    """
-    path = LOCAL_BWAR_FILE
-    if not path.exists():
-        return pd.DataFrame()
-    try:
-        df = pd.read_csv(path)
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    # Drop pitcher rows only when they have no plate appearances (true pitchers)
-    pitcher_col = df.get("pitcher")
-    pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
-    if pitcher_col is not None:
-        pitcher_mask = (
-            pitcher_col.astype(str)
-            .str.strip()
-            .str.upper()
-            .isin({"Y", "1", "TRUE"})
-        )
-        no_pa_mask = pa_col.isna() | (pa_col <= 0)
-        drop_mask = pitcher_mask & no_pa_mask
-        df = df[~drop_mask]
-
-    df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["WAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    player_series = df["player_ID"] if "player_ID" in df.columns else pd.Series("", index=df.index)
-    df["player_ID"] = player_series.astype(str).str.strip().str.lower()
-    mlb_series = df["mlb_ID"] if "mlb_ID" in df.columns else pd.Series(np.nan, index=df.index)
-    df["mlb_ID"] = pd.to_numeric(mlb_series, errors="coerce")
-    df = df.dropna(subset=["NameKey", "year_ID", "WAR"])
-    return df[["NameKey", "Name", "year_ID", "WAR", "player_ID", "mlb_ID"]]
 
 
 def compute_team_display(teams: list[str]) -> str:
@@ -159,10 +163,10 @@ def compute_team_display(teams: list[str]) -> str:
 
 
 # ----------------------------
-#  External Data Loaders
+#  External Data Loaders (SIMPLIFIED)
 # ----------------------------
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=600, max_entries=2)  # Reduced TTL and entries
 def batting_stats(start_year: int, end_year: int, qual=0, split_seasons=False):
     try:
         return pybaseball.batting_stats(start_year, end_year, qual=qual, split_seasons=split_seasons)
@@ -170,54 +174,9 @@ def batting_stats(start_year: int, end_year: int, qual=0, split_seasons=False):
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def load_year(year: int):
-    try:
-        return pybaseball.batting_stats(year, year, qual=0, split_seasons=False)
-    except Exception:
-        return pd.DataFrame()
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def load_bwar(start_year: int, end_year: int) -> pd.DataFrame:
-    # Load normalized local bWAR dataset and filter to the requested span
-    df = load_local_bwar_data()
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    mask = df["year_ID"].between(start_year, end_year)
-    df = df[mask].copy()
-    return df
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def load_bwar_span(start_year: int, end_year: int, target_names=None):
-    try:
-        df = load_bwar(start_year, end_year)
-        if df is None or df.empty:
-            return pd.DataFrame()
-
-        df["NameKey"] = df["Name"].astype(str).apply(normalize_statcast_name)
-
-        if target_names:
-            keys = [normalize_statcast_name(n) for n in target_names]
-            df = df[df["NameKey"].isin(keys)]
-
-        # Rename to bWAR for consistency
-        df["bWAR"] = df["WAR"]
-        # Keep mlb and bbref ids as available so enrichment can perform ID-based joins
-        cols = ["NameKey", "bWAR"]
-        if "player_ID" in df.columns:
-            cols.append("player_ID")
-        if "mlb_ID" in df.columns:
-            cols.append("mlb_ID")
-        return df[cols].copy()
-    except Exception:
-        return pd.DataFrame()
-
-
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
 def load_savant_frv_year(year: int) -> pd.DataFrame:
+    """Load Fielding Run Value from Baseball Savant for a specific year."""
     url = (
         "https://baseballsavant.mlb.com/leaderboard/fielding-run-value?"
         f"gameType=Regular&seasonStart={year}&seasonEnd={year}"
@@ -247,8 +206,9 @@ def load_savant_frv_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
 def load_savant_oaa_year(year: int) -> pd.DataFrame:
+    """Load Outs Above Average from Statcast for a specific year."""
     try:
         df = statcast_outs_above_average(year, "all")
     except Exception:
@@ -279,135 +239,107 @@ def load_savant_oaa_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "OAA"]]
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def load_statcast_fielding_span(start_year: int, end_year: int, target_names=None):
-    # Collect FRV (Savant) and OAA (statcast) across the span and merge by NameKey
-    frames = []
-    for year in range(start_year, end_year + 1):
-        frv = load_savant_frv_year(year)
-        if frv is not None and not frv.empty:
-            frv["Season"] = year
-            frames.append(frv)
-        oaa = load_savant_oaa_year(year)
-        if oaa is not None and not oaa.empty:
-            oaa["Season"] = year
-            frames.append(oaa)
-
-    if not frames:
+@st.cache_data(show_spinner=False, ttl=600, max_entries=5)
+def load_fangraphs_fielding(player_names: list[str], start_year: int, end_year: int) -> pd.DataFrame:
+    """
+    Load DRS and TZ from FanGraphs fielding stats for specific players.
+    """
+    if not player_names:
+        return pd.DataFrame()
+    
+    try:
+        # Load FanGraphs fielding data for the year range
+        df = pybaseball.fielding_stats(start_year, end_year, qual=0, split_seasons=False)
+        if df is None or df.empty:
+            return pd.DataFrame()
+        
+        # Normalize names for matching
+        df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+        target_keys = set([normalize_statcast_name(n) for n in player_names])
+        
+        # Filter to only our target players
+        df = df[df["NameKey"].isin(target_keys)]
+        
+        if df.empty:
+            return pd.DataFrame()
+        
+        # Aggregate by player (sum DRS, TZ, UZR, FRM across positions/years)
+        result = df.groupby("NameKey", as_index=False).agg({
+            "DRS": "sum",
+            "TZ": "sum",
+            "UZR": "sum",
+            "FRM": "sum",
+        })
+        
+        return result
+        
+    except Exception:
         return pd.DataFrame()
 
-    combined = pd.concat(frames, ignore_index=True)
-    combined["NameKey"] = combined["NameKey"].astype(str)
 
-    if target_names:
-        keys = [normalize_statcast_name(n) for n in target_names]
-        combined = combined[combined["NameKey"].isin(keys)]
-
-    # aggregate by NameKey
-    out = combined.groupby("NameKey").agg({
-        "FRV": "sum",
-        "ARM": "sum",
-        "RANGE": "sum",
-        "OAA": "sum",
-    }).reset_index()
-    return out
-
-@st.cache_data(ttl=86400, show_spinner=False)
-def _scrape_fg_team_rows(fg_id: int):
-    url = f"https://www.fangraphs.com/players/x/{fg_id}/stats?season=all"
-    try:
-        r = requests.get(url, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-    except Exception:
-        return []
-
-    rows = []
-    for table in soup.find_all("table"):
-        for row in table.find_all("tr"):
-            cols = [c.get_text(strip=True) for c in row.find_all("td")]
-            if len(cols) >= 3:
-                rows.append(cols)
-
-    return rows
-
-
-def get_player_teams_fangraphs(fg_id: int, start_year: int, end_year: int):
-    rows = _scrape_fg_team_rows(fg_id)
-    if not rows:
-        return []
-
-    found = []
-
-    for cols in rows:
-        if not (cols[0].isdigit() and len(cols[0]) == 4):
-            continue
-
-        year = int(cols[0])
-        if not (start_year <= year <= end_year):
-            continue
-
-        team_raw = cols[1].strip()
-        league = cols[2].strip()
-
-        if league != "MLB":
-            continue
-        if team_raw not in VALID_TEAMS:
-            continue
-
-        team_norm = normalize_team_code(team_raw, year)
-        if team_norm:
-            found.append(team_norm)
-
-    return collapse_athletics(sorted(set(found)))
-
-    # Unique + alphabetical
-    unique = sorted(set(found))
-
-    # Collapse OAK + ATH -> OAK/ATH if both
-    collapsed = collapse_athletics(unique)
-
-    return collapsed
-
-
-@st.cache_data(show_spinner=False, ttl=300)
-def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
-    """Load a player's fielding aggregates (DRS, TZ, UZR, FRM) using pybaseball.
-
-    Returns a dict with any of the keys found summed across the span.
+@st.cache_data(ttl=600, show_spinner=False, max_entries=5)
+def load_fielding_for_players(player_names: list[str], start_year: int, end_year: int) -> pd.DataFrame:
     """
-    try:
-        df = pybaseball.fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
-    except Exception:
-        df = None
-    if df is None or df.empty:
-        frames = []
-        for year in range(start_year, end_year + 1):
-            try:
-                yearly = pybaseball.fielding_stats(year, year, qual=0, split_seasons=False, players=str(fg_id))
-            except Exception:
-                yearly = None
-            if yearly is not None and not yearly.empty:
-                frames.append(yearly)
-        if not frames:
-            return {}
-        df = pd.concat(frames, ignore_index=True)
-    result: dict[str, float] = {}
-    for key in ["DRS", "TZ", "UZR", "FRM"]:
-        if key in df.columns:
-            series = pd.to_numeric(df[key], errors="coerce")
-            if not series.isna().all():
-                result[key] = series.sum(skipna=True)
+    Load fielding stats ONLY for specific players (the top 10).
+    Combines Savant data (FRV, OAA, ARM) with FanGraphs data (DRS, TZ, UZR, FRM).
+    """
+    if not player_names:
+        return pd.DataFrame()
+    
+    # Normalize names for matching
+    target_keys = set([normalize_statcast_name(n) for n in player_names])
+    
+    # Load Savant data (FRV, OAA, ARM)
+    frames = []
+    for year in range(start_year, end_year + 1):
+        # Load FRV
+        frv = load_savant_frv_year(year)
+        if frv is not None and not frv.empty:
+            frv = frv[frv["NameKey"].isin(target_keys)]
+            if not frv.empty:
+                frv["Season"] = year
+                frames.append(frv)
+        
+        # Load OAA
+        oaa = load_savant_oaa_year(year)
+        if oaa is not None and not oaa.empty:
+            oaa = oaa[oaa["NameKey"].isin(target_keys)]
+            if not oaa.empty:
+                oaa["Season"] = year
+                frames.append(oaa)
+    
+    savant_data = pd.DataFrame()
+    if frames:
+        combined = pd.concat(frames, ignore_index=True)
+        combined["NameKey"] = combined["NameKey"].astype(str)
+        
+        # Aggregate by player
+        savant_data = combined.groupby("NameKey", as_index=False).agg({
+            "FRV": "sum",
+            "ARM": "sum",
+            "RANGE": "sum",
+            "OAA": "sum",
+        })
+    
+    # Load FanGraphs data (DRS, TZ, UZR, FRM)
+    fangraphs_data = load_fangraphs_fielding(player_names, start_year, end_year)
+    
+    # Merge the two datasets
+    if not savant_data.empty and not fangraphs_data.empty:
+        result = savant_data.merge(fangraphs_data, on="NameKey", how="outer")
+    elif not savant_data.empty:
+        result = savant_data
+    elif not fangraphs_data.empty:
+        result = fangraphs_data
+    else:
+        result = pd.DataFrame()
+    
     return result
 
-
-# Lightweight headshot helpers (same bases used in comparison app)
+# Lightweight headshot helpers
 HEADSHOT_BASES = [
-    # Standard silo path (real photos when they exist)
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
-    # Generic fallback path with slash
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
-    # Alternate path (kept last)
-    "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}headshot/67/current",
 ]
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
@@ -420,19 +352,14 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=100)  # Limit cache size
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
-    """Try to resolve a player's mlbam id using pybaseball's playerid_lookup.
-
-    Returns (mlbam, bbref) or (None, None) when not found.
-    """
     try:
         if not full_name or not isinstance(full_name, str):
             return (None, None) if return_bbref else None
         df = pybaseball.playerid_lookup(full_name)
         if df is None or df.empty:
             return (None, None) if return_bbref else None
-        # prefer key_mlbam if present
         cols = [c for c in ("key_mlbam", "mlbam", "MLBAMID") if c in df.columns]
         mlbam = None
         if cols:
@@ -453,13 +380,8 @@ def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
         return (None, None) if return_bbref else None
 
 
-@st.cache_data(show_spinner=False, ttl=300)
+@st.cache_data(show_spinner=False, ttl=3600)
 def build_mlb_headshot(mlbam: int | str | None) -> str | None:
-    """Build a candidate MLB static headshot URL given an mlbam id.
-
-    This mirrors the comparison app: we don't verify the URL here to keep the
-    hot path fast — the first working base is returned formatted.
-    """
     if mlbam is None:
         return None
     try:
@@ -467,7 +389,6 @@ def build_mlb_headshot(mlbam: int | str | None) -> str | None:
             try:
                 return base.format(mlbam=int(mlbam))
             except Exception:
-                # fallback to string formatting
                 try:
                     return base.format(mlbam=str(mlbam).strip())
                 except Exception:
@@ -477,14 +398,27 @@ def build_mlb_headshot(mlbam: int | str | None) -> str | None:
     return None
 
 
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=50)
+def reverse_lookup_mlbam(fg_id: int) -> int | None:
+    """Reverse lookup mlbam from FanGraphs ID with caching."""
+    try:
+        rev = pybaseball.playerid_reverse_lookup([int(fg_id)], key_type="fangraphs")
+        if rev is not None and not rev.empty:
+            mlbam = rev.iloc[0].get("key_mlbam")
+            if pd.notna(mlbam):
+                return int(mlbam)
+    except Exception:
+        pass
+    return None
+
+
 def get_headshot_url_from_row(row: pd.Series) -> str:
     """Resolve the best headshot URL for a single-row (aggregated or yearly).
-
+    
     Strategy:
     1. Look for mlbam-like columns and build an MLB headshot URL.
     2. If missing, look for FanGraphs id and reverse-lookup to mlbam.
-    3. As a last resort, try to look up mlbam by the player's name.
-    4. Return a data-URI placeholder when nothing resolved.
+    3. Return a placeholder when nothing resolved.
     """
     # 1) direct mlbam-like columns
     for col in ("mlbam", "MLBID", "key_mlbam", "mlbam_id", "MLBAMID", "mlbam_override"):
@@ -494,26 +428,27 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
                 url = build_mlb_headshot(val)
                 if url:
                     return url
-
-    # 2) FanGraphs id reverse lookup
-    for fg_col in ("playerid", "IDfg", "fg_id", "FGID", "IDfg"):
+    
+    # 2) FanGraphs id reverse lookup (cached)
+    for fg_col in ("playerid", "IDfg", "fg_id", "FGID"):
         if fg_col in row.index:
             fg = row.get(fg_col)
             if pd.notna(fg) and str(fg).strip():
                 try:
-                    rev = pybaseball.playerid_reverse_lookup([int(fg)], key_type="fangraphs")
-                    if rev is not None and not rev.empty:
-                        mlbam = rev.iloc[0].get("key_mlbam")
-                        if pd.notna(mlbam):
-                            url = build_mlb_headshot(mlbam)
-                            if url:
-                                return url
+                    mlbam = reverse_lookup_mlbam(int(fg))
+                    if mlbam:
+                        url = build_mlb_headshot(mlbam)
+                        if url:
+                            return url
                 except Exception:
                     pass
+    
+    # 3) Fallback to placeholder
+    return HEADSHOT_PLACEHOLDER
 
 
 # ----------------------------
-#  Aggregation
+#  Aggregation (unchanged)
 # ----------------------------
 
 def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
@@ -526,7 +461,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     if name:
         result["Name"] = name
 
-    # Team aggregation
     teams = grp.get("Team", pd.Series([], dtype=str)).dropna().astype(str).tolist()
     teams = [t.strip().upper() for t in teams if t.strip()]
     teams = [normalize_team_code(t, int(grp["Season"].iloc[0]) if "Season" in grp.columns else 2025) for t in teams]
@@ -535,15 +469,12 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     result["Teams"] = teams
     result["TeamDisplay"] = compute_team_display(teams)
 
-    # Pick the most recent headshot / id info from the grouped rows so spans use
-    # the latest available MLBAM or FanGraphs id for the player's picture.
     try:
         if "Season" in grp.columns:
             grp_sorted = grp.sort_values(by="Season", ascending=False)
         else:
             grp_sorted = grp.iloc[::-1]
 
-        # MLBAM-like candidates
         mlb_cols = ["mlbam", "MLBID", "key_mlbam", "mlbam_id", "MLBAMID"]
         fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
 
@@ -576,46 +507,14 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         if found_mlb is not None:
             result["mlbam"] = found_mlb
         if found_fg is not None:
-            # Use IDfg as a canonical FG id column on aggregated rows
             result["IDfg"] = found_fg
     except Exception:
-        # non-critical; ignore
         pass
 
-    # Ensure every aggregated row has an mlbam id when possible. If we didn't
-    # find an mlbam in the grouped rows above, try a name lookup as a fallback.
-    try:
-        if "mlbam" not in result or result.get("mlbam") is None:
-            name_for_lookup = result.get("Name") if "Name" in result else None
-            if name_for_lookup:
-                try:
-                    mlb_lookup = lookup_mlbam_id(str(name_for_lookup))
-                    if mlb_lookup:
-                        result["mlbam"] = mlb_lookup
-                except Exception:
-                    # non-fatal
-                    pass
-    except Exception:
-        pass
-
-    # Copy other columns — skip id columns so our chosen mlbam/IDfg are not
-    # overwritten by numeric sums across seasons.
     skip_cols = {
-        "Name",
-        "Team",
-        "Season",
-        "Teams",
-        # mlbam / MLB id variants
-        "mlbam",
-        "MLBID",
-        "key_mlbam",
-        "mlbam_id",
-        "MLBAMID",
-        # FanGraphs id variants
-        "playerid",
-        "IDfg",
-        "fg_id",
-        "FGID",
+        "Name", "Team", "Season", "Teams",
+        "mlbam", "MLBID", "key_mlbam", "mlbam_id", "MLBAMID",
+        "playerid", "IDfg", "fg_id", "FGID",
     }
 
     for col in grp.columns:
@@ -626,14 +525,12 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         except Exception:
             result[col] = grp[col].iloc[0]
 
-    # Derive rate stats from aggregated counting stats where appropriate.
     def to_num(x):
         try:
             return float(x)
         except Exception:
             return np.nan
 
-    # Ensure numeric conversions for common counting stats
     h = to_num(result.get("H"))
     ab = to_num(result.get("AB"))
     bb = to_num(result.get("BB"))
@@ -643,7 +540,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     triples = to_num(result.get("3B"))
     hr = to_num(result.get("HR"))
 
-    # Derive singles and TB when possible
     singles = result.get("1B")
     if singles is None or pd.isna(singles):
         if pd.notna(h) and pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
@@ -664,19 +560,16 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         else:
             tb = np.nan
 
-    # AVG
     if pd.notna(ab) and ab > 0 and pd.notna(h):
         result["AVG"] = h / ab
     else:
         result["AVG"] = np.nan
 
-    # SLG
     if pd.notna(ab) and ab > 0 and pd.notna(tb):
         result["SLG"] = tb / ab
     else:
         result["SLG"] = np.nan
 
-    # OBP
     bb_val = 0 if pd.isna(bb) else bb
     hbp_val = 0 if pd.isna(hbp) else hbp
     sf_val = 0 if pd.isna(sf) else sf
@@ -686,7 +579,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     else:
         result["OBP"] = np.nan
 
-    # ISO when possible
     if pd.notna(result.get("SLG")) and pd.notna(result.get("AVG")):
         try:
             result["ISO"] = float(result.get("SLG")) - float(result.get("AVG"))
@@ -695,7 +587,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     else:
         result["ISO"] = np.nan
 
-    # For other rate stats, compute PA-weighted averages when PA is available
     pa_total = 0.0
     if "PA" in result and pd.notna(result.get("PA")):
         try:
@@ -708,18 +599,10 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "Whiff%",
         "Barrel%", "HardHit%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
         "EV", "MaxEV", "CSW%", "BB/K", "ISO", "WRC+"
-
     }
 
-    # Compute PA-weighted averages using the original group rows when the
-    # stat is present on the per-year rows. This prevents summed values for
-    # rate stats across multi-year spans (e.g., HardHit%, EV, wRC+, wOBA,
-    # xwOBA, xBA, xSLG, OPS). If the per-row stat isn't available but the
-    # function already derived a value (e.g., AVG/OBP/SLG from counting stats),
-    # keep that derived value.
     if pa_total > 0:
         for rs in rate_stats:
-            # Find a matching per-row column case-insensitively (e.g., WRC+ vs wRC+)
             matching_col = None
             for c in grp.columns:
                 try:
@@ -735,18 +618,12 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
                     pas = pd.to_numeric(grp.get("PA", 0), errors="coerce").fillna(0)
                     numer = (vals * pas).sum(skipna=True)
                     if numer is None or np.isnan(numer):
-                        # assign to the actual column name so any previously
-                        # summed value is overwritten
                         result[matching_col] = np.nan
                     else:
-                        # assign to the actual column name so any previously
-                        # summed value is overwritten
                         result[matching_col] = numer / pa_total
                 except Exception:
                     result[matching_col] = np.nan
             else:
-                # If the stat wasn't present per-row, prefer any already-derived
-                # value (like AVG from counts). Otherwise set NaN.
                 if rs in result and pd.notna(result.get(rs)):
                     continue
                 result[rs] = np.nan
@@ -755,21 +632,15 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
 
 
 # ----------------------------
-#  Enrichment
+#  Formatting
 # ----------------------------
-
-SUM_STATS = {"HR", "R", "RBI", "SB", "BB", "H", "PA", "AB"}
-
 
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
 
     upper_stat = stat.upper()
-    if upper_stat == "FRV":
-        return f"{int(round(float(val)))}"
-
-    if upper_stat == "ARM":
+    if upper_stat in {"FRV", "ARM"}:
         return f"{int(round(float(val)))}"
 
     if upper_stat == "AGE":
@@ -807,10 +678,6 @@ def format_stat(stat: str, val) -> str:
 
 
 def transform_stat_value(stat: str, raw_val):
-    """
-    Normalize or derive stat values before formatting/comparison.
-    Whiff% is not provided directly, so derive it from Contact% (100 - Contact%).
-    """
     if stat == "Contact%":
         if pd.isna(raw_val):
             return np.nan
@@ -818,60 +685,10 @@ def transform_stat_value(stat: str, raw_val):
             contact = float(raw_val)
         except Exception:
             return np.nan
-        # Contact% may come in as a fraction (0.78) or percentage (78.0).
         if contact <= 1:
             contact *= 100
         return 100 - contact
     return raw_val
-
-@st.cache_data(ttl=300, max_entries=5)
-def enrich_leaderboard_players(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Lightweight enrichment ONLY.
-    No network calls.
-    No year loops.
-    No external data.
-    """
-
-    if df.empty:
-        return df
-
-    df = df.copy()
-
-    # --- Normalize name for joins / lookups ---
-    if "Name" in df.columns:
-        df["NameKey"] = (
-            df["Name"]
-            .astype(str)
-            .str.normalize("NFKD")
-            .str.encode("ascii", errors="ignore")
-            .str.decode("utf-8")
-            .str.lower()
-            .str.replace(r"[^a-z ]", "", regex=True)
-            .str.strip()
-        )
-
-    # --- Ensure numeric columns are actually numeric ---
-    for col in ("PA", "AB", "IP"):
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    # --- Ensure IDfg is usable ---
-    if "IDfg" in df.columns:
-        df["IDfg"] = pd.to_numeric(df["IDfg"], errors="coerce")
-
-    # --- Create placeholders (do NOT fill them here) ---
-    if "Team" not in df.columns:
-        df["Team"] = ""
-    if "TeamDisplay" not in df.columns:
-        df["TeamDisplay"] = ""
-    if "mlbam_override" not in df.columns:
-        df["mlbam_override"] = np.nan
-    return df
-
-
-
-
 
 
 # ----------------------------
@@ -883,7 +700,8 @@ STAT_ALLOWLIST = [
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA", "FRV", "OAA", "ARM", "DRS", "TZ",
+    "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA", 
+    "FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM",
 ]
 
 label_map = {
@@ -907,44 +725,24 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# default to the current year as a single-year view
 current_year = date.today().year
 if "hl_start_year" not in st.session_state:
-    # default to 2025 per app convention
     st.session_state["hl_start_year"] = 2025
 if "hl_end_year" not in st.session_state:
     st.session_state["hl_end_year"] = 2025
 if "hl_stat" not in st.session_state:
     st.session_state["hl_stat"] = "WAR"
-
-def compute_default_pa(start: int, end: int) -> int:
-    # keep helper but default behavior for the app is a flat 502 PA minimum
-    return 502
+if "hl_min_pa" not in st.session_state:
+    st.session_state["hl_min_pa"] = 502
 
 def on_year_change():
     s = st.session_state
-    start = int(s.get("hl_start_year", 2025))
-    end = int(s.get("hl_end_year", 2025))
-    # keep the single-year / span sync: when not in span mode keep end == start
     if not s.get("hl_span", False):
         s["hl_end_year"] = s["hl_start_year"]
-
-def on_stat_change():
-    s = st.session_state
-    start = int(s.get("hl_start_year", 2025))
-    end = int(s.get("hl_end_year", 2025))
-    # do not change the user's chosen Min PA when switching stats
-    # keep span sync as well
-    if not s.get("hl_span", False):
-        s["hl_end_year"] = s["hl_start_year"]
-
-if "hl_min_pa" not in st.session_state:
-    st.session_state["hl_min_pa"] = 502
 
 st.markdown(
     """
     <style>
-        /* shrink dropdowns and number inputs in the controls column */
         .stSelectbox div[data-baseweb="select"],
         .stNumberInput > div {
             max-width: 200px;
@@ -962,7 +760,6 @@ stat = st.selectbox(
 )
 
 if "hl_span" not in st.session_state:
-    # single-year view by default; checkbox enables multi-year span
     st.session_state["hl_span"] = False
 
 col1, col2 = st.columns([.5, 2])
@@ -977,7 +774,6 @@ with col1:
         key="hl_start_year",
         on_change=on_year_change
     )
-    # only show the end-year when the user has requested a multi-year span
     if st.session_state.get("hl_span", False):
         end_year = st.number_input(
             "End Year",
@@ -987,40 +783,54 @@ with col1:
             on_change=on_year_change
         )
     else:
-        # ensure end == start for single-year default and keep a local var for loads
         end_year = st.session_state["hl_start_year"]
    
-# Minimum plate appearances (default 502) shown under the year selectors
     min_pa = st.number_input(
-    "Min PA",
-    min_value=0,
-    max_value=20000,
-    key="hl_min_pa"
-)
+        "Min PA",
+        min_value=0,
+        max_value=20000,
+        key="hl_min_pa"
+    )
     st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
 
-
-
-# Apply Min PA filter (ensure numeric PA)
+# OPTIMIZED: Load filtered data with PA threshold applied BEFORE caching
 min_pa_val = int(st.session_state.get("hl_min_pa", 0))
+df = load_filtered_data(start_year, end_year, min_pa_val)
 
-#LOAD DATA
-df = preload_all_data(start_year,end_year)
+# FIX: If sorting by a fielding stat, we need to load ALL fielding data first
+# Otherwise we can't sort by it. This is still way better than the old approach
+# because we're only loading fielding for players who meet the PA threshold.
+if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
+    # Get all player names that meet PA threshold
+    player_names = df["Name"].tolist()
+    fielding_data = load_fielding_for_players(player_names, start_year, end_year)
+    
+    if not fielding_data.empty:
+        # Add NameKey to df for joining
+        df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+        
+        # Merge fielding stats
+        df = df.merge(
+            fielding_data,
+            on="NameKey",
+            how="left",
+            suffixes=("", "_fielding")
+        )
+        
+        # Fill NaN values with 0 for fielding stats so they can be sorted
+        for col in ["FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "UZR", "FRM"]:
+            if col in df.columns:
+                df[col] = df[col].fillna(0)
 
-#Filter out for MIN PA
-df = df[df["PA"] >= min_pa_val]
-
-# Sort and take top N
+# Now sort and take top N
 df = df.sort_values(by=stat, ascending=st.session_state.get("hl_sort_worst", False))
 df = df.head(10)
 
+# TeamDisplay should already be set by load_filtered_data or aggregate_player_group
+# But ensure it exists as a safety measure
 if "TeamDisplay" not in df.columns:
-    if "Team" in df.columns:
-        df["TeamDisplay"] = df["Team"].fillna("N/A")
-    else:
-        df["TeamDisplay"] = "N/A"
-
+    df["TeamDisplay"] = "N/A"
 
 cards = []
 for _, row in df.iterrows():
@@ -1029,12 +839,9 @@ for _, row in df.iterrows():
     raw_val = row.get(stat, np.nan)
     transformed = transform_stat_value(stat, raw_val)
     display_val = format_stat(stat, transformed)
-    # Honor any manual MLBAM override entered by the user (widget keys hl_mlbam_override_0..9).
-    # We read from st.session_state so the input can be rendered later in the page but
-    # still affect headshot resolution on rerun.
+    
     src_row = row
     try:
-        # find the index of this row within the current top-10 (0..9)
         pos = list(df.index).index(row.name)
         key = f"hl_mlbam_override_{pos}"
         override_val = st.session_state.get(key, "")
@@ -1044,10 +851,8 @@ for _, row in df.iterrows():
                 src_row = row.copy()
                 src_row["mlbam_override"] = ov
             except Exception:
-                # ignore invalid overrides
                 pass
     except Exception:
-        # fallback: no session override available
         pass
 
     src = get_headshot_url_from_row(src_row) or ""
@@ -1062,14 +867,11 @@ for _, row in df.iterrows():
     '''
     cards.append(card_html)
 
-# ...existing code...
-
 span_label = f"{int(start_year)}" if start_year == end_year else f"{int(start_year)}–{int(end_year)}"
 title_label = label_map.get(stat, stat)
 title = f"{span_label} {title_label} Leaders"
 if st.session_state.get("hl_sort_worst", False):
     title += " (Worst)"
-# Optionally show the minimum PA used for filtering in the title
 if st.session_state.get("hl_show_min_pa", False):
     try:
         min_pa_display = int(st.session_state.get("hl_min_pa", 0))
@@ -1102,7 +904,6 @@ full_html = f"""
     border-radius: 12px;
     padding: 3rem 4rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    /* left-align inside the column instead of centering page-wide */
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
@@ -1117,7 +918,6 @@ full_html = f"""
 .players-grid {{
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    /* align items to the left so the grid doesn't get centered */
     justify-content: start;
     justify-items: center;
     row-gap: 2.5rem;
@@ -1180,8 +980,6 @@ height = 8000
 with col2:
     components.html(full_html, height=height)
 
-# Manual MLBAM id overrides for displayed players (rendered in a full-width row
-# below the controls and cards so the leaderboard grid isn't squeezed)
 if not df.empty:
     st.markdown("---")
     st.write("Manual MLBAM overrides (enter MLBAM id to fix headshot)")
