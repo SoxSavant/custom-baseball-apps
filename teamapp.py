@@ -927,9 +927,9 @@ with right_col:
         fontsize=22, fontweight="bold"
     )
 
-    if st.session_state.get("hl_show_min_pa", False):
 
-        fig.text(
+
+    fig.text(
         0.5, 0.84,
         f"(min {min_pa} PA)",
         ha="center", va="center",
