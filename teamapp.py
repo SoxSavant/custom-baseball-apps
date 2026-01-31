@@ -959,7 +959,7 @@ with right_col:
     BAR_LENGTH = 45
     VALUE_X = LEFT_OFFSET + BAR_LENGTH + 12
     LABEL_X = 0
-    BUBBLE_SIZE = 700
+    BUBBLE_SIZE = 650
 
     # Background track bars
     ax.barh(
