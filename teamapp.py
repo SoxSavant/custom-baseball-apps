@@ -848,7 +848,7 @@ label_map = {
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
+lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "SO"}
 
 for stat in stats_order:
 

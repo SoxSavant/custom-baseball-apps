@@ -135,7 +135,7 @@ STAT_ALLOWLIST = [
     "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
 ]
 
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%"}
+lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "SO"}
 
 FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM", "FRV", "OAA", "ARM", "RANGE"]
 STATCAST_FIELDING_START_YEAR = 2016
