@@ -4,6 +4,7 @@ import numpy as np
 import unicodedata
 import html
 import requests
+import re
 from bs4 import BeautifulSoup
 from pybaseball.statcast_fielding import statcast_outs_above_average
 import io
@@ -348,9 +349,20 @@ def load_fielding_for_players(player_names: list[str], start_year: int, end_year
 
 # Lightweight headshot helpers
 HEADSHOT_BASES = [
+    # Standard silo path (real photos when they exist)
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
+    # Generic fallback path with slash
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
+    # Alternate path provided (kept last to avoid overriding real photos)
+    "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}headshot/67/current",
 ]
+HEADSHOT_BREF_BASES = [
+    "https://content-static.baseball-reference.com/req/202406/images/headshots/{folder}/{bref_id}.jpg",
+    "https://content-static.baseball-reference.com/req/202310/images/headshots/{folder}/{bref_id}.jpg",
+    "https://www.baseball-reference.com/req/202108020/images/headshots/{folder}/{bref_id}.jpg",
+]
+HEADSHOT_CHECK_TIMEOUT = 1.0
+HEADSHOT_USER_AGENT = "headshot-fetcher/1.0"
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
     "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
@@ -362,50 +374,154 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 
-@st.cache_data(show_spinner=False, ttl=3600, max_entries=100)  # Limit cache size
+@st.cache_data(show_spinner=False)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
-    try:
-        if not full_name or not isinstance(full_name, str):
-            return (None, None) if return_bbref else None
-        df = pybaseball.playerid_lookup(full_name)
-        if df is None or df.empty:
-            return (None, None) if return_bbref else None
-        cols = [c for c in ("key_mlbam", "mlbam", "MLBAMID") if c in df.columns]
-        mlbam = None
-        if cols:
-            val = df.iloc[0].get(cols[0])
-            if pd.notna(val) and str(val).strip():
-                try:
-                    mlbam = int(val)
-                except Exception:
-                    mlbam = str(val).strip()
-        bbref = None
-        if return_bbref:
-            if "key_bbref" in df.columns:
-                v = df.iloc[0].get("key_bbref")
-                if pd.notna(v) and str(v).strip():
-                    bbref = str(v).strip()
-        return (mlbam, bbref) if return_bbref else mlbam
-    except Exception:
+    """Best-effort MLBAM lookup using pybaseball's playerid_lookup. Optionally returns bbref id."""
+    if not full_name or not full_name.strip():
+        return (None, None) if return_bbref else None
+    suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
+
+    def normalize_token(tok: str) -> str:
+        if not tok:
+            return ""
+        tok = tok.replace(".", "").strip()
+        try:
+            return unicodedata.normalize("NFKD", tok).encode("ascii", "ignore").decode()
+        except Exception:
+            return tok
+
+    def clean_full(val: str) -> str:
+        try:
+            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
+        except Exception:
+            pass
+        return "".join(ch for ch in val if ch.isalnum()).lower()
+
+    def strip_suffix(tokens: list[str]) -> list[str]:
+        toks = tokens.copy()
+        while toks and toks[-1].lower() in suffixes:
+            toks.pop()
+        return toks
+
+    parts = full_name.split()
+    base_tokens = strip_suffix(parts)
+    if len(base_tokens) < 2:
         return (None, None) if return_bbref else None
 
+    first_raw = base_tokens[0]
+    last_raw = " ".join(base_tokens[1:])
+    target_clean = clean_full(first_raw + last_raw)
 
-@st.cache_data(show_spinner=False, ttl=3600)
+    def initial_forms(token: str) -> list[str]:
+        forms = []
+        if not token:
+            return forms
+        stripped = token.replace(".", "")
+        if stripped and stripped.isupper() and 1 <= len(stripped) <= 4:
+            dotted = ".".join(list(stripped)) + "."
+            spaced = " ".join(list(stripped))
+            forms.extend([dotted, spaced, stripped, stripped + "."])
+        return forms
+
+    first_forms = initial_forms(first_raw)
+    variants = [
+        (last_raw, first_raw),  # raw as-is (keeps accents/dots)
+        (normalize_token(last_raw), normalize_token(first_raw)),
+        (normalize_token(last_raw).lower(), normalize_token(first_raw).lower()),
+        (last_raw.replace(".", ""), first_raw.replace(".", "")),  # no dots
+    ]
+    for form in first_forms:
+        variants.append((last_raw, form))
+        variants.append((normalize_token(last_raw), normalize_token(form)))
+
+    first_hit_mlbam = None
+    first_hit_bbref = None
+    best_match_mlbam = None
+    best_match_bbref = None
+
+    def consider_row(row):
+        nonlocal first_hit_mlbam, first_hit_bbref, best_match_mlbam, best_match_bbref
+        combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
+        mlbam_val = row.get("key_mlbam")
+        bbref_val = row.get("key_bbref")
+        if combo == target_clean:
+            if pd.notna(mlbam_val):
+                try:
+                    best_match_mlbam = int(mlbam_val)
+                except Exception:
+                    pass
+            if pd.notna(bbref_val):
+                try:
+                    best_match_bbref = str(bbref_val)
+                except Exception:
+                    pass
+        if first_hit_mlbam is None and pd.notna(mlbam_val):
+            try:
+                first_hit_mlbam = int(mlbam_val)
+            except Exception:
+                pass
+        if first_hit_bbref is None and pd.notna(bbref_val):
+            try:
+                first_hit_bbref = str(bbref_val)
+            except Exception:
+                pass
+    for last, first in variants:
+        try:
+            lookup_df = pybaseball.playerid_lookup(last, first)
+        except Exception:
+            continue
+        if lookup_df is None or lookup_df.empty:
+            continue
+        for _, row in lookup_df.iterrows():
+            consider_row(row)
+
+    # Fallback: search by last name only, then match cleaned full name
+    try:
+        lookup_df = pybaseball.playerid_lookup(last_raw, None)
+    except Exception:
+        lookup_df = None
+    if lookup_df is not None and not lookup_df.empty:
+        for _, row in lookup_df.iterrows():
+            consider_row(row)
+
+    mlbam_result = best_match_mlbam if best_match_mlbam is not None else first_hit_mlbam
+    bbref_result = best_match_bbref if best_match_bbref is not None else first_hit_bbref
+
+    if return_bbref:
+        return mlbam_result, bbref_result
+    return mlbam_result
+
+
+@st.cache_data(show_spinner=False, ttl=21600)
 def build_mlb_headshot(mlbam: int | str | None) -> str | None:
+    """Try MLB headshot URLs in order; return the first that responds (200)."""
     if mlbam is None:
         return None
-    try:
-        for base in HEADSHOT_BASES:
-            try:
-                return base.format(mlbam=int(mlbam))
-            except Exception:
-                try:
-                    return base.format(mlbam=str(mlbam).strip())
-                except Exception:
-                    continue
-    except Exception:
+    mlbam_val = str(mlbam).strip()
+    if not mlbam_val:
         return None
-    return None
+    headers = {"User-Agent": HEADSHOT_USER_AGENT}
+    fallback_url = None
+    for base in HEADSHOT_BASES:
+        try:
+            url = base.format(mlbam=mlbam_val)
+            if fallback_url is None:
+                fallback_url = url
+        except Exception:
+            continue
+        try:
+            resp = requests.head(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, allow_redirects=True)
+            status = resp.status_code
+            if status == 200:
+                return url
+            # Some endpoints reject HEAD; try a lightweight GET
+            if status in (403, 404, 405):
+                resp_get = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, stream=True)
+                if resp_get.status_code == 200:
+                    return url
+        except Exception:
+            continue
+    return fallback_url
 
 
 @st.cache_data(show_spinner=False, ttl=3600, max_entries=50)
@@ -422,38 +538,166 @@ def reverse_lookup_mlbam(fg_id: int) -> int | None:
     return None
 
 
-def get_headshot_url_from_row(row: pd.Series) -> str:
-    """Resolve the best headshot URL for a single-row (aggregated or yearly).
+@st.cache_data(show_spinner=False, ttl=3600)
+def fetch_bbref_headshot(bref_id: str | None) -> str | None:
+    if not bref_id:
+        return None
+    slug = str(bref_id).strip().lower()
+    if not slug:
+        return None
+    first_letter = slug[0]
+    url = f"https://www.baseball-reference.com/players/{first_letter}/{slug}.shtml"
+    headers = {"User-Agent": HEADSHOT_USER_AGENT}
+    try:
+        resp = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT)
+    except Exception:
+        return None
+    if resp.status_code != 200 or not resp.text:
+        return None
+    html_text = resp.text
+    urls = []
+    for pattern in [
+        r'https?://[^"\']*headshots[^"\']*\.(?:jpg|png)',
+        r'//[^"\']*headshots[^"\']*\.(?:jpg|png)',
+    ]:
+        urls.extend(re.findall(pattern, html_text, flags=re.IGNORECASE))
+    for raw in urls:
+        if not raw:
+            continue
+        candidate = raw if raw.startswith("http") else f"https:{raw}"
+        return candidate
+    return None
+
+
+def build_bref_headshot(bref_id: str | None) -> str | None:
+    if not bref_id:
+        return None
+    raw_slug = str(bref_id).strip()
+    if not raw_slug:
+        return None
+    slug_variants = {raw_slug.lower(), raw_slug.upper()}
+    for slug in slug_variants:
+        folder_variants = {slug[0].lower(), slug[0].upper()} if slug else set()
+        for folder in folder_variants:
+            for base in HEADSHOT_BREF_BASES:
+                try:
+                    return base.format(folder=folder, bref_id=slug)
+                except Exception:
+                    continue
+    return None
+
+
+def resolve_bref_headshot(bref_id: str | None) -> str | None:
+    direct = build_bref_headshot(bref_id)
+    if direct:
+        return direct
+    return fetch_bbref_headshot(bref_id)
+
+
+def heuristic_bbref_slug(full_name: str) -> list[str]:
+    """Best-effort guesses for bbref slug when lookup fails (last5 + first2 + 2-digit index)."""
+    def clean_name(val: str) -> str:
+        if not val:
+            return ""
+        try:
+            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
+        except Exception:
+            pass
+        return "".join(ch for ch in val if ch.isalnum() or ch.isspace()).strip().lower()
     
-    Strategy:
-    1. Look for mlbam-like columns and build an MLB headshot URL.
-    2. If missing, look for FanGraphs id and reverse-lookup to mlbam.
-    3. Return a placeholder when nothing resolved.
+    cleaned = clean_name(full_name)
+    if not cleaned:
+        return []
+    parts = cleaned.split()
+    if len(parts) < 2:
+        return []
+    first = parts[0]
+    last = parts[-1]
+    if not first or not last:
+        return []
+    base_slug = f"{last[:5]}{first[:2]}"
+    if len(base_slug) < 6:
+        return []
+    slugs = []
+    for i in range(1, 16):  # try 01-15 to account for name collisions
+        slugs.append(f"{base_slug}{i:02d}")
+    return slugs
+
+
+def get_headshot_url_from_row(row: pd.Series) -> str:
     """
-    # 1) direct mlbam-like columns
-    for col in ("mlbam", "MLBID", "key_mlbam", "mlbam_id", "MLBAMID", "mlbam_override"):
+    Comprehensive headshot resolution with multiple fallback strategies.
+    Returns a valid URL (real headshot or placeholder), never None.
+    
+    Priority order:
+    1. mlbam_override or direct MLBAM columns
+    2. FanGraphs ID reverse lookup to MLBAM
+    3. BBRef ID (direct columns or from lookup)
+    4. Name-based lookup for MLBAM/BBRef
+    5. Heuristic BBRef slug generation
+    6. Placeholder
+    """
+    name = str(row.get("Name", "")).strip()
+    
+    # 1) Try direct MLBAM columns
+    id_cols = ["mlbam_override", "mlbamid", "mlbam_id", "mlbam", "MLBID", "MLBAMID", "key_mlbam"]
+    for col in id_cols:
         if col in row.index:
             val = row.get(col)
             if pd.notna(val) and str(val).strip():
-                url = build_mlb_headshot(val)
-                if url:
-                    return url
+                try:
+                    mlbam = int(val)
+                    headshot = build_mlb_headshot(mlbam)
+                    if headshot:
+                        return headshot
+                except Exception:
+                    pass
     
-    # 2) FanGraphs id reverse lookup (cached)
-    for fg_col in ("playerid", "IDfg", "fg_id", "FGID"):
-        if fg_col in row.index:
-            fg = row.get(fg_col)
+    # 2) Try FanGraphs ID reverse lookup
+    fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
+    for col in fg_cols:
+        if col in row.index:
+            fg = row.get(col)
             if pd.notna(fg) and str(fg).strip():
                 try:
                     mlbam = reverse_lookup_mlbam(int(fg))
                     if mlbam:
-                        url = build_mlb_headshot(mlbam)
-                        if url:
-                            return url
+                        headshot = build_mlb_headshot(mlbam)
+                        if headshot:
+                            return headshot
                 except Exception:
                     pass
     
-    # 3) Fallback to placeholder
+    # 3) Try direct BBRef columns
+    bref_cols = ["key_bbref", "bbref_id", "BBREFID", "bref_id", "BREFID"]
+    for col in bref_cols:
+        if col in row.index:
+            val = row.get(col)
+            if pd.notna(val) and str(val).strip():
+                bref_url = resolve_bref_headshot(str(val))
+                if bref_url:
+                    return bref_url
+    
+    # 4) Try name-based lookup
+    if name:
+        mlbam_fallback, bbref_fallback = lookup_mlbam_id(name, return_bbref=True)
+        if mlbam_fallback:
+            headshot = build_mlb_headshot(mlbam_fallback)
+            if headshot:
+                return headshot
+        if bbref_fallback:
+            bref_url = resolve_bref_headshot(bbref_fallback)
+            if bref_url:
+                return bref_url
+    
+    # 5) Try heuristic BBRef slugs
+    if name:
+        for slug in heuristic_bbref_slug(name):
+            bref_url = resolve_bref_headshot(slug)
+            if bref_url:
+                return bref_url
+    
+    # 6) Fallback to placeholder - ALWAYS return this, never None
     return HEADSHOT_PLACEHOLDER
 
 
@@ -869,7 +1113,7 @@ for _, row in df.iterrows():
     except Exception:
         pass
 
-    src = get_headshot_url_from_row(src_row) or ""
+    src = get_headshot_url_from_row(src_row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
     card_html = f'''
     <div class="player-card">
