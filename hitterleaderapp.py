@@ -21,13 +21,13 @@ st.set_page_config(layout="wide")
 @st.cache_data(ttl=3600, max_entries=3)  # Limit cache entries
 def load_filtered_data(start_year, end_year, min_pa=0):
     """
-    Load ONLY the data we need - filtered by PA threshold BEFORE caching.
-    This is the key optimization: don't cache everything, cache only what's displayed.
+    Load data and filter by PA threshold.
+    For single year: use qual parameter (much faster!)
+    For multi-year: filter AFTER aggregation (so min_pa represents total PA across all years).
     """
     if start_year == end_year:
-        df = batting_stats(start_year, end_year, qual=0, split_seasons=False)
-        if not df.empty and min_pa > 0:
-            df = df[pd.to_numeric(df.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
+        # Single year: use qual parameter for fast server-side filtering
+        df = batting_stats(start_year, end_year, qual=min_pa, split_seasons=False)
         
         # FIX: Create proper TeamDisplay for single-year data
         # FanGraphs returns "---" or "- - -" for players who played for multiple teams
@@ -47,13 +47,17 @@ def load_filtered_data(start_year, end_year, min_pa=0):
         
         return df
     else:
+        # Multi-year: use smart pre-filter, then aggregate, then filter by total PA
+        # Pre-filter estimate: if someone needs min_pa total, they likely averaged min_pa/num_years per season
+        # Use a conservative estimate (divide by 2) to avoid filtering out players who had uneven distributions
+        num_years = end_year - start_year + 1
+        pre_filter_pa = max(1, min_pa // (num_years * 2)) if min_pa > 0 else 0
+        
         frames = []
         for year in range(start_year, end_year + 1):
-            yr_data = batting_stats(year, year, qual=0, split_seasons=False)
+            # Use qual parameter to pre-filter on the server side
+            yr_data = batting_stats(year, year, qual=pre_filter_pa, split_seasons=False)
             if not yr_data.empty:
-                # Filter EARLY before appending
-                if min_pa > 0:
-                    yr_data = yr_data[pd.to_numeric(yr_data.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
                 yr_data['Season'] = year
                 frames.append(yr_data)
         
@@ -72,7 +76,13 @@ def load_filtered_data(start_year, end_year, min_pa=0):
             
             result = pd.DataFrame(grouped_rows)
             # Optimize dtypes again after aggregation
-            return optimize_dtypes(result)
+            result = optimize_dtypes(result)
+            
+            # NOW filter by total PA across all years (final precise filter)
+            if not result.empty and min_pa > 0:
+                result = result[pd.to_numeric(result.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
+            
+            return result
         return pd.DataFrame()
 
 
@@ -794,13 +804,12 @@ with col1:
     st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
 
-# OPTIMIZED: Load filtered data with PA threshold applied BEFORE caching
+# Load filtered data - min_pa applies to total PA across the selected span
 min_pa_val = int(st.session_state.get("hl_min_pa", 0))
 df = load_filtered_data(start_year, end_year, min_pa_val)
 
-# FIX: If sorting by a fielding stat, we need to load ALL fielding data first
-# Otherwise we can't sort by it. This is still way better than the old approach
-# because we're only loading fielding for players who meet the PA threshold.
+# FIX: If sorting by a fielding stat, we need to load fielding data for ALL qualifying players first
+# Then we can sort and limit to top 10
 if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
     # Get all player names that meet PA threshold
     player_names = df["Name"].tolist()
@@ -823,13 +832,18 @@ if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
             if col in df.columns:
                 df[col] = df[col].fillna(0)
 
-# Now sort and take top N
-df = df.sort_values(by=stat, ascending=st.session_state.get("hl_sort_worst", False))
-df = df.head(10)
+# FIXED: Sort and LIMIT TO TOP 10
+if stat in df.columns:
+    df = df.sort_values(by=stat, ascending=st.session_state.get("hl_sort_worst", False))
+    # *** CRITICAL FIX: LIMIT TO TOP 10 AFTER SORTING ***
+    df = df.head(10)
+else:
+    st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
+    df = pd.DataFrame()  # Empty df if stat not found
 
 # TeamDisplay should already be set by load_filtered_data or aggregate_player_group
 # But ensure it exists as a safety measure
-if "TeamDisplay" not in df.columns:
+if not df.empty and "TeamDisplay" not in df.columns:
     df["TeamDisplay"] = "N/A"
 
 cards = []
@@ -980,21 +994,59 @@ height = 8000
 with col2:
     components.html(full_html, height=height)
 
+# MLBAM overrides section - always exactly 10 players (2 rows of 5)
 if not df.empty:
     st.markdown("---")
     st.write("Manual MLBAM overrides (enter MLBAM id to fix headshot)")
-    cols_row = [st.columns(5), st.columns(5)]
-    for i, idx in enumerate(df.index):
-        row_cols = cols_row[i // 5]
-        with row_cols[i % 5]:
-            key = f"hl_mlbam_override_{i}"
+    
+    # First row of 5
+    cols_row1 = st.columns(5)
+    for col_idx in range(5):
+        player_idx = col_idx
+        if player_idx >= len(df):
+            break
+        
+        idx = df.index[player_idx]
+        row = df.loc[idx]
+        
+        with cols_row1[col_idx]:
+            key = f"hl_mlbam_override_{player_idx}"
             default_val = ""
-            if "mlbam_override" in df.columns and pd.notna(df.at[idx, "mlbam_override"]):
+            if "mlbam_override" in df.columns and pd.notna(row.get("mlbam_override")):
                 try:
-                    default_val = str(int(df.at[idx, "mlbam_override"]))
+                    default_val = str(int(row["mlbam_override"]))
                 except Exception:
-                    default_val = str(df.at[idx, "mlbam_override"]) if pd.notna(df.at[idx, "mlbam_override"]) else ""
-            user_val = st.text_input(f"Player {i+1} MLBAM", value=default_val, key=key)
+                    default_val = str(row["mlbam_override"]) if pd.notna(row.get("mlbam_override")) else ""
+            
+            user_val = st.text_input(f"Player {player_idx+1} MLBAM", value=default_val, key=key)
+            try:
+                if user_val and str(user_val).strip():
+                    df.at[idx, "mlbam_override"] = int(str(user_val).strip())
+                else:
+                    df.at[idx, "mlbam_override"] = np.nan
+            except Exception:
+                df.at[idx, "mlbam_override"] = np.nan
+    
+    # Second row of 5
+    cols_row2 = st.columns(5)
+    for col_idx in range(5):
+        player_idx = col_idx + 5
+        if player_idx >= len(df):
+            break
+        
+        idx = df.index[player_idx]
+        row = df.loc[idx]
+        
+        with cols_row2[col_idx]:
+            key = f"hl_mlbam_override_{player_idx}"
+            default_val = ""
+            if "mlbam_override" in df.columns and pd.notna(row.get("mlbam_override")):
+                try:
+                    default_val = str(int(row["mlbam_override"]))
+                except Exception:
+                    default_val = str(row["mlbam_override"]) if pd.notna(row.get("mlbam_override")) else ""
+            
+            user_val = st.text_input(f"Player {player_idx+1} MLBAM", value=default_val, key=key)
             try:
                 if user_val and str(user_val).strip():
                     df.at[idx, "mlbam_override"] = int(str(user_val).strip())
