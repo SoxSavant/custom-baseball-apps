@@ -1236,7 +1236,7 @@ rows = max(1, (len(cards) + 4) // 5)
 height = 8000
 
 with col2:
-    components.html(full_html, height=height)
+    components.html(full_html, height=800)
 
 # MLBAM overrides section - always exactly 10 players (2 rows of 5)
 if not df.empty:
