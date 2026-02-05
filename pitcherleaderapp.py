@@ -19,65 +19,30 @@ st.set_page_config(layout="wide")
 # ----------------------------
 
 @st.cache_data(ttl=3600, max_entries=3)
-def load_filtered_data(start_year, end_year, min_ip=0):
+def load_filtered_data(year, year2, min_ip=0):
     """
     Load data and filter by IP threshold.
     For single year: use qual parameter (much faster!)
     For multi-year: filter AFTER aggregation (so min_ip represents total IP across all years).
     """
-    if start_year == end_year:
-        # Single year: use qual parameter for fast server-side filtering
-        df = pitching_stats(start_year, end_year, qual=min_ip, split_seasons=False)
+    df = pitching_stats(year, year2, qual=min_ip, split_seasons=False)
         
-        # Create proper TeamDisplay for single-year data
-        if not df.empty and "Team" in df.columns:
-            def make_team_display(team_val):
-                if pd.isna(team_val):
-                    return "N/A"
-                team_str = str(team_val).strip()
+       
+    if not df.empty and "Team" in df.columns:
+        def make_team_display(team_val):
+            if pd.isna(team_val):
+                return "N/A"
+            team_str = str(team_val).strip()
                 # FanGraphs uses these patterns for multi-team players
-                if team_str in {"---", "- - -", "--", "TOT", ""}:
-                    return "2 Teams"
+            if team_str in {"---", "- - -", "--", "TOT", ""}:
+                return "2 Teams"
                 # Otherwise normalize the team code
-                normalized = normalize_team_code(team_str, start_year)
-                return normalized if normalized else "N/A"
+            normalized = normalize_team_code(team_str, year)
+            return normalized if normalized else "N/A"
             
-            df["TeamDisplay"] = df["Team"].apply(make_team_display)
+        df["TeamDisplay"] = df["Team"].apply(make_team_display)
         
         return df
-    else:
-        # Multi-year: use smart pre-filter, then aggregate, then filter by total IP
-        num_years = end_year - start_year + 1
-        pre_filter_ip = max(1, min_ip // (num_years * 2)) if min_ip > 0 else 0
-        
-        frames = []
-        for year in range(start_year, end_year + 1):
-            yr_data = pitching_stats(year, year, qual=pre_filter_ip, split_seasons=False)
-            if not yr_data.empty:
-                yr_data['Season'] = year
-                frames.append(yr_data)
-        
-        if frames:
-            combined = pd.concat(frames, ignore_index=True)
-            combined = optimize_dtypes(combined)
-            
-            # Group by player and aggregate
-            grouped_rows = []
-            for player_id, grp in combined.groupby("IDfg"):
-                name = grp["Name"].iloc[0] if not grp.empty else None
-                row = aggregate_player_group(grp, name)
-                if row is not None and len(row):
-                    grouped_rows.append(row)
-            
-            result = pd.DataFrame(grouped_rows)
-            result = optimize_dtypes(result)
-            
-            # NOW filter by total IP across all years (final precise filter)
-            if not result.empty and min_ip > 0:
-                result = result[pd.to_numeric(result.get("IP", 0), errors="coerce").fillna(0) >= min_ip]
-            
-            return result
-        return pd.DataFrame()
 
 
 def optimize_dtypes(df):
@@ -629,7 +594,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     # Pitching-specific aggregation
     SUM_STATS = {"G", "GS", "W", "L", "SV", "IP", "SO", "BB", "HR", "ER", "WAR"}
     RATE_STATS = {"ERA", "FIP", "xFIP", "WHIP", "K/9", "BB/9", "K%", "BB%", "K-BB%", 
-                  "Barrel%", "HardHit%", "EV", "O-Swing%", "Whiff%", "GB%", "FB%"}
+                  "Barrel%", "HardHit%", "EV", "O-Swing%", "Contact%", "GB%", "FB%"}
 
     for col in grp.columns:
         if col in skip_cols:
@@ -699,7 +664,7 @@ def format_stat(stat: str, val) -> str:
             return f"{int(round(v))}.0"
         return f"{v:.1f}"
 
-    if upper_stat in {"ERA", "FIP", "XFIP", "K/9", "BB/9", "HR/9"}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "K/9", "BB/9", "HR/9", "XERA",}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":
@@ -744,10 +709,12 @@ def transform_stat_value(stat: str, raw_val):
 #  UI
 # ----------------------------
 
+
+
 STAT_ALLOWLIST = [
-    "WAR", "ERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB", "K/9", "BB/9",
+    "WAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB", "K/9", "BB/9",
     "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-    "O-Swing%", "Whiff%", "GB%", "FB%", "QS", "CG", "ShO"
+    "O-Swing%", "Contact%", "GB%", "FB%", "CG", "ShO"
 ]
 
 label_map = {
@@ -755,6 +722,7 @@ label_map = {
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",
     "O-Swing%": "Chase%",
+    "Contact%": "Whiff%",
 }
 
 lower_better = {
@@ -816,25 +784,15 @@ if "pl_span" not in st.session_state:
 col1, col2 = st.columns([.5, 2])
 
 with col1:
-    st.checkbox("Multi-year span", key="pl_span", on_change=on_year_change)
+    
     start_label = "Start Year" if st.session_state.get("pl_span", False) else "Year"
-    start_year = st.number_input(
+    year = st.number_input(
         start_label,
         min_value=1900,
         max_value=current_year,
         key="pl_start_year",
         on_change=on_year_change
     )
-    if st.session_state.get("pl_span", False):
-        end_year = st.number_input(
-            "End Year",
-            min_value=2025,
-            max_value=current_year,
-            key="pl_end_year",
-            on_change=on_year_change
-        )
-    else:
-        end_year = st.session_state["pl_start_year"]
    
     min_ip = st.number_input(
         "Min IP",
@@ -847,7 +805,11 @@ with col1:
 
 # Load filtered data
 min_ip_val = int(st.session_state.get("pl_min_ip", 0))
-df = load_filtered_data(start_year, end_year, min_ip_val)
+df = load_filtered_data(year, year, min_ip_val)
+
+if st.checkbox("Show available columns"):
+            st.write("All columns:", sorted(df.columns.tolist()))
+            st.write("Percentage stats:", [c for c in df.columns if '%' in c])
 
 # Sort and limit to top 10
 if not df.empty and stat in df.columns:
@@ -908,7 +870,7 @@ for _, row in df.iterrows():
     '''
     cards.append(card_html)
 
-span_label = f"{int(start_year)}" if start_year == end_year else f"{int(start_year)}–{int(end_year)}"
+span_label = f"{int(year)}"
 title_label = label_map.get(stat, stat)
 title = f"{span_label} {title_label} Leaders"
 if st.session_state.get("pl_sort_worst", False):
