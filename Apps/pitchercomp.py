@@ -1115,9 +1115,7 @@ def load_player_pitching_profile(fg_id: int, start_year: int, end_year: int) -> 
 
         return pd.DataFrame()
 
-    # -----------------------------
-    # SINGLE YEAR
-    # -----------------------------
+    # single year
     if start_year == end_year:
         try:
             df = pitching_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
@@ -1147,9 +1145,7 @@ def load_player_pitching_profile(fg_id: int, start_year: int, end_year: int) -> 
             row["Name"] = str(row.get("Name", "")).strip()
             return row
 
-    # -----------------------------
-    # MULTI-YEAR SPAN
-    # -----------------------------
+    # multi year
     frames = []
     for year in range(start_year, end_year + 1):
         try:
@@ -1635,7 +1631,7 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
     return HEADSHOT_PLACEHOLDER
 
 
-# --------------------- Layout containers ---------------------
+# containers
 player_mode_options = ["2 players", "3 players", "4 players"]
 player_mode = st.radio(
     "",
@@ -1657,7 +1653,7 @@ with left_col:
     controls_container = st.container()
     stat_builder_container = st.container()
 
-# --------------------- Controls ---------------------
+# controls
 current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
 MAX_PLAYERS = 4
@@ -1854,7 +1850,7 @@ for idx, pdata in enumerate(players_data):
 
 dfs = [p["df"] for p in players_data]
 
-# --------------------- Stat builder setup ---------------------
+# stat builder setup
 stat_exclusions = {"Season", "W", "L"}
 numeric_sets = []
 for df in dfs:
@@ -2248,7 +2244,7 @@ if not stats_order:
     st.stop()
 
 
-# --------------------- Formatting ---------------------
+# formatting
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
@@ -2314,7 +2310,7 @@ def format_stat(stat: str, val) -> str:
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
-# --------------------- Comparison table ---------------------
+# comparison graphic
 label_map = {
     "HardHit%": "Hard Hit%",
     "WAR": "fWAR",

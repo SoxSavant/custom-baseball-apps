@@ -89,7 +89,7 @@ if not st.session_state.get(CSS_KEY):
     )
     st.session_state[CSS_KEY] = True
 
-# --------------------- Teams ---------------------
+# teams
 TEAMS = {
     "ARI": "Arizona Diamondbacks", "ATL": "Atlanta Braves",
     "BAL": "Baltimore Orioles",    "BOS": "Boston Red Sox",
@@ -433,7 +433,7 @@ def get_team_nickname(full_name: str) -> str:
             return full_name[len(prefix):]
     return full_name.split(" ", 1)[-1]
 
-# --------------------- Controls ---------------------
+# controls
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
@@ -458,7 +458,7 @@ with left_col:
 
 stat_builder_container = left_col.container()
 
-# --------------------- Data ---------------------
+# data
 team_full_name = TEAMS[team_abbr]
 nickname = get_team_nickname(team_full_name)
 logo_dir = Path(__file__).parent / "logos"
@@ -502,7 +502,7 @@ if team_df.empty:
     st.warning(f"No players on {team_abbr} with ≥ {min_pa} PA.")
     st.stop()
 
-# --------------------- Stat builder setup ---------------------
+# stat builder
 numeric_stats = [
     col for col in df.columns
     if pd.api.types.is_numeric_dtype(df[col])
@@ -533,7 +533,7 @@ stat_version_key = "stat_config_version"
 
 # --- End AG Grid Checkbox Renderer JS ---
 
-# --- Callbacks ---
+#c allbacks 
 def bump_stat_config_version():
     st.session_state[stat_version_key] = st.session_state.get(stat_version_key, 0) + 1
 
@@ -617,7 +617,7 @@ def normalize_stat_rows(rows, fallback):
     if not cleaned:
         cleaned = [row.copy() for row in fallback]
     return cleaned
-# --- End Callbacks ---
+# end callbacks 
 
 def move_stat_row(delta: int, index: int, fallback):
     """Move a stat row up/down and persist."""
@@ -809,7 +809,7 @@ if not stats_order:
     st.stop()
 
 
-# --------------------- Formatting ---------------------
+# formatting
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
@@ -840,7 +840,7 @@ def format_stat(stat: str, val) -> str:
     v = float(val)
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
-# --------------------- Build leader rows ---------------------
+# build leader rows
 leaders = []
 
 label_map = {
@@ -899,7 +899,7 @@ if lead_df.empty:
 lead_df["Display"] = lead_df.apply(lambda r: format_stat(r["Stat"], r["Value"]), axis=1)
 
 with right_col:
-    # --------------------- Plot ---------------------
+    # plot
 
     cmap = LinearSegmentedColormap.from_list(
         "savant",

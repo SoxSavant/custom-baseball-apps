@@ -19,30 +19,25 @@ st.set_page_config(layout="wide")
 # ----------------------------
 
 @st.cache_data(ttl=3600, max_entries=3)
-def load_filtered_data(year, year2, min_ip=0):
-    """
-    Load data and filter by IP threshold.
-    For single year: use qual parameter (much faster!)
-    For multi-year: filter AFTER aggregation (so min_ip represents total IP across all years).
-    """
-    df = pitching_stats(year, year2, qual=min_ip, split_seasons=False)
-        
-       
+def load_filtered_data(year, min_ip=0):
+    """Load single-year data with IP filter."""
+    df = pitching_stats(year, year, qual=min_ip, split_seasons=False)
+    
     if not df.empty and "Team" in df.columns:
         def make_team_display(team_val):
             if pd.isna(team_val):
                 return "N/A"
             team_str = str(team_val).strip()
-                # FanGraphs uses these patterns for multi-team players
+            # FanGraphs uses these patterns for multi-team players
             if team_str in {"---", "- - -", "--", "TOT", ""}:
                 return "2 Teams"
-                # Otherwise normalize the team code
+            # Otherwise normalize the team code
             normalized = normalize_team_code(team_str, year)
             return normalized if normalized else "N/A"
-            
-        df["TeamDisplay"] = df["Team"].apply(make_team_display)
         
-        return df
+        df["TeamDisplay"] = df["Team"].apply(make_team_display)
+    
+    return df
 
 
 def optimize_dtypes(df):
@@ -112,13 +107,6 @@ def collapse_athletics(teams: list[str]) -> list[str]:
         return sorted(new_list)
     return teams
 
-
-VALID_TEAMS = {
-    "ARI","ATL","BAL","BOS","CHC","CIN","CLE","COL","CHW","DET",
-    "HOU","KCR","LAA","LAD","MIA","MIL","MIN","NYM","NYY",
-    "OAK","ATH","PHI","PIT","SDP","SEA","SFG","STL","TBR",
-    "TEX","TOR","WSN"
-}
 
 
 def compute_team_display(teams: list[str]) -> str:
@@ -480,9 +468,7 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
     return HEADSHOT_PLACEHOLDER
 
 
-# ----------------------------
-#  Aggregation
-# ----------------------------
+# aggregation
 
 def ip_to_outs(value) -> float:
     """Convert MLB innings notation (e.g., 5.1/5.2) to outs."""
@@ -642,9 +628,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     return result
 
 
-# ----------------------------
-#  Formatting
-# ----------------------------
+# formatting
 
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
@@ -747,17 +731,12 @@ with meta_col:
 current_year = date.today().year
 if "pl_start_year" not in st.session_state:
     st.session_state["pl_start_year"] = 2025
-if "pl_end_year" not in st.session_state:
-    st.session_state["pl_end_year"] = 2025
 if "pl_stat" not in st.session_state:
     st.session_state["pl_stat"] = "WAR"
 if "pl_min_ip" not in st.session_state:
     st.session_state["pl_min_ip"] = 162
 
-def on_year_change():
-    s = st.session_state
-    if not s.get("pl_span", False):
-        s["pl_end_year"] = s["pl_start_year"]
+
 
 st.markdown(
     """
@@ -785,13 +764,11 @@ col1, col2 = st.columns([.5, 2])
 
 with col1:
     
-    start_label = "Start Year" if st.session_state.get("pl_span", False) else "Year"
     year = st.number_input(
-        start_label,
+        "Year",
         min_value=1900,
         max_value=current_year,
         key="pl_start_year",
-        on_change=on_year_change
     )
    
     min_ip = st.number_input(
@@ -805,7 +782,7 @@ with col1:
 
 # Load filtered data
 min_ip_val = int(st.session_state.get("pl_min_ip", 0))
-df = load_filtered_data(year, year, min_ip_val)
+df = load_filtered_data(year, min_ip_val)
 
 if st.checkbox("Show available columns"):
             st.write("All columns:", sorted(df.columns.tolist()))

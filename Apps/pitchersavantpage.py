@@ -291,7 +291,7 @@ def load_pitching(y: int) -> pd.DataFrame:
     return df
 
 
-# --------------------- Controls ---------------------
+# controls
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
@@ -311,7 +311,7 @@ with controls_container:
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 
-# --------------------- Data ---------------------
+# data
 df = load_pitching(year).copy()
 
 if df is None or df.empty:
@@ -399,7 +399,7 @@ if len(player_teams) > 1:
 else:
     player_team_display = player_teams[0]
 
-# --------------------- Stat builder setup ---------------------
+# stat builder
 numeric_stats = [
     col for col in df.columns
     if pd.api.types.is_numeric_dtype(df[col])
@@ -767,7 +767,7 @@ if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the chart.")
     st.stop()
 
-# --------------------- Formatting ---------------------
+# formatting
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
@@ -812,7 +812,7 @@ def format_stat(stat: str, val) -> str:
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
-# --------------------- Build rows ---------------------
+# build rows
 leaders = []
 
 label_map = {
@@ -966,7 +966,7 @@ with right_col:
     
     st.pyplot(fig, use_container_width=True, clear_figure=False)
 
-    # --- Create PDF buffer ---
+    # PDF
     pdf_buffer = BytesIO()
     fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.3, dpi=300)
     pdf_buffer.seek(0)

@@ -447,7 +447,7 @@ def normalize_team_code(team: str, year: int) -> str:
     if team in {"", "-", "--", "---", "- - -", "TOT"}:
         return None
 
-    # Athletics → year-aware
+    # check for OAK/ATH years
     if year < 2025:
         if team in {"ATH", "OAK"}:
             return "OAK"
@@ -502,7 +502,7 @@ def get_player_teams_fangraphs(fg_id: int, start_year: int, end_year: int) -> li
     # Unique + alphabetical
     unique = sorted(set(found))
 
-    # 👇 Collapse OAK + ATH → OAK/ATH
+    # Collapse OAK + ATH into OAK/ATH
     collapsed = collapse_athletics(unique)
 
     return collapsed
@@ -622,7 +622,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     if pd.notna(slg_val) and pd.notna(avg_val):
         result["ISO"] = slg_val - avg_val
 
-    # Explicit PA-weighted wRC+ (handles spans cleanly).
+    # Explicit PA-weighted wRC+ to handle spanning
     if "wRC+" in grp.columns and pa_total > 0:
         wrc_series = pd.to_numeric(grp["wRC+"], errors="coerce")
         result["wRC+"] = (wrc_series * pa_weight).sum(skipna=True) / pa_total
@@ -1025,9 +1025,7 @@ def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> p
     Also attaches corrected Team / TeamDisplay based on direct Fangraphs HTML scraping.
     """
 
-    # -----------------------------
-    # SINGLE YEAR
-    # -----------------------------
+    # single year selected
     if start_year == end_year:
         try:
             df = batting_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
@@ -1051,11 +1049,8 @@ def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> p
             return row
 
         # if single year but no data, fall through to multi-year logic
-        # (rare, but harmless)
 
-    # -----------------------------
-    # MULTI-YEAR SPAN
-    # -----------------------------
+    # multi-year span
     frames = []
     for year in range(start_year, end_year + 1):
         try:
@@ -1584,7 +1579,7 @@ with left_col:
     controls_container = st.container()
     stat_builder_container = st.container()
 
-# --------------------- Controls ---------------------
+# controls
 current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
 MAX_PLAYERS = 4
@@ -1784,7 +1779,7 @@ for idx, pdata in enumerate(players_data):
 
 dfs = [p["df"] for p in players_data]
 
-# --------------------- Stat builder setup ---------------------
+# build stats
 stat_exclusions = {"Season"}
 numeric_sets = []
 for df in dfs:
@@ -2156,7 +2151,7 @@ if not stats_order:
     st.stop()
 
 
-# --------------------- Formatting ---------------------
+# formatting
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
@@ -2202,7 +2197,7 @@ def format_stat(stat: str, val) -> str:
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
-# --------------------- Comparison table ---------------------
+# comparison table
 def transform_stat_value(stat: str, raw_val):
     """
     Normalize or derive stat values before formatting/comparison.
@@ -2222,7 +2217,7 @@ def transform_stat_value(stat: str, raw_val):
     return raw_val
 
 
-label_map = {
+label_map = { # in stat drop down, change display names
     "HardHit%": "Hard Hit%",
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",

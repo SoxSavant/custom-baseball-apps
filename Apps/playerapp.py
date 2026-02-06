@@ -593,7 +593,7 @@ def load_batting(y: int) -> pd.DataFrame:
     return df
 # ...existing code...
 
-# --------------------- Controls ---------------------
+# controls
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
@@ -612,7 +612,7 @@ with controls_container:
         player_input = st.text_input("Player Name", value=default_player, key="player_select")
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
-# --------------------- Data ---------------------
+# data
 df = load_batting(year).copy()
 
 if df is None or df.empty:
@@ -725,7 +725,7 @@ if len(player_teams) > 1:
 else:
     player_team_display = player_teams[0]
 
-# --------------------- Stat builder setup ---------------------
+# stat builder setup
 numeric_stats = [
     col for col in df.columns
     if pd.api.types.is_numeric_dtype(df[col])
@@ -753,7 +753,7 @@ add_reset_key = "reset_add_select"
 remove_reset_key = "reset_remove_select"
 stat_version_key = "stat_config_version"
 
-# --- Callbacks ---
+# callbacks
 def bump_stat_config_version():
     st.session_state[stat_version_key] = st.session_state.get(stat_version_key, 0) + 1
 
@@ -837,7 +837,7 @@ def normalize_stat_rows(rows, fallback):
     if not cleaned:
         cleaned = [row.copy() for row in fallback]
     return cleaned
-# --- End Callbacks ---
+# callbacks
 
 
 def move_stat_row(delta: int, index: int, fallback):
@@ -1088,7 +1088,7 @@ if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the chart.")
     st.stop()
 
-# --------------------- Formatting ---------------------
+# formatting
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
@@ -1121,7 +1121,7 @@ def format_stat(stat: str, val) -> str:
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
-# --------------------- Build rows ---------------------
+# build rows
 leaders = []
 
 label_map = {
