@@ -10,40 +10,14 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 from io import BytesIO, StringIO
-from pybaseball import batting_stats, fielding_stats, bwar_bat
+from pybaseball import pitching_stats, bwar_pitch
 from datetime import date
 import requests
 
 
+st.set_page_config(page_title="Custom Team Pitcher Savant Page App", layout="wide")
 
-
-GRID_THEME = "balham"
-GRID_CUSTOM_CSS = {
-    ".ag-root-wrapper": {"border": "1px solid #2d2d2d"},
-    ".ag-root": {"background-color": "#1b1b1d"},
-    ".ag-header": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
-    ".ag-header-row": {"background-color": "#2c2c2c", "color": "#dcdcdc"},
-    ".ag-row": {"color": "#e0e0e0"},
-    ".ag-row-odd": {"background-color": "#1f1f1f"},
-    ".ag-row-even": {"background-color": "#242424"},
-    ".ag-center-cols-viewport": {"background-color": "#1b1b1d"},
-    ".ag-body-viewport": {"background-color": "#1b1b1d"},
-    ".ag-center-cols-container": {"background-color": "#1b1b1d"},
-    ".ag-body-horizontal-scroll-viewport": {"background-color": "#1b1b1d"},
-    ".ag-body-vertical-scroll-viewport": {"background-color": "#1b1b1d"},
-    ".ag-rich-select-popup": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
-    ".ag-rich-select-list": {"background-color": "#1b1b1d"},
-    ".ag-virtual-list-viewport": {"background-color": "#1b1b1d"},
-    ".ag-list-item": {"background-color": "#1b1b1d", "color": "#f0f0f0"},
-    ".ag-list-item.ag-active-item": {"background-color": "#2c2c2c", "color": "#f0f0f0"},
-    ".ag-rich-select-value": {"color": "#f0f0f0"},
-}
-
-
-
-st.set_page_config(page_title="Custom Team Savant Page App", layout="wide")
-
-# Hide Streamlit Cloud toolbar + profile badge on deployed app
+# Hide Streamlit Cloud toolbar
 st.markdown(
     """
     <style>
@@ -51,43 +25,25 @@ st.markdown(
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
         .viewerBadge_link__qRi_k {display: none;}
-        /* Hide slider end labels */
         [data-testid="stTickBarMin"],
         [data-testid="stTickBarMax"] {display: none;}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Team Savant Page App")
+    st.title("Custom Team Pitcher Savant Page App")
 with meta_col:
     st.markdown(
         """
         <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
-            <span style="color: #aaa;"></span>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-CSS_KEY = "stat_builder_css"
-if not st.session_state.get(CSS_KEY):
-    st.markdown(
-        """
-        <style>
-        /* Keep row selector column hidden without touching data columns */
-        div.ag-header-cell[col-id="ag-RowSelector"],
-        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
-        div.ag-center-cols-container [col-id="ag-RowSelector"] {
-            display: none !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.session_state[CSS_KEY] = True
 
 # teams
 TEAMS = {
@@ -96,16 +52,16 @@ TEAMS = {
     "CHC": "Chicago Cubs",         "CIN": "Cincinnati Reds",
     "CLE": "Cleveland Guardians",  "COL": "Colorado Rockies",
     "CHW": "Chicago White Sox",    "DET": "Detroit Tigers",
-    "HOU": "Houston Astros",       "KCR":  "Kansas City Royals",
+    "HOU": "Houston Astros",       "KCR": "Kansas City Royals",
     "LAA": "Los Angeles Angels",   "LAD": "Los Angeles Dodgers",
     "MIA": "Miami Marlins",        "MIL": "Milwaukee Brewers",
     "MIN": "Minnesota Twins",      "NYM": "New York Mets",
     "NYY": "New York Yankees",     "OAK": "Oakland Athletics",
     "ATH": "Athletics",
     "PHI": "Philadelphia Phillies","PIT": "Pittsburgh Pirates",
-    "SDP":  "San Diego Padres",     "SEA": "Seattle Mariners",
-    "SFG":  "San Francisco Giants", "STL": "St. Louis Cardinals",
-    "TBR":  "Tampa Bay Rays",       "TEX": "Texas Rangers",
+    "SDP": "San Diego Padres",     "SEA": "Seattle Mariners",
+    "SFG": "San Francisco Giants", "STL": "St. Louis Cardinals",
+    "TBR": "Tampa Bay Rays",       "TEX": "Texas Rangers",
     "TOR": "Toronto Blue Jays",    "WSN": "Washington Nationals"
 }
 
@@ -115,55 +71,39 @@ STAT_PRESETS = {
     "Statcast": [
         "WAR",
         "bWAR",
-        "Off",
-        "BsR",
-        "Def",
-        "xwOBA",
-        "xBA",
-        "xSLG",
+        "xERA",
         "EV",
-        "Barrel%",
-        "HardHit%",
         "O-Swing%",
         "Whiff%",
         "K%",
         "BB%",
-    ],
-    "Fielding": [
-        "DRS",
-        "FRV",
-        "OAA",
-        "ARM",
-        "RANGE",
-        "TZ",
-        "UZR",
-        "FRM",
+        "Barrel%",
+        "HardHit%",
+        "GB%",
     ],
     "Standard": [
         "bWAR",
         "WAR",
-        "PA",
-        "AVG",
-        "OBP",
-        "SLG",
-        "OPS",
-        "H",
-        "2B",
-        "3B",
-        "HR",
-        "XBH",
-        "RBI",
-        "SB",
-        "R",
+        "GS",
+        "IP",
+        "ERA",
+        "FIP",
+        "WHIP",
+        "K/9",
+        "BB/9",
+        "HR/9",
         "K%",
         "BB%",
     ],
+    "Plus/Minus Stats": [
+        "ERA-",
+        "FIP-",
+        "Stuff+",
+        "Location+",
+        "Pitching+",
+    ],
     "Miscellaneous": [
         "K-BB%",
-        "O-Swing%",
-        "Z-Swing%",
-        "Swing%",
-        "Contact%",
         "WPA",
         "Clutch",
         "Pull%",
@@ -172,31 +112,36 @@ STAT_PRESETS = {
         "GB%",
         "FB%",
         "LD%",
+        "GB/FB",
+        "HR/FB",
     ],
-
     "Every Stat": [
-       "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV", "MaxEV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-    "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
+        "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+        "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
+        "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
+        "GB%", "SIERA", "O-Swing%", "Whiff%",
+        "WPA", "Clutch",
     ],
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV", "MaxEV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G","PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-    "DRS", "FRV", "OAA", "ARM", "RANGE", "TZ", "UZR", "FRM",
+    "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+    "K/9", "BB/9", "HR/9", "BABIP", "vFA", "QS", "CG", "ShO", "SV",
+    "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
+    "GB%", "SIERA", "O-Swing%", "Whiff%",
+    "WPA", "Clutch",
 ]
 
-STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
+STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%", "O-Swing%": "Chase%"}
 
-FIELDING_COLS = ["DRS", "TZ", "UZR", "FRM"]
-LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
+# For pitchers, lower is better for these stats
+LOWER_BETTER = {
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "WHIP", "BB%", "BB/9", "HR/9", 
+    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB",
+    "LD%", "FB%",
+}
+
+LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 
 
 def normalize_name_key(val: str) -> str:
@@ -237,7 +182,7 @@ def load_local_bwar_data():
             .str.upper()
             .isin({"Y", "1", "TRUE"})
         )
-        df = df[~pitcher_mask]
+        df = df[pitcher_mask]
     df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
     df["NameKey"] = df["Name"].apply(normalize_name_key)
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
@@ -251,7 +196,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     _ = local_sig
     frames: list[pd.DataFrame] = []
     try:
-        data = bwar_bat(return_all=True)
+        data = bwar_pitch(return_all=True)
     except Exception:
         data = None
     if data is not None and not data.empty:
@@ -259,7 +204,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
         data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
         data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
         if "pitcher" in data.columns:
-            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) == 0]
+            data = data[pd.to_numeric(data["pitcher"], errors="coerce").fillna(1) != 0]
         data["Name"] = data["name_common"].astype(str).str.strip()
         data["NameKey"] = data["Name"].apply(normalize_name_key)
         frames.append(data[["NameKey", "Name", "year_ID", "WAR"]])
@@ -294,120 +239,40 @@ def load_bwar_for_year(year: int) -> pd.DataFrame:
     return agg
 
 
-@st.cache_data(show_spinner=False, ttl=900)
-def load_fielding_year(year: int) -> pd.DataFrame:
+@st.cache_data(show_spinner=True, ttl=900)
+def load_pitching(y: int) -> pd.DataFrame:
     try:
-        df = fielding_stats(year, year, qual=0, split_seasons=False)
+        base = pitching_stats(y, y, qual=0)
     except Exception:
         return pd.DataFrame()
-    if df is None or df.empty:
+    
+    if base is None or base.empty:
         return pd.DataFrame()
-    df = df.copy()
+    
+    df = base.copy()
+    df = df.loc[:, ~df.columns.duplicated()]
     df["NameKey"] = df["Name"].astype(str).apply(normalize_name_key)
-    for col in FIELDING_COLS:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-        else:
-            df[col] = np.nan
-    agg = df.groupby(["NameKey"], as_index=False)[FIELDING_COLS].sum(min_count=1)
-    return agg
 
-@st.cache_data(show_spinner=True, ttl=900)
-def load_batting(y: int) -> pd.DataFrame:
+    # Add bWAR
+    bwar_df = load_bwar_for_year(y)
+    if bwar_df is not None and not bwar_df.empty:
+        df = df.merge(bwar_df[["NameKey", "bWAR"]], on="NameKey", how="left")
     
-    # Strategy 1: Try direct CSV with error handling
-    try:
-        url = f"https://www.fangraphs.com/leaders.aspx?pos=all&stats=bat&lg=all&qual=0&type=8&season={y}&month=0&season1={y}&ind=0&page=1_1000000&rost=0&players=0&export=1"
-        
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        
-        # Try parsing with error_bad_lines=False (pandas < 2.0) or on_bad_lines='skip' (pandas >= 2.0)
-        try:
-            df = pd.read_csv(StringIO(response.text), on_bad_lines='skip', encoding='utf-8')
-        except TypeError:
-            # Fallback for older pandas versions
-            df = pd.read_csv(StringIO(response.text), error_bad_lines=False, encoding='utf-8')
-        
-        if df is not None and not df.empty and len(df) > 10:
-            st.success(f"Loaded {len(df)} players from FanGraphs CSV")
-            return df
-            
-    except Exception as e:
-        st.warning(f"CSV method failed: {str(e)}")
+    # Add Whiff% from Contact%
+    if "Contact%" in df.columns:
+        contact = pd.to_numeric(df["Contact%"], errors="coerce")
+        needs_percent_scale = contact.dropna().abs().le(1).mean() > 0.9 if contact.notna().any() else False
+        if needs_percent_scale:
+            contact = contact * 100
+        df["Contact%"] = contact
+        df["Whiff%"] = 100 - contact
+    else:
+        df["Whiff%"] = np.nan
     
-    # Strategy 2: Try with smaller chunks using pagination
-    try:
-        all_data = []
-        page_size = 100
-        
-        for page in range(1, 4):  # Try first 3 pages
-            url = f"https://www.fangraphs.com/leaders.aspx?pos=all&stats=bat&lg=all&qual=0&type=8&season={y}&month=0&season1={y}&ind=0&page={page}_{page_size}&rost=0&players=0&export=1"
-            
-            response = requests.get(url, timeout=20)
-            if response.status_code == 200:
-                try:
-                    chunk = pd.read_csv(StringIO(response.text), on_bad_lines='skip', encoding='utf-8')
-                    if not chunk.empty:
-                        all_data.append(chunk)
-                except:
-                    pass
-            time.sleep(0.5)  # Be nice to the server
-        
-        if all_data:
-            df = pd.concat(all_data, ignore_index=True).drop_duplicates()
-            st.success(f"Loaded {len(df)} players using pagination")
-            return df
-            
-    except Exception as e:
-        st.warning(f"Pagination method failed: {str(e)}")
+    if "bWAR" not in df.columns:
+        df["bWAR"] = np.nan
     
-    # Strategy 3: Clear cache and try pybaseball with updated user agent
-    try:
-        from pybaseball import cache
-        cache.purge()
-        
-        # Set a user agent to avoid being blocked
-        import pybaseball
-        if hasattr(pybaseball, 'set_options'):
-            pybaseball.set_options(user_agent='Mozilla/5.0')
-        
-        base = batting_stats(y, y, qual=0)
-        
-        if base is not None and not base.empty:
-            st.success(f"Loaded {len(base)} players from pybaseball")
-            return base.copy()
-            
-    except Exception as e:
-        st.warning(f"Pybaseball method failed: {str(e)}")
-    
-    # Strategy 4: Use Baseball Savant as ultimate fallback
-    try:
-        st.info("Attempting to load from Baseball Savant...")
-        from pybaseball import statcast_batter_exitvelo_barrels
-        
-        savant_data = statcast_batter_exitvelo_barrels(y)
-        
-        if savant_data is not None and not savant_data.empty:
-            st.success(f"Loaded {len(savant_data)} players from Baseball Savant")
-            return savant_data
-            
-    except Exception as e:
-        st.warning(f"Baseball Savant method failed: {str(e)}")
-    
-    # Strategy 5: Try loading from a static backup or sample data
-    st.error("⚠️ All data sources failed. Showing sample data or previous season.")
-    
-    # Try previous year as fallback
-    if y > 2020:
-        try:
-            st.info(f"Trying to load {y-1} season data as fallback...")
-            return load_batting(y - 1)
-        except:
-            pass
-    
-    # Return empty DataFrame with expected columns
-    return pd.DataFrame(columns=['Name', 'Team', 'G', 'PA', 'AB', 'H', 'HR', 'R', 'RBI', 'SB', 'BB', 'SO', 'AVG', 'OBP', 'SLG', 'OPS', 'WAR'])
+    return df
 
 
 def get_teams_for_year(season: int) -> dict[str, str]:
@@ -433,6 +298,7 @@ def get_team_nickname(full_name: str) -> str:
             return full_name[len(prefix):]
     return full_name.split(" ", 1)[-1]
 
+
 # controls
 left_col, right_col = st.columns([1, 1.3])
 
@@ -454,7 +320,7 @@ with left_col:
         index=default_index,
         key=team_select_key,
     )
-    min_pa = st.number_input("Minimum PA", 0, 800, 500)
+    min_ip = st.number_input("Minimum IP", 0, 250, 40)
 
 stat_builder_container = left_col.container()
 
@@ -470,36 +336,27 @@ if logo_path.exists():
     except Exception:
         logo_img = None
 
-df = load_batting(year).copy()
+df = load_pitching(year).copy()
 
 if df is None or df.empty:
     st.error("No data returned from pybaseball.")
     st.stop()
 
-df["PA"] = pd.to_numeric(df["PA"], errors="coerce")
+df["IP"] = pd.to_numeric(df.get("IP", 0), errors="coerce")
 df["Team"] = df["Team"].astype(str).str.upper()
 df["Name"] = df["Name"].astype(str).str.replace(".", "", regex=False).str.strip()
-if "Contact%" in df.columns:
-    contact = pd.to_numeric(df["Contact%"], errors="coerce")
-    needs_percent_scale = contact.dropna().abs().le(1).mean() > 0.9 if contact.notna().any() else False
-    if needs_percent_scale:
-        contact = contact * 100
-    df["Contact%"] = contact
-    df["Whiff%"] = 100 - contact
-else:
-    df["Whiff%"] = np.nan
 
-# League for percentile distribution (Savant uses 340+ PA)
-PCT_PA = 126 if year == 2020 else 340
-league_for_pct = df[df["PA"] >= PCT_PA].copy()
+# League for percentile distribution (40+ IP)
+PCT_IP = 40
+league_for_pct = df[df["IP"] >= PCT_IP].copy()
 if league_for_pct.empty:
-    st.error(f"No league hitters ≥ {PCT_PA} PA in {year}.")
+    st.error(f"No league pitchers ≥ {PCT_IP} IP in {year}.")
     st.stop()
 
-# Team leaders for selected PA
-team_df = df[(df["Team"] == team_abbr) & (df["PA"] >= min_pa)].copy()
+# Team leaders for selected IP
+team_df = df[(df["Team"] == team_abbr) & (df["IP"] >= min_ip)].copy()
 if team_df.empty:
-    st.warning(f"No players on {team_abbr} with ≥ {min_pa} PA.")
+    st.warning(f"No pitchers on {team_abbr} with ≥ {min_ip} IP.")
     st.stop()
 
 # stat builder
@@ -531,9 +388,7 @@ remove_reset_key = "reset_remove_select"
 stat_version_key = "stat_config_version"
 
 
-# --- End AG Grid Checkbox Renderer JS ---
-
-#c allbacks 
+# callbacks 
 def bump_stat_config_version():
     st.session_state[stat_version_key] = st.session_state.get(stat_version_key, 0) + 1
 
@@ -542,7 +397,6 @@ def add_stat_callback(stat_key: str, select_key: str, reset_key: str, sentinel: 
     choice = st.session_state.get(select_key)
     if not choice or choice == sentinel:
         return
-    # Recalculate base config to pass to normalize_stat_rows
     current_preset_for_base = st.session_state.get(stat_preset_key, default_preset_name)
     preset_base_candidates = [stat for stat in STAT_PRESETS[current_preset_for_base] if stat in stat_options]
     if not preset_base_candidates and stat_options:
@@ -558,11 +412,11 @@ def add_stat_callback(stat_key: str, select_key: str, reset_key: str, sentinel: 
     st.session_state[manual_stat_update_key] = True
     st.session_state[reset_key] = True
 
+
 def remove_stat_callback(stat_key: str, select_key: str, reset_key: str, sentinel: str):
     choice = st.session_state.get(select_key)
     if not choice or choice == sentinel:
         return
-    # Recalculate base config to pass to normalize_stat_rows
     current_preset_for_base = st.session_state.get(stat_preset_key, default_preset_name)
     preset_base_candidates = [stat for stat in STAT_PRESETS[current_preset_for_base] if stat in stat_options]
     if not preset_base_candidates and stat_options:
@@ -577,6 +431,7 @@ def remove_stat_callback(stat_key: str, select_key: str, reset_key: str, sentine
     st.session_state[manual_stat_update_key] = True
     st.session_state[reset_key] = True
 
+
 def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[str]):
     preset_name = st.session_state.get(preset_key, default_preset_name)
     preset_stats = STAT_PRESETS.get(preset_name, [])
@@ -590,6 +445,7 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
     st.session_state[manual_stat_update_key] = True
     st.session_state[add_reset_key] = True
     st.session_state[remove_reset_key] = True
+
 
 def normalize_stat_rows(rows, fallback):
     """Clean incoming rows into a valid stat config list."""
@@ -617,7 +473,7 @@ def normalize_stat_rows(rows, fallback):
     if not cleaned:
         cleaned = [row.copy() for row in fallback]
     return cleaned
-# end callbacks 
+
 
 def move_stat_row(delta: int, index: int, fallback):
     """Move a stat row up/down and persist."""
@@ -639,28 +495,23 @@ def toggle_stat_show(index: int, state_key: str, fallback):
         bump_stat_config_version()
         st.session_state[manual_stat_update_key] = True
 
-# ====================================================================================
-# FIX: Ensure stat_config persists across Team/PA changes by initializing it only once.
-# ====================================================================================
 
-# 1. Initialize State ONLY ONCE if not present (This is what prevents the reset)
+# Initialize State ONLY ONCE
 if stat_state_key not in st.session_state:
     st.session_state[stat_preset_key] = default_preset_name
     
-    # Calculate initial base config for the default preset
     current_preset_for_base = st.session_state[stat_preset_key]
     preset_base_candidates = [stat for stat in STAT_PRESETS[current_preset_for_base] if stat in stat_options]
     if not preset_base_candidates and stat_options:
         preset_base_candidates = [stat_options[0]]
     preset_base_config = [{"Stat": stat, "Show": True} for stat in preset_base_candidates]
     
-    # Set the initial stat config
     st.session_state[stat_state_key] = preset_base_config
     st.session_state[stat_version_key] = 0
 elif stat_version_key not in st.session_state:
     st.session_state[stat_version_key] = 0
 
-# 2. Update config variables for the current run based on session state
+# Update config variables for the current run
 current_preset_for_base = st.session_state.get(stat_preset_key, default_preset_name)
 preset_base_candidates = [stat for stat in STAT_PRESETS[current_preset_for_base] if stat in stat_options]
 if not preset_base_candidates and stat_options:
@@ -670,24 +521,17 @@ preset_base_config = [{"Stat": stat, "Show": True} for stat in preset_base_candi
 current_stat_config = st.session_state.get(stat_state_key, preset_base_config)
 current_stat_config = normalize_stat_rows(current_stat_config, preset_base_config)
 
-# ====================================================================================
-# END FIX
-# ====================================================================================
-
 with stat_builder_container:
-    # 3. New Preset Select Box (Simplified)
-    # Using key and on_change prevents the config from being reset on Min PA/Team change.
     prior_preset = st.session_state.get(stat_preset_key, default_preset_name)
     preset_index = preset_options.index(prior_preset) if prior_preset in preset_options else 0
     st.selectbox(
         "Stat Preset",
         preset_options,
         index=preset_index,
-        key=stat_preset_key, # Use the session state key directly
+        key=stat_preset_key,
         on_change=stat_preset_callback,
         args=(stat_preset_key, stat_state_key, stat_options)
     )
-
 
     st.markdown("### Customize stats")
     st.markdown(
@@ -815,8 +659,8 @@ def format_stat(stat: str, val) -> str:
         return ""
 
     upper_stat = stat.upper()
-    # append .0 to these stats if its a whole number
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}: 
+    
+    if upper_stat in {"WAR", "BWAR", "FWAR"}:
         v = float(val)
         if abs(v - round(v)) < 1e-9:
             return f"{int(round(v))}.0"
@@ -825,11 +669,24 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        return f"{float(val):.3f}".lstrip("0")
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "WHIP", "K/9", "BB/9", "HR/9", "GB/FB"}:
+        return f"{float(val):.2f}"
+
+    if upper_stat in {"ERA-", "FIP-"}:
+        return f"{int(round(float(val)))}"
+
+    if upper_stat == "IP":
+        v = float(val)
+        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
+
+    if upper_stat == "VFA":
+        return f"{float(val):.1f}"
+
+    if upper_stat == "EV":
+        return f"{float(val):.1f}"
 
     if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
+        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
@@ -840,46 +697,42 @@ def format_stat(stat: str, val) -> str:
     v = float(val)
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
+
 # build leader rows
 leaders = []
 
 label_map = {
-    "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
+    **STAT_DISPLAY_NAMES,
     "EV": "Avg Exit Velo",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "SO"}
 
 for stat in stats_order:
-
-    # Completely skip stats missing from dataset
+    # Skip stats missing from dataset
     if stat not in df.columns:
         continue
 
     # TEAM values
     team_vals = team_df[[stat, "Name"]].dropna(subset=[stat])
     if team_vals.empty:
-        continue  # no one on the team has a real value for this stat
+        continue
 
     team_leader_row = team_vals.sort_values(
         stat,
-        ascending=stat in lower_better
+        ascending=stat in LOWER_BETTER
     ).iloc[0]
     leader_val = float(team_leader_row[stat])
 
-    # LEAGUE percentile distribution (340+ PA)
+    # LEAGUE percentile distribution
     league_vals = league_for_pct[stat].dropna()
     if league_vals.empty:
-        continue  # league does not have values for this stat
+        continue
 
-    # Compute percentile safely (higher = better)
+    # Compute percentile (higher = better)
     pct = (league_vals <= leader_val).mean() * 100.0
-    if stat in lower_better:
+    if stat in LOWER_BETTER:
         pct = 100 - pct
     pct = float(np.clip(pct, 0, 100))
 
-
-    # Pretty output label
     label = label_map.get(stat, stat)
 
     leaders.append({
@@ -899,34 +752,31 @@ if lead_df.empty:
 lead_df["Display"] = lead_df.apply(lambda r: format_stat(r["Stat"], r["Value"]), axis=1)
 
 with right_col:
-    # plot
-
     cmap = LinearSegmentedColormap.from_list(
         "savant",
         [
-            (0, "#335AA1"),   # low end (blue)
-            (0.5, "#E8E8E8"), # neutral
-            (1, "#D92229"),   # high end (bright red)
+            (0, "#335AA1"),
+            (0.5, "#E8E8E8"),
+            (1, "#D92229"),
         ],
     )
 
-    # Increased height based on number of rows
     fig_height = 1.25 + len(lead_df) * 0.4
     fig, ax = plt.subplots(figsize=(7.5, fig_height))
 
-    # Adjust white card space with more breathing room between subtitle and bars
+    # Fixed space from top for title/subtitle in inches
     title_space = 0.75  # inches of space at top for title/subtitle
     top_pad = title_space / fig_height  # Convert to fraction
     ax_height = 1.0 - top_pad - 0.12  # 0.15 for bottom margin
     ax.set_position([0.08, 0.12, 0.8, ax_height])
 
+    # Calculate title positions in absolute inches from top
     title_from_top = 0.3  # inches from top
     subtitle_from_top = 0.6  # inches from top
     
     title_y = 1 - (title_from_top / fig_height)
     subtitle_y = 1 - (subtitle_from_top / fig_height)
 
-    # Title
     fig.text(
         0.5, title_y,
         f"{year} {team_full_name}",
@@ -934,11 +784,9 @@ with right_col:
         fontsize=22, fontweight="bold"
     )
 
-
-
     fig.text(
         0.5, subtitle_y,
-        f"(min {min_pa} PA)",
+        f"(min {min_ip} IP)",
         ha="center", va="center",
         fontsize=13, color="#555"
     )
@@ -956,17 +804,6 @@ with right_col:
         ha="center", va="center",
         fontsize=11, color="#555"
     )
-    # if logo_img is not None:
-    #     imagebox = OffsetImage(logo_img, zoom=0.08)
-    #     ab = AnnotationBbox(
-    #         imagebox,
-    #         (0.88, 0.90),
-    #         xycoords="figure fraction",
-    #         frameon=False,
-    #         pad=0,
-    #         zorder=0.5
-    #     )
-    #     ax.add_artist(ab)
 
     y = np.arange(len(lead_df))
 
@@ -978,7 +815,6 @@ with right_col:
     LABEL_X = 0
     BUBBLE_SIZE = 650
 
-    # Background track bars
     ax.barh(
         y,
         BAR_LENGTH,
@@ -1007,7 +843,7 @@ with right_col:
         name_x = LEFT_OFFSET + bar_width / 2
         needs_shift = pct < len(str(name)) * 3.2
         if needs_shift:
-            name_x = bubble_x + (VALUE_X -  bubble_x) * 0.2 - 1
+            name_x = bubble_x + (VALUE_X - bubble_x) * 0.2 - 1
             name_ha = "left"
         else:
             name_x = LEFT_OFFSET + bar_width / 2 - 1 + 2
@@ -1034,7 +870,7 @@ with right_col:
         ax.text(LABEL_X, i, row["Stat"],
                 ha="right", va="center", fontsize=13,)
 
-    # Add translucent percentile guide lines at 10th, 50th, 90th
+    # Add translucent percentile guide lines
     for pos in (0.1, 0.5, 0.9):
         guide_x = LEFT_OFFSET + BAR_LENGTH * pos
         ax.vlines(
@@ -1057,11 +893,10 @@ with right_col:
     st.pyplot(fig, use_container_width=True, clear_figure=False)
 
     pdf_buffer = BytesIO()
-    fig.savefig(pdf_buffer, format="pdf", bbox_inches = "tight", pad_inches = .25)
+    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=.25)
     pdf_buffer.seek(0)
 
-    
-    download_name = f"{team_abbr}_{year}_stat_leaders.pdf"
+    download_name = f"{team_abbr}_{year}_pitcher_stat_leaders.pdf"
     st.download_button(
         "Download as PDF",
         data=pdf_buffer,
