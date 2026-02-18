@@ -1664,7 +1664,7 @@ with left_col:
 current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
 MAX_PLAYERS = 4
-default_names = ["Tarik Skubal", "Paul Skenes", "", ""]
+default_names = ["Tarik Skubal", "Garrett Crochet", "", ""]
 # If mode increases, default new players to single-season
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
