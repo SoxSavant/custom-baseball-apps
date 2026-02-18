@@ -892,7 +892,7 @@ full_html = f"""
 }}
 .leaderboard-title {{
     font-weight: 900;
-    font-size: 2.1rem;
+    font-size: 2.65rem;
     margin-bottom: 2rem;
     text-align: center;
 }}
