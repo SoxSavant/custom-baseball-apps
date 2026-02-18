@@ -23,11 +23,6 @@ STATCAST_RATE_STATS = {"Barrel%", "HardHit%", "EV"}
 
 @st.cache_data(ttl=3600, max_entries=3)
 def load_filtered_data(start_year, end_year, min_ip=0):
-    """
-    Load data and filter by IP threshold.
-    For single year: use qual parameter (much faster).
-    For multi-year: aggregate per-year frames, then filter by total IP.
-    """
     if start_year == end_year:
         df = pitching_stats(start_year, end_year, qual=min_ip, split_seasons=False)
 
@@ -44,11 +39,11 @@ def load_filtered_data(start_year, end_year, min_ip=0):
 
         return df
     else:
-        # Multi-year: pre-filter conservatively, aggregate, then apply final IP filter
+        num_years = end_year - start_year + 1
 
         frames = []
         for year in range(start_year, end_year + 1):
-            yr_data = pitching_stats(year, year, qual=0, split_seasons=False)
+            yr_data = pitching_stats(year, year, qual=1, split_seasons=False)
             if not yr_data.empty:
                 yr_data = yr_data.copy()
                 yr_data["Season"] = year
@@ -58,6 +53,17 @@ def load_filtered_data(start_year, end_year, min_ip=0):
             return pd.DataFrame()
 
         combined = pd.concat(frames, ignore_index=True)
+
+        # Smart pre-filter: keep any player who had at least min_ip / num_years * 0.5
+        # in ANY single season — catches injured players who missed a year but had
+        # real seasons otherwise, while cutting true cup-of-coffee arms
+        if min_ip > 0:
+            single_season_threshold = min_ip / num_years * 0.5
+            ip_per_row = pd.to_numeric(combined["IP"], errors="coerce").fillna(0)
+            qualifying_mask = ip_per_row >= single_season_threshold
+            candidate_names = set(combined.loc[qualifying_mask, "Name"].tolist())
+            combined = combined[combined["Name"].isin(candidate_names)]
+
         combined = optimize_dtypes(combined)
 
         grouped_rows = []
@@ -70,12 +76,10 @@ def load_filtered_data(start_year, end_year, min_ip=0):
         result = pd.DataFrame(grouped_rows)
         result = optimize_dtypes(result)
 
-        # Final IP filter using total aggregated IP
         if not result.empty and min_ip > 0 and "IP" in result.columns:
             result = result[pd.to_numeric(result["IP"], errors="coerce").fillna(0) >= min_ip]
 
         return result
-
 
 def optimize_dtypes(df):
     if df.empty:
