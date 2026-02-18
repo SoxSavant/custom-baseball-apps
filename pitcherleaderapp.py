@@ -14,52 +14,81 @@ import pybaseball
 
 st.set_page_config(layout="wide")
 
+STATCAST_START_YEAR = 2015
+STATCAST_RATE_STATS = {"Barrel%", "HardHit%", "EV"}
+
 # ----------------------------
 #  MEMORY-OPTIMIZED DATA LOADING
 # ----------------------------
 
 @st.cache_data(ttl=3600, max_entries=3)
-def load_filtered_data(year, min_ip=0):
-    """Load single-year data with IP filter."""
-    df = pitching_stats(year, year, qual=min_ip, split_seasons=False)
-    
-    if not df.empty and "Team" in df.columns:
-        def make_team_display(team_val):
-            if pd.isna(team_val):
-                return "N/A"
-            team_str = str(team_val).strip()
-            # FanGraphs uses these patterns for multi-team players
-            if team_str in {"---", "- - -", "--", "TOT", ""}:
-                return "2 Teams"
-            # Otherwise normalize the team code
-            normalized = normalize_team_code(team_str, year)
-            return normalized if normalized else "N/A"
-        
-        df["TeamDisplay"] = df["Team"].apply(make_team_display)
-    
-    return df
+def load_filtered_data(start_year, end_year, min_ip=0):
+    """
+    Load data and filter by IP threshold.
+    For single year: use qual parameter (much faster).
+    For multi-year: aggregate per-year frames, then filter by total IP.
+    """
+    if start_year == end_year:
+        df = pitching_stats(start_year, end_year, qual=min_ip, split_seasons=False)
+
+        if not df.empty and "Team" in df.columns:
+            def make_team_display(team_val):
+                if pd.isna(team_val):
+                    return "N/A"
+                team_str = str(team_val).strip()
+                if team_str in {"---", "- - -", "--", "TOT", ""}:
+                    return "2 Teams"
+                normalized = normalize_team_code(team_str, start_year)
+                return normalized if normalized else "N/A"
+            df["TeamDisplay"] = df["Team"].apply(make_team_display)
+
+        return df
+    else:
+        # Multi-year: pre-filter conservatively, aggregate, then apply final IP filter
+
+        frames = []
+        for year in range(start_year, end_year + 1):
+            yr_data = pitching_stats(year, year, qual=0, split_seasons=False)
+            if not yr_data.empty:
+                yr_data = yr_data.copy()
+                yr_data["Season"] = year
+                frames.append(yr_data)
+
+        if not frames:
+            return pd.DataFrame()
+
+        combined = pd.concat(frames, ignore_index=True)
+        combined = optimize_dtypes(combined)
+
+        grouped_rows = []
+        for player_id, grp in combined.groupby("IDfg"):
+            name = grp["Name"].iloc[0] if not grp.empty else None
+            row = aggregate_player_group(grp, name, start_year=start_year)
+            if row is not None and len(row):
+                grouped_rows.append(row)
+
+        result = pd.DataFrame(grouped_rows)
+        result = optimize_dtypes(result)
+
+        # Final IP filter using total aggregated IP
+        if not result.empty and min_ip > 0 and "IP" in result.columns:
+            result = result[pd.to_numeric(result["IP"], errors="coerce").fillna(0) >= min_ip]
+
+        return result
 
 
 def optimize_dtypes(df):
-    """Convert data types to use less memory"""
     if df.empty:
         return df
-    
     df = df.copy()
-    
-    # Convert float64 to float32 where appropriate
-    float_cols = df.select_dtypes(include=['float64']).columns
+    float_cols = df.select_dtypes(include=["float64"]).columns
     for col in float_cols:
-        # Keep high precision for rate stats
-        if col not in ['ERA', 'FIP', 'xFIP', 'WHIP', 'K/9', 'BB/9']:
-            df[col] = df[col].astype('float32')
-    
-    # Convert int64 to int32 where appropriate
-    int_cols = df.select_dtypes(include=['int64']).columns
+        if col not in {"ERA", "FIP", "xFIP", "WHIP", "K/9", "BB/9"}:
+            df[col] = df[col].astype("float32")
+    int_cols = df.select_dtypes(include=["int64"]).columns
     for col in int_cols:
-        if df[col].max() < 2147483647:  # int32 max
-            df[col] = df[col].astype('int32')
-    
+        if df[col].max() < 2147483647:
+            df[col] = df[col].astype("int32")
     return df
 
 
@@ -108,7 +137,6 @@ def collapse_athletics(teams: list[str]) -> list[str]:
     return teams
 
 
-
 def compute_team_display(teams: list[str]) -> str:
     if not teams:
         return "N/A"
@@ -155,7 +183,6 @@ HEADSHOT_PLACEHOLDER = (
 
 @st.cache_data(show_spinner=False)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
-    """Best-effort MLBAM lookup using pybaseball's playerid_lookup. Optionally returns bbref id."""
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None
     suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
@@ -273,7 +300,6 @@ def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
 
 @st.cache_data(show_spinner=False, ttl=21600)
 def build_mlb_headshot(mlbam: int | str | None) -> str | None:
-    """Try MLB headshot URLs in order; return the first that responds (200)."""
     if mlbam is None:
         return None
     mlbam_val = str(mlbam).strip()
@@ -304,7 +330,6 @@ def build_mlb_headshot(mlbam: int | str | None) -> str | None:
 
 @st.cache_data(show_spinner=False, ttl=3600, max_entries=50)
 def reverse_lookup_mlbam(fg_id: int) -> int | None:
-    """Reverse lookup mlbam from FanGraphs ID with caching."""
     try:
         rev = pybaseball.playerid_reverse_lookup([int(fg_id)], key_type="fangraphs")
         if rev is not None and not rev.empty:
@@ -373,7 +398,6 @@ def resolve_bref_headshot(bref_id: str | None) -> str | None:
 
 
 def heuristic_bbref_slug(full_name: str) -> list[str]:
-    """Best-effort guesses for bbref slug when lookup fails."""
     def clean_name(val: str) -> str:
         if not val:
             return ""
@@ -382,7 +406,7 @@ def heuristic_bbref_slug(full_name: str) -> list[str]:
         except Exception:
             pass
         return "".join(ch for ch in val if ch.isalnum() or ch.isspace()).strip().lower()
-    
+
     cleaned = clean_name(full_name)
     if not cleaned:
         return []
@@ -396,17 +420,12 @@ def heuristic_bbref_slug(full_name: str) -> list[str]:
     base_slug = f"{last[:5]}{first[:2]}"
     if len(base_slug) < 6:
         return []
-    slugs = []
-    for i in range(1, 16):
-        slugs.append(f"{base_slug}{i:02d}")
-    return slugs
+    return [f"{base_slug}{i:02d}" for i in range(1, 16)]
 
 
 def get_headshot_url_from_row(row: pd.Series) -> str:
-    """Comprehensive headshot resolution with multiple fallback strategies."""
     name = str(row.get("Name", "")).strip()
-    
-    # 1) Try direct MLBAM columns
+
     id_cols = ["mlbam_override", "mlbamid", "mlbam_id", "mlbam", "MLBID", "MLBAMID", "key_mlbam"]
     for col in id_cols:
         if col in row.index:
@@ -419,8 +438,7 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
                         return headshot
                 except Exception:
                     pass
-    
-    # 2) Try FanGraphs ID reverse lookup
+
     fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
     for col in fg_cols:
         if col in row.index:
@@ -434,8 +452,7 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
                             return headshot
                 except Exception:
                     pass
-    
-    # 3) Try direct BBRef columns
+
     bref_cols = ["key_bbref", "bbref_id", "BBREFID", "bref_id", "BREFID"]
     for col in bref_cols:
         if col in row.index:
@@ -444,8 +461,7 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
                 bref_url = resolve_bref_headshot(str(val))
                 if bref_url:
                     return bref_url
-    
-    # 4) Try name-based lookup
+
     if name:
         mlbam_fallback, bbref_fallback = lookup_mlbam_id(name, return_bbref=True)
         if mlbam_fallback:
@@ -456,25 +472,23 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
             bref_url = resolve_bref_headshot(bbref_fallback)
             if bref_url:
                 return bref_url
-    
-    # 5) Try heuristic BBRef slugs
+
     if name:
         for slug in heuristic_bbref_slug(name):
             bref_url = resolve_bref_headshot(slug)
             if bref_url:
                 return bref_url
-    
-    # 6) Fallback to placeholder
+
     return HEADSHOT_PLACEHOLDER
 
 
-# aggregation
+# ----------------------------
+#  Aggregation
+# ----------------------------
 
 def ip_to_outs(value) -> float:
-    """Convert MLB innings notation (e.g., 5.1/5.2) to outs."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return np.nan
-
     if isinstance(value, str):
         match = re.search(r"[-+]?[0-9]+(?:\.[0-9]+)?", value)
         if not match:
@@ -488,7 +502,6 @@ def ip_to_outs(value) -> float:
             v = float(value)
         except Exception:
             return np.nan
-
     innings = int(np.floor(v))
     fractional = v - innings
     if abs(fractional - 0.1) < 0.05:
@@ -502,7 +515,6 @@ def ip_to_outs(value) -> float:
 
 
 def outs_to_ip(outs: float) -> float:
-    """Convert outs back to MLB innings notation."""
     if pd.isna(outs):
         return np.nan
     total_outs = float(outs)
@@ -511,7 +523,14 @@ def outs_to_ip(outs: float) -> float:
     return innings + remainder / 10
 
 
-def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
+SUM_STATS = {"G", "GS", "W", "L", "SV", "HLD", "BS", "SO", "BB", "HR", "ER", "H", "HBP",
+             "IBB", "WP", "BK", "R", "WAR", "CG", "ShO", "TBF"}
+RATE_STATS = {"FIP", "xFIP", "xERA", "WHIP", "K/9", "BB/9", "HR/9", "K%", "BB%",
+              "K-BB%", "Barrel%", "HardHit%", "EV", "O-Swing%", "Contact%", "GB%", "FB%",
+              "LD%", "HR/FB", "BABIP", "SIERA", "ERA-", "FIP-"}
+
+
+def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_year: int = 2015) -> dict:
     result: dict[str, object] = {}
 
     if name is None and "Name" in grp.columns:
@@ -521,23 +540,20 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     if name:
         result["Name"] = name
 
+    # Team display
     teams = grp.get("Team", pd.Series([], dtype=str)).dropna().astype(str).tolist()
     teams = [t.strip().upper() for t in teams if t.strip()]
-    teams = [normalize_team_code(t, int(grp["Season"].iloc[0]) if "Season" in grp.columns else 2025) for t in teams]
+    ref_year = int(grp["Season"].iloc[0]) if "Season" in grp.columns else 2025
+    teams = [normalize_team_code(t, ref_year) for t in teams]
     teams = collapse_athletics(sorted(set([t for t in teams if t])))
-
     result["Teams"] = teams
     result["TeamDisplay"] = compute_team_display(teams)
 
+    # Preserve IDs
     try:
-        if "Season" in grp.columns:
-            grp_sorted = grp.sort_values(by="Season", ascending=False)
-        else:
-            grp_sorted = grp.iloc[::-1]
-
+        grp_sorted = grp.sort_values(by="Season", ascending=False) if "Season" in grp.columns else grp.iloc[::-1]
         mlb_cols = ["mlbam", "MLBID", "key_mlbam", "mlbam_id", "MLBAMID"]
         fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
-
         found_mlb = None
         found_fg = None
         for _, r in grp_sorted.iterrows():
@@ -563,7 +579,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
                             break
             if found_mlb is not None and found_fg is not None:
                 break
-
         if found_mlb is not None:
             result["mlbam"] = found_mlb
         if found_fg is not None:
@@ -577,58 +592,72 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         "playerid", "IDfg", "fg_id", "FGID",
     }
 
-    # Pitching-specific aggregation
-    SUM_STATS = {"G", "GS", "W", "L", "SV", "IP", "SO", "BB", "HR", "ER", "WAR"}
-    RATE_STATS = {"ERA", "FIP", "xFIP", "WHIP", "K/9", "BB/9", "K%", "BB%", "K-BB%", 
-                  "Barrel%", "HardHit%", "EV", "O-Swing%", "Contact%", "GB%", "FB%"}
+    # Build IP weight for rate stat averaging
+    if "IP" in grp.columns:
+        ip_series = pd.to_numeric(grp["IP"], errors="coerce").fillna(0)
+        weight = ip_series
+    elif "TBF" in grp.columns:
+        weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
+    else:
+        weight = pd.Series(np.ones(len(grp)), index=grp.index)
+    weight_total = weight.sum()
+
+    # Handle IP aggregation first (special case)
+    if "IP" in grp.columns:
+        ip_num = pd.to_numeric(grp["IP"], errors="coerce")
+        outs_series = ip_num.apply(ip_to_outs)
+        valid_outs = outs_series.dropna()
+        if not valid_outs.empty:
+            result["IP"] = outs_to_ip(valid_outs.sum())
 
     for col in grp.columns:
-        if col in skip_cols:
+        if col in skip_cols or col == "IP":
             continue
 
         series = pd.to_numeric(grp[col], errors="coerce")
-        
-        # Handle IP specially
-        if col == "IP":
-            outs_series = series.apply(ip_to_outs)
-            valid_outs = outs_series.dropna()
-            if valid_outs.empty:
-                continue
-            ip_outs_total = valid_outs.sum()
-            result[col] = outs_to_ip(ip_outs_total)
-            continue
-
         if series.isna().all():
             continue
 
-        # Sum stats vs rate stats
+        if col == "Age":
+            age_min = series.min(skipna=True)
+            age_max = series.max(skipna=True)
+            if pd.isna(age_min) or pd.isna(age_max):
+                continue
+            if abs(age_min - age_max) < 0.01:
+                result[col] = float(age_min)
+            else:
+                result[col] = f"{int(round(age_min))}-{int(round(age_max))}"
+            continue
+
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS:
-            # Weight by IP or TBF
-            if "IP" in grp.columns:
-                weight = pd.to_numeric(grp["IP"], errors="coerce").fillna(0)
-            elif "TBF" in grp.columns:
-                weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
+        elif col in RATE_STATS and weight_total > 0:
+            if col in STATCAST_RATE_STATS:
+                # Blank if span starts before statcast era
+                if start_year >= STATCAST_START_YEAR:
+                    result[col] = (series * weight).sum(skipna=True) / weight_total
+                else:
+                    result[col] = np.nan
             else:
-                weight = pd.Series(np.ones(len(grp)), index=grp.index)
-            
-            weight_total = weight.sum()
-            if weight_total > 0:
                 result[col] = (series * weight).sum(skipna=True) / weight_total
-            else:
-                result[col] = series.mean(skipna=True)
         else:
-            # Default: sum
-            try:
-                result[col] = series.sum(skipna=True)
-            except Exception:
-                result[col] = grp[col].iloc[0]
+            result[col] = series.mean(skipna=True)
+
+    # Derive ERA from ER and IP outs if available
+    er_val = result.get("ER")
+    ip_val = result.get("IP")
+    if pd.notna(er_val) and pd.notna(ip_val):
+        ip_outs = ip_to_outs(ip_val)
+        ip_innings = ip_outs / 3 if pd.notna(ip_outs) and ip_outs > 0 else None
+        if ip_innings:
+            result["ERA"] = (float(er_val) / ip_innings) * 9
 
     return result
 
 
-# formatting
+# ----------------------------
+#  Formatting
+# ----------------------------
 
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
@@ -648,7 +677,7 @@ def format_stat(stat: str, val) -> str:
             return f"{int(round(v))}.0"
         return f"{v:.1f}"
 
-    if upper_stat in {"ERA", "FIP", "XFIP", "K/9", "BB/9", "HR/9", "XERA",}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "K/9", "BB/9", "HR/9"}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":
@@ -675,7 +704,6 @@ def format_stat(stat: str, val) -> str:
 
 
 def transform_stat_value(stat: str, raw_val):
-    """Transform stat values if needed (e.g., Contact% to Whiff%)"""
     if stat == "Contact%":
         if pd.isna(raw_val):
             return np.nan
@@ -692,8 +720,6 @@ def transform_stat_value(stat: str, raw_val):
 # ----------------------------
 #  UI
 # ----------------------------
-
-
 
 STAT_ALLOWLIST = [
     "WAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB", "K/9", "BB/9",
@@ -729,13 +755,23 @@ with meta_col:
     )
 
 current_year = date.today().year
+
 if "pl_start_year" not in st.session_state:
     st.session_state["pl_start_year"] = 2025
+if "pl_end_year" not in st.session_state:
+    st.session_state["pl_end_year"] = 2025
 if "pl_stat" not in st.session_state:
     st.session_state["pl_stat"] = "WAR"
 if "pl_min_ip" not in st.session_state:
     st.session_state["pl_min_ip"] = 162
+if "pl_span" not in st.session_state:
+    st.session_state["pl_span"] = False
 
+
+def on_year_change():
+    s = st.session_state
+    if not s.get("pl_span", False):
+        s["pl_end_year"] = s["pl_start_year"]
 
 
 st.markdown(
@@ -757,58 +793,62 @@ stat = st.selectbox(
     format_func=lambda x: label_map.get(x, x),
 )
 
-if "pl_span" not in st.session_state:
-    st.session_state["pl_span"] = False
-
 col1, col2 = st.columns([.5, 2])
 
 with col1:
-    
-    year = st.number_input(
-        "Year",
+    st.checkbox("Multi-year span", key="pl_span", on_change=on_year_change)
+    start_label = "Start Year" if st.session_state.get("pl_span", False) else "Year"
+    start_year = st.number_input(
+        start_label,
         min_value=1900,
         max_value=current_year,
         key="pl_start_year",
+        on_change=on_year_change,
     )
-   
+    if st.session_state.get("pl_span", False):
+        end_year = st.number_input(
+            "End Year",
+            min_value=1900,
+            max_value=current_year,
+            key="pl_end_year",
+            on_change=on_year_change,
+        )
+    else:
+        end_year = st.session_state["pl_start_year"]
+
     min_ip = st.number_input(
         "Min IP",
         min_value=0,
         max_value=5000,
-        key="pl_min_ip"
+        key="pl_min_ip",
     )
     st.checkbox("Show worst", key="pl_sort_worst")
     st.checkbox("Show min IP", key="pl_show_min_ip")
 
-# Load filtered data
+# Load data
+start_year = int(start_year)
+end_year = int(max(start_year, end_year))
 min_ip_val = int(st.session_state.get("pl_min_ip", 0))
-df = load_filtered_data(year, min_ip_val)
+df = load_filtered_data(start_year, end_year, min_ip_val)
 
 if st.checkbox("Show available columns"):
-            st.write("All columns:", sorted(df.columns.tolist()))
-            st.write("Percentage stats:", [c for c in df.columns if '%' in c])
+    st.write("All columns:", sorted(df.columns.tolist()))
+    st.write("Percentage stats:", [c for c in df.columns if "%" in c])
 
 # Sort and limit to top 10
 if not df.empty and stat in df.columns:
-    # For lower_better stats, we want ascending=True when NOT showing worst
-    # For higher_better stats, we want ascending=False when NOT showing worst
     is_lower_better = stat in lower_better
     show_worst = st.session_state.get("pl_sort_worst", False)
-    
     if is_lower_better:
-        # For ERA, FIP, etc.: ascending=True shows best (lowest), ascending=False shows worst (highest)
         df = df.sort_values(by=stat, ascending=not show_worst)
     else:
-        # For WAR, SO, etc.: ascending=False shows best (highest), ascending=True shows worst (lowest)
         df = df.sort_values(by=stat, ascending=show_worst)
-    
     df = df.head(10)
 else:
     if not df.empty:
         st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
 
-# Ensure TeamDisplay exists
 if not df.empty and "TeamDisplay" not in df.columns:
     df["TeamDisplay"] = "N/A"
 
@@ -819,7 +859,7 @@ for _, row in df.iterrows():
     raw_val = row.get(stat, np.nan)
     transformed = transform_stat_value(stat, raw_val)
     display_val = format_stat(stat, transformed)
-    
+
     src_row = row
     try:
         pos = list(df.index).index(row.name)
@@ -837,17 +877,17 @@ for _, row in df.iterrows():
 
     src = get_headshot_url_from_row(src_row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
-    card_html = f'''
+    card_html = f"""
     <div class="player-card">
       {img_html}
       <div class="player-name">{name}</div>
       <div class="player-team">{team}</div>
       <div class="player-stat">{display_val}</div>
     </div>
-    '''
+    """
     cards.append(card_html)
 
-span_label = f"{int(year)}"
+span_label = f"{start_year}" if start_year == end_year else f"{start_year}–{end_year}"
 title_label = label_map.get(stat, stat)
 title = f"{span_label} {title_label} Leaders"
 if st.session_state.get("pl_sort_worst", False):
@@ -863,7 +903,7 @@ grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{title}</div>
     <div class="players-grid">
-        {''.join(cards)}
+        {"".join(cards)}
     </div>
     <div class="footer">
         <p>By: Sox_Savant</p>
@@ -884,8 +924,7 @@ full_html = f"""
     border-radius: 12px;
     padding: 3rem 4rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    margin: -1rem auto 0 auto;
-    margin-top: 0;
+    margin: 0 auto;
     width: 100%;
     max-width: 900px;
     box-sizing: border-box;
@@ -958,21 +997,18 @@ html, body {{
 with col2:
     components.html(full_html, height=800)
 
-# MLBAM overrides section
+# MLBAM overrides
 if not df.empty:
     st.markdown("---")
     st.write("Manual MLBAM overrides (enter MLBAM id to fix headshot)")
-    
-    # First row of 5
+
     cols_row1 = st.columns(5)
     for col_idx in range(5):
         player_idx = col_idx
         if player_idx >= len(df):
             break
-        
         idx = df.index[player_idx]
         row = df.loc[idx]
-        
         with cols_row1[col_idx]:
             key = f"pl_mlbam_override_{player_idx}"
             default_val = ""
@@ -981,7 +1017,6 @@ if not df.empty:
                     default_val = str(int(row["mlbam_override"]))
                 except Exception:
                     default_val = str(row["mlbam_override"]) if pd.notna(row.get("mlbam_override")) else ""
-            
             user_val = st.text_input(f"Player {player_idx+1} MLBAM", value=default_val, key=key)
             try:
                 if user_val and str(user_val).strip():
@@ -990,17 +1025,14 @@ if not df.empty:
                     df.at[idx, "mlbam_override"] = np.nan
             except Exception:
                 df.at[idx, "mlbam_override"] = np.nan
-    
-    # Second row of 5
+
     cols_row2 = st.columns(5)
     for col_idx in range(5):
         player_idx = col_idx + 5
         if player_idx >= len(df):
             break
-        
         idx = df.index[player_idx]
         row = df.loc[idx]
-        
         with cols_row2[col_idx]:
             key = f"pl_mlbam_override_{player_idx}"
             default_val = ""
@@ -1009,7 +1041,6 @@ if not df.empty:
                     default_val = str(int(row["mlbam_override"]))
                 except Exception:
                     default_val = str(row["mlbam_override"]) if pd.notna(row.get("mlbam_override")) else ""
-            
             user_val = st.text_input(f"Player {player_idx+1} MLBAM", value=default_val, key=key)
             try:
                 if user_val and str(user_val).strip():
