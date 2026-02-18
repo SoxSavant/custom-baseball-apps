@@ -674,7 +674,9 @@ def get_pitcher_teams_fangraphs(fg_id: int, start_year: int, end_year: int) -> l
     return collapsed
 
 
-def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
+STATCAST_RATE_STATS = {"xERA", "EV", "Barrel%", "HardHit%"}
+
+def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_year: int = 2015) -> dict:
     result: dict[str, object] = {}
     if name is None and "Name" in grp.columns:
         val = grp["Name"].dropna()
@@ -697,7 +699,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
             continue
         if pd.api.types.is_numeric_dtype(grp[col]):
             numeric_cols.append(col)
-    # Use TBF for pitchers, fallback to IP, then PA
     if "TBF" in grp.columns:
         weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
     elif "IP" in grp.columns:
@@ -719,7 +720,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     ld_total = np.nan
     hr_total = np.nan
     event_weighted_stats: dict[str, pd.Series] = {}
-    
+
     for col in numeric_cols:
         series = pd.to_numeric(grp[col], errors="coerce")
         if series.isna().all():
@@ -761,7 +762,13 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
         elif col in RATE_STATS and weight_total > 0:
-            result[col] = (series * weight).sum(skipna=True) / weight_total
+            if col in STATCAST_RATE_STATS:
+                if start_year >= 2015:
+                    result[col] = (series * weight).sum(skipna=True) / weight_total
+                else:
+                    result[col] = np.nan
+            else:
+                result[col] = (series * weight).sum(skipna=True) / weight_total
         else:
             result[col] = series.mean(skipna=True)
 
@@ -851,7 +858,7 @@ def load_pitching(start_year: int, end_year: int) -> pd.DataFrame:
 
         grouped_rows = []
         for name, grp in combined.groupby("Name"):
-            row = aggregate_player_group(grp, name)
+            row = aggregate_player_group(grp, name, start_year=start_year)
             if age_span_map and name in age_span_map:
                 row["Age"] = age_span_map[name]
             grouped_rows.append(row)
@@ -1166,7 +1173,7 @@ def load_player_pitching_profile(fg_id: int, start_year: int, end_year: int) -> 
         return None
 
     combined = pd.concat(frames, ignore_index=True)
-    aggregated = aggregate_player_group(combined)
+    aggregated = aggregate_player_group(combined, start_year=start_year)
 
     team_values = extract_teams_from_stats(
         load_team_splits(fg_id, start_year, end_year),

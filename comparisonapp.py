@@ -507,7 +507,7 @@ def get_player_teams_fangraphs(fg_id: int, start_year: int, end_year: int) -> li
 
     return collapsed
 
-def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
+def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_year: int = 2015) -> dict:
     result: dict[str, object] = {}
     if name is None and "Name" in grp.columns:
         val = grp["Name"].dropna()
@@ -530,6 +530,9 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     else:
         pa_weight = pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
     pa_total = pa_weight.sum()
+    print("pa_total:", pa_total)
+    print("K% in RATE_STATS:", "K%" in RATE_STATS)
+    print("K% in grp columns:", "K%" in grp.columns)
     season_series = pd.to_numeric(grp["Season"], errors="coerce") if "Season" in grp.columns else None
     statcast_pa_weight = None
     statcast_pa_total = None
@@ -554,21 +557,14 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
             result[col] = series.sum(skipna=True)
         elif col in RATE_STATS and pa_total > 0:
             if col in STATCAST_RATE_STATS:
-                if statcast_pa_weight is not None and statcast_pa_total is not None and statcast_pa_total > 0:
-        # Filter to only statcast-era rows
-                    statcast_mask = season_series >= STATCAST_HITTING_START_YEAR
-                    statcast_series = series.where(statcast_mask)
-        # Only calculate if we have actual statcast data
-                    if not statcast_series.isna().all():
-                        result[col] = (statcast_series * statcast_pa_weight).sum(skipna=True) / statcast_pa_total
-                    else:
-                        result[col] = np.nan
+                if start_year >= 2015 and pa_total > 0:
+                    result[col] = (series * pa_weight).sum(skipna=True) / pa_total
                 else:
-                    result[col] = np.nan  # No valid statcast seasons in span
+                    result[col] = np.nan
             else:
                 result[col] = (series * pa_weight).sum(skipna=True) / pa_total
         else:
-            result[col] = series.mean(skipna=True)
+            result[col] = (series * pa_weight).sum(skipna=True) / pa_total
 
     # Manually derive key rate stats from aggregated counting stats.
     def to_num(val) -> float:
@@ -660,11 +656,17 @@ def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
             except Exception:
                 yearly = None
         if yearly is not None and not yearly.empty:
+            yearly = yearly.copy()
+            if "Season" not in yearly.columns:
+                yearly["Season"] = year
             frames.append(yearly)
         else:
             failed_years.append(year)
     if frames:
         combined = pd.concat(frames, ignore_index=True)
+        print("columns:", combined.columns.tolist())
+        print("Season sample:", combined.get("Season"))
+        aggregated = aggregate_player_group(combined, start_year=start_year)
 
         age_span_map: dict[str, str | float] = {}
         if "Name" in combined.columns and "Age" in combined.columns:
@@ -1065,7 +1067,7 @@ def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> p
 
     combined = pd.concat(frames, ignore_index=True)
 
-    aggregated = aggregate_player_group(combined)
+    aggregated = aggregate_player_group(combined, start_year=start_year)
 
     # Pull actual teams from HTML scraper
     team_values = get_player_teams_fangraphs(fg_id, start_year, end_year)
