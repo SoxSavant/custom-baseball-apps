@@ -92,16 +92,19 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         if "H" in df.columns and "Hits" not in df.columns:
             df["Hits"] = df["H"]
 
-        # Compute XBH for single year
-        if "XBH" not in df.columns or df.get("XBH", pd.Series(dtype=float)).isna().all():
-            for col in ["2B", "3B", "HR"]:
-                if col not in df.columns:
-                    df[col] = np.nan
-            df["XBH"] = (
-                pd.to_numeric(df["2B"], errors="coerce").fillna(0)
-                + pd.to_numeric(df["3B"], errors="coerce").fillna(0)
-                + pd.to_numeric(df["HR"], errors="coerce").fillna(0)
-            )
+        # Compute XBH and TB for single year
+        for col in ["H", "2B", "3B", "HR"]:
+            if col not in df.columns:
+                df[col] = np.nan
+        _2b = pd.to_numeric(df["2B"], errors="coerce")
+        _3b = pd.to_numeric(df["3B"], errors="coerce")
+        _hr = pd.to_numeric(df["HR"], errors="coerce")
+        _h  = pd.to_numeric(df["H"],  errors="coerce")
+        df["XBH"] = _2b.fillna(0) + _3b.fillna(0) + _hr.fillna(0)
+        _1b = _h - _2b - _3b - _hr
+        df["TB"] = (_1b.fillna(0) + 2 * _2b.fillna(0) + 3 * _3b.fillna(0) + 4 * _hr.fillna(0)).where(
+            _h.notna() & _2b.notna() & _3b.notna() & _hr.notna(), other=np.nan
+        )
 
         if position != "all" and "DefPos" in df.columns:
             pos_values = POSITION_FILTER_MAP.get(position, [])
@@ -970,7 +973,7 @@ def transform_stat_value(stat: str, raw_val):
 STAT_ALLOWLIST = [
     "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "Hits", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "Hits", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
     "FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM",
@@ -1104,7 +1107,7 @@ if not df.empty:
     keep_cols = set(STAT_ALLOWLIST) | {
         "Name", "Team", "TeamDisplay", "IDfg", "Age",
         "mlbam", "MLBID", "key_mlbam", "mlbam_id", "DefPos",
-        "H",  # keep raw H for internal use even though we display "Hits"
+        "H", "TB",  # keep raw H and TB for internal use
     }
     df = df[[c for c in df.columns if c in keep_cols]]
 

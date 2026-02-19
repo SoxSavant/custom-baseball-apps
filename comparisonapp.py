@@ -31,13 +31,11 @@ st.markdown(
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
         .viewerBadge_link__qRi_k {display: none;}
-        /* Keep row selector column hidden without touching data columns */
         div.ag-header-cell[col-id="ag-RowSelector"],
         div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
         div.ag-center-cols-container [col-id="ag-RowSelector"] {
             display: none !important;
         }
-        /* Comparison card styling */
         .compare-card {
             background: #ffffff;
             border: 1px solid #d0d0d0;
@@ -48,12 +46,11 @@ st.markdown(
             max-width: 100%;
             margin: 0 auto;
         }
-
         .compare-card .headshot-row {
             display: grid;
             grid-auto-flow: column;
             grid-auto-columns: 1fr;
-            grid-template-columns: var(--stat-col-width) 1fr 1fr; /* default, overridden inline for more players */
+            grid-template-columns: var(--stat-col-width) 1fr 1fr;
             align-items: center;
             justify-items: center;
             width: 100%;
@@ -65,7 +62,6 @@ st.markdown(
         .compare-card .headshot-spacer {
             width: var(--stat-col-width);
         }
-
         .compare-card .headshot-col {
             flex: 1 1 auto;
             width: auto;
@@ -74,7 +70,7 @@ st.markdown(
             text-align: center;
             padding-top: .1rem;
         }
-        .compare-card .headshot-col img { /*headshot size, background color, border */
+        .compare-card .headshot-col img {
             border: 1px solid #d0d0d0;
             background: #f2f2f2;
             border-radius: 4px;
@@ -96,7 +92,7 @@ st.markdown(
             margin: 0 0 0.3rem 0;
             font-size: var(--player-meta-size);
         }
-        .compare-table { /* sets the line height, width, font size */
+        .compare-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
@@ -106,21 +102,21 @@ st.markdown(
         .compare-table td {
             width: auto;
         }
-        .compare-table th, .compare-table td { /* centers text, white background for rows */
+        .compare-table th, .compare-table td {
             border: 1px solid #d0d0d0;
             padding: 3px 3px;
             text-align: center;
             background: #ffffff;
             color: #111111;
         }
-        .compare-table th { /* Overall Stats row */
+        .compare-table th {
             background: #f1f1f1;
             font-weight: 800;
             color: #7b0d0d;
             font-size: 15px;
             line-height: 1.2;
         }
-        .compare-table .overall-row th { /* More styling for Overall Stats row */
+        .compare-table .overall-row th {
             background: #f1f1f1;
             color: #7b0d0d;
             font-weight: 800;
@@ -131,7 +127,7 @@ st.markdown(
             border-left: 1px solid #d0d0d0;
             border-right: 1px solid #d0d0d0;
         }
-        .compare-table .stat-col { /* stats rows */
+        .compare-table .stat-col {
             font-weight: 700;
             background: #fafafa;
             color: #111;
@@ -143,7 +139,7 @@ st.markdown(
         .compare-table col.col-player {
             width: auto;
         }
-        .compare-table .best { /* highlights the winner in green */
+        .compare-table .best {
             background: #E5F1E4;
             font-weight: 800;
             color: #111111;
@@ -261,16 +257,15 @@ STAT_PRESETS = {
     "Blank – Create your own": [
         "Age",
     ],
-
     "Every Stat": [
         "bWAR",
         "WAR",
         "G",
         "PA",
         "H",
-        "1B", 
-        "2B", 
-        "3B", 
+        "1B",
+        "2B",
+        "3B",
         "SB",
         "HR",
         "RBI",
@@ -297,8 +292,8 @@ STAT_PRESETS = {
         "Contact%",
         "K%",
         "BB%",
-        "BB", 
-        "IBB", 
+        "BB",
+        "IBB",
         "SO",
         "K-BB%",
         "O-Swing%",
@@ -311,18 +306,18 @@ STAT_PRESETS = {
         "FB%",
         "LD%",
         "ARM",
-        ],
-        # Dynamic presets - computed at runtime when selected
-        "Player A leads": [],
-        "Player B leads": [],
-        "Player C leads": [],
-        "Player D leads": [],
-    }
+    ],
+    # Dynamic presets - computed at runtime when selected
+    "Player A leads": [],
+    "Player B leads": [],
+    "Player C leads": [],
+    "Player D leads": [],
+}
 
 STAT_ALLOWLIST = [
-     "WAR", "bWAR","Off", "Def", "BsR",  "Barrel%", "HardHit%", "EV",
+    "WAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
     "Pull%", "FRV", "OAA", "ARM", "DRS", "TZ", "FRM", "UZR", "Age",
 ]
@@ -341,6 +336,8 @@ def display_stat_name(stat) -> str:
         return ""
     text = str(stat)
     return STAT_DISPLAY_NAMES.get(text, text)
+
+
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
@@ -356,11 +353,8 @@ RATE_STATS = {
 STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}
 
 HEADSHOT_BASES = [
-    # Standard silo path (real photos when they exist)
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
-    # Generic fallback path with slash
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
-    # Alternate path provided (kept last to avoid overriding real photos)
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}headshot/67/current",
 ]
 HEADSHOT_BREF_BASES = [
@@ -391,38 +385,25 @@ def local_bwar_signature() -> float:
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_year(y: int) -> pd.DataFrame:
-    """Cached single-year fetch."""
     return batting_stats(y, y, qual=0, split_seasons=False)
 
 
 def compute_team_display(teams: list[str]) -> str:
-    """
-    Convert a list of team codes into a display string.
-    """
     if not teams:
         return "N/A"
     if len(teams) == 1:
-        return teams[0]       # Includes the collapsed "OAK/ATH"
+        return teams[0]
     return f"{len(teams)} Teams"
 
 
 def collapse_athletics(teams: list[str]) -> list[str]:
-    """
-    Collapse OAK + ATH into a single franchise for counting purposes
-    but preserve all other teams.
-    """
     has_oak = "OAK" in teams
     has_ath = "ATH" in teams
-
-    # If both appear, collapse them into one entry
     if has_oak and has_ath:
         new_list = [t for t in teams if t not in {"OAK", "ATH"}]
         new_list.append("OAK/ATH")
         return sorted(new_list)
-
-    # If only one of OAK or ATH appears → keep as-is
     return teams
-
 
 
 VALID_TEAMS = {
@@ -434,78 +415,47 @@ VALID_TEAMS = {
 
 
 def normalize_team_code(team: str, year: int) -> str:
-    """
-    Normalize Athletics team codes depending on the year.
-    Before 2025 → OAK
-    2025+ → ATH
-    """
     if not team:
         return team
-
     team = team.upper().strip()
-
     if team in {"", "-", "--", "---", "- - -", "TOT"}:
         return None
-
-    # check for OAK/ATH years
     if year < 2025:
         if team in {"ATH", "OAK"}:
             return "OAK"
     else:
         if team in {"ATH", "OAK"}:
             return "ATH"
-
     return team
 
 
 def get_player_teams_fangraphs(fg_id: int, start_year: int, end_year: int) -> list[str]:
-    """
-    Scrape Fangraphs batting tables and extract MLB team codes.
-    Handles:
-    - multiple teams in a year
-    - ATH/OAK transition
-    - split-season rows
-    """
-
     url = f"https://www.fangraphs.com/players/x/{fg_id}/stats?season=all"
     r = requests.get(url, timeout=10)
     soup = BeautifulSoup(r.text, "html.parser")
-
     found = []
-
-    # Scan all tables (MLB + Minors + College)
     for table in soup.find_all("table"):
         for row in table.find_all("tr"):
             cols = [c.get_text(strip=True) for c in row.find_all("td")]
             if len(cols) < 2:
                 continue
-
-            # Year check
             if not (cols[0].isdigit() and len(cols[0]) == 4):
                 continue
-
             year = int(cols[0])
             team_raw = cols[1].strip()
-            # Ensure this is a Major League row
             league = cols[2] if len(cols) > 2 else ""
             if league != "MLB":
                 continue
-
             if team_raw not in VALID_TEAMS:
                 continue
-
             if start_year <= year <= end_year:
                 team_norm = normalize_team_code(team_raw, year)
                 if team_norm:
                     found.append(team_norm)
-
-    # Unique + alphabetical
     unique = sorted(set(found))
-
-    # Collapse OAK + ATH into OAK/ATH
     collapsed = collapse_athletics(unique)
-
     return collapsed
+
 
 def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_year: int = 2015) -> dict:
     result: dict[str, object] = {}
@@ -530,9 +480,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
     else:
         pa_weight = pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
     pa_total = pa_weight.sum()
-    print("pa_total:", pa_total)
-    print("K% in RATE_STATS:", "K%" in RATE_STATS)
-    print("K% in grp columns:", "K%" in grp.columns)
     season_series = pd.to_numeric(grp["Season"], errors="coerce") if "Season" in grp.columns else None
     statcast_pa_weight = None
     statcast_pa_total = None
@@ -566,7 +513,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
         else:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total
 
-    # Manually derive key rate stats from aggregated counting stats.
     def to_num(val) -> float:
         try:
             num = float(val)
@@ -598,6 +544,12 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
     if all(pd.notna(x) for x in tb_components):
         result["TB"] = sum(tb_components)
 
+    # XBH = 2B + 3B + HR (derived explicitly so multi-year spans always work)
+    if pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
+        result["XBH"] = doubles + triples + hr
+    else:
+        result["XBH"] = np.nan
+
     tb = to_num(result.get("TB"))
     if pd.notna(ab) and ab > 0 and pd.notna(h):
         result["AVG"] = h / ab
@@ -618,7 +570,6 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
     if pd.notna(slg_val) and pd.notna(avg_val):
         result["ISO"] = slg_val - avg_val
 
-    # Explicit PA-weighted wRC+ to handle spanning
     if "wRC+" in grp.columns and pa_total > 0:
         wrc_series = pd.to_numeric(grp["wRC+"], errors="coerce")
         result["wRC+"] = (wrc_series * pa_weight).sum(skipna=True) / pa_total
@@ -627,11 +578,8 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
-    """Load aggregated batting stats for a single year or a span of years."""
     start = min(start_year, end_year)
     end = max(start_year, end_year)
-
-    # Single year: return directly
     if start == end:
         try:
             df = batting_stats(start, end, qual=0, split_seasons=False)
@@ -641,8 +589,6 @@ def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
             pass
         fallback = load_year(start)
         return fallback if fallback is not None else pd.DataFrame()
-
-    # Multi-year: always build from per-year frames so Age spans are accurate
     frames = []
     failed_years = []
     for year in range(start, end + 1):
@@ -664,10 +610,7 @@ def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
             failed_years.append(year)
     if frames:
         combined = pd.concat(frames, ignore_index=True)
-        print("columns:", combined.columns.tolist())
-        print("Season sample:", combined.get("Season"))
         aggregated = aggregate_player_group(combined, start_year=start_year)
-
         age_span_map: dict[str, str | float] = {}
         if "Name" in combined.columns and "Age" in combined.columns:
             for name, grp in combined.groupby("Name"):
@@ -682,7 +625,6 @@ def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
                     age_span_map[name] = float(age_min)
                 else:
                     age_span_map[name] = f"{int(round(age_min))}-{int(round(age_max))}"
-
         grouped_rows = []
         for name, grp in combined.groupby("Name"):
             row = aggregate_player_group(grp, name)
@@ -693,7 +635,6 @@ def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
         if failed_years:
             st.info(f"Loaded partial data; skipped years: {', '.join(map(str, failed_years))}")
         return aggregated
-
     st.error(f"Could not load batting data for {start}-{end}. Please try another span.")
     return pd.DataFrame()
 
@@ -747,14 +688,7 @@ def load_savant_frv_year(year: int) -> pd.DataFrame:
     df = fetch_csv(url)
     if df is None or df.empty:
         return pd.DataFrame()
-    df = df.rename(
-        columns={
-            "name": "NameRaw",
-            "total_runs": "FRV",
-            "arm_runs": "ARM",
-            "range_runs": "RANGE",
-        }
-    )
+    df = df.rename(columns={"name": "NameRaw", "total_runs": "FRV", "arm_runs": "ARM", "range_runs": "RANGE"})
     df["Name"] = df["NameRaw"].apply(reorder_savant_name)
     df["NameKey"] = df["Name"].apply(normalize_statcast_name)
     for metric in ["FRV", "ARM", "RANGE"]:
@@ -804,15 +738,11 @@ def load_local_bwar_data() -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     df = df.copy()
-    # Drop pitcher rows only when they have no plate appearances (true pitchers)
     pitcher_col = df.get("pitcher")
     pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
     if pitcher_col is not None:
         pitcher_mask = (
-            pitcher_col.astype(str)
-            .str.strip()
-            .str.upper()
-            .isin({"Y", "1", "TRUE"})
+            pitcher_col.astype(str).str.strip().str.upper().isin({"Y", "1", "TRUE"})
         )
         no_pa_mask = pa_col.isna() | (pa_col <= 0)
         drop_mask = pitcher_mask & no_pa_mask
@@ -831,7 +761,7 @@ def load_local_bwar_data() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
-    _ = local_sig  # cache key
+    _ = local_sig
     frames: list[pd.DataFrame] = []
     try:
         data = bwar_bat(return_all=True)
@@ -854,14 +784,11 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
         mlb_series = data["mlb_ID"] if "mlb_ID" in data.columns else pd.Series(np.nan, index=data.index)
         data["mlb_ID"] = pd.to_numeric(mlb_series, errors="coerce")
         frames.append(data[["NameKey", "Name", "year_ID", "WAR", "player_ID", "mlb_ID"]])
-
     local = load_local_bwar_data()
     if local is not None and not local.empty:
         frames.append(local)
-
     if not frames:
         return pd.DataFrame()
-
     combined = pd.concat(frames, ignore_index=True)
     combined = combined.dropna(subset=["NameKey", "year_ID", "WAR"])
     combined = combined.sort_values(["NameKey", "year_ID"])
@@ -968,9 +895,6 @@ def load_statcast_fielding_span(
     name_filter = None
     if target_names:
         name_filter = {normalize_statcast_name(name) for name in target_names if name}
-    name_filter = None
-    if target_names:
-        name_filter = {normalize_statcast_name(name) for name in target_names if name}
     frames: list[pd.DataFrame] = []
     for year in range(start, end + 1):
         frv = load_savant_frv_year(year)
@@ -982,12 +906,7 @@ def load_statcast_fielding_span(
         elif oaa is None or oaa.empty:
             yearly = frv.copy()
         else:
-            yearly = pd.merge(
-                frv,
-                oaa,
-                on=["NameKey", "Name"],
-                how="outer",
-            )
+            yearly = pd.merge(frv, oaa, on=["NameKey", "Name"], how="outer")
         for metric in ["FRV", "OAA", "ARM", "RANGE"]:
             if metric not in yearly.columns:
                 yearly[metric] = np.nan
@@ -1001,11 +920,13 @@ def load_statcast_fielding_span(
     if not frames:
         return pd.DataFrame()
     combined = pd.concat(frames, ignore_index=True)
+
     def pick_name(series: pd.Series) -> str:
         for val in series:
             if isinstance(val, str) and val.strip():
                 return val
         return ""
+
     agg = combined.groupby("NameKey", as_index=False).agg({
         "Name": pick_name,
         "FRV": lambda s: s.sum(min_count=1),
@@ -1022,37 +943,34 @@ def normalize_display_team(team_value: str) -> str:
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> pd.Series | None:
-    """
-    Load the player's batting profile for either a single season or a multi-year span.
-    Also attaches corrected Team / TeamDisplay based on direct Fangraphs HTML scraping.
-    """
-
-    # single year selected
     if start_year == end_year:
         try:
             df = batting_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
         except Exception:
             df = None
-
         if df is not None and not df.empty:
             row = df.iloc[0].copy()
-
-            # Pull real teams from HTML
             team_values = get_player_teams_fangraphs(fg_id, start_year, end_year)
             if team_values:
                 team_display = compute_team_display(team_values)
                 row["Team"] = team_display
                 row["TeamDisplay"] = team_display
             else:
-                # fallback: use pybaseball Team column
                 row["TeamDisplay"] = normalize_display_team(str(row.get("Team", "")).strip())
-
             row["Name"] = str(row.get("Name", "")).strip()
+            # Ensure XBH and TB are computed for single-year too
+            h_val = pd.to_numeric(row.get("H", np.nan), errors="coerce")
+            doubles = pd.to_numeric(row.get("2B", np.nan), errors="coerce")
+            triples = pd.to_numeric(row.get("3B", np.nan), errors="coerce")
+            hr = pd.to_numeric(row.get("HR", np.nan), errors="coerce")
+            if pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
+                row["XBH"] = doubles + triples + hr
+                if pd.notna(h_val):
+                    singles = h_val - doubles - triples - hr
+                    if pd.notna(singles) and singles >= 0:
+                        row["TB"] = singles + 2 * doubles + 3 * triples + 4 * hr
             return row
 
-        # if single year but no data, fall through to multi-year logic
-
-    # multi-year span
     frames = []
     for year in range(start_year, end_year + 1):
         try:
@@ -1061,22 +979,17 @@ def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> p
             yearly = None
         if yearly is not None and not yearly.empty:
             frames.append(yearly)
-
     if not frames:
         return None
-
     combined = pd.concat(frames, ignore_index=True)
-
     aggregated = aggregate_player_group(combined, start_year=start_year)
-
-    # Pull actual teams from HTML scraper
     team_values = get_player_teams_fangraphs(fg_id, start_year, end_year)
     if team_values:
         team_display = compute_team_display(team_values)
         aggregated["Team"] = team_display
         aggregated["TeamDisplay"] = team_display
-
     return pd.Series(aggregated)
+
 
 @st.cache_data(show_spinner=False, ttl=900)
 def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
@@ -1218,7 +1131,6 @@ def resolve_player_fg_id(name: str, pool_df: pd.DataFrame | None = None) -> int 
 
 @st.cache_data(show_spinner=False)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
-    """Best-effort MLBAM lookup using pybaseball's playerid_lookup. Optionally returns bbref id."""
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None
     suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
@@ -1267,10 +1179,10 @@ def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
 
     first_forms = initial_forms(first_raw)
     variants = [
-        (last_raw, first_raw),  # raw as-is (keeps accents/dots)
+        (last_raw, first_raw),
         (normalize_token(last_raw), normalize_token(first_raw)),
         (normalize_token(last_raw).lower(), normalize_token(first_raw).lower()),
-        (last_raw.replace(".", ""), first_raw.replace(".", "")),  # no dots
+        (last_raw.replace(".", ""), first_raw.replace(".", "")),
     ]
     for form in first_forms:
         variants.append((last_raw, form))
@@ -1307,6 +1219,7 @@ def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
                 first_hit_bbref = str(bbref_val)
             except Exception:
                 pass
+
     for last, first in variants:
         try:
             lookup_df = playerid_lookup(last, first)
@@ -1317,7 +1230,6 @@ def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
         for _, row in lookup_df.iterrows():
             consider_row(row)
 
-    # Fallback: search by last name only, then match cleaned full name
     try:
         lookup_df = playerid_lookup(last_raw, None)
     except Exception:
@@ -1336,7 +1248,6 @@ def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
 
 @st.cache_data(show_spinner=False, ttl=21600)
 def build_mlb_headshot(mlbam: int | str | None) -> str | None:
-    """Try MLB headshot URLs in order; return the first that responds (200)."""
     if mlbam is None:
         return None
     mlbam_val = str(mlbam).strip()
@@ -1356,7 +1267,6 @@ def build_mlb_headshot(mlbam: int | str | None) -> str | None:
             status = resp.status_code
             if status == 200:
                 return url
-            # Some endpoints reject HEAD; try a lightweight GET
             if status in (403, 404, 405):
                 resp_get = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, stream=True)
                 if resp_get.status_code == 200:
@@ -1437,7 +1347,6 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
                 except Exception:
                     pass
 
-    # If we have a FanGraphs id, try to resolve MLBAM/BBRef via reverse lookup
     for col in fg_cols:
         if col in df.columns:
             vals = df.loc[df["Name"] == name, col].dropna()
@@ -1474,7 +1383,6 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
         return "".join(ch for ch in val if ch.isalnum() or ch.isspace()).strip().lower()
 
     def heuristic_bbref_slug(full_name: str) -> list[str]:
-        """Best-effort guesses for bbref slug when lookup fails (last5 + first2 + 2-digit index)."""
         cleaned = clean_name(full_name)
         if not cleaned:
             return []
@@ -1489,15 +1397,12 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
         if len(base_slug) < 6:
             return []
         slugs = []
-        for i in range(1, 16):  # try 01-15 to account for name collisions
+        for i in range(1, 16):
             slugs.append(f"{base_slug}{i:02d}")
         return slugs
 
     target_clean = clean_name(name)
-
-    candidate_cols = [
-        "mlbam_override", "mlbamid", "MLBID", "mlbam_id", "mlbam", "key_mlbam", "MLBAMID", "playerid"
-    ]
+    candidate_cols = ["mlbam_override", "mlbamid", "MLBID", "mlbam_id", "mlbam", "key_mlbam", "MLBAMID", "playerid"]
     for col in candidate_cols:
         if col in df.columns:
             vals = df.loc[df["Name"] == name, col].dropna()
@@ -1518,7 +1423,6 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
                 if bref_url:
                     return bref_url
 
-    # Try matching by cleaned name in the df
     if "Name" in df.columns:
         df_clean = df.copy()
         df_clean["__clean_name"] = df_clean["Name"].astype(str).apply(clean_name)
@@ -1561,12 +1465,7 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
 
 # --------------------- Layout containers ---------------------
 player_mode_options = ["2 players", "3 players", "4 players"]
-player_mode = st.radio(
-    "",
-    player_mode_options,
-    index=0,
-    horizontal=True,
-)
+player_mode = st.radio("", player_mode_options, index=0, horizontal=True)
 player_count = int(player_mode.split()[0])
 column_weights_map = {
     "2 players": [1, 1],
@@ -1581,19 +1480,18 @@ with left_col:
     controls_container = st.container()
     stat_builder_container = st.container()
 
-# controls
 current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
 MAX_PLAYERS = 4
 default_names = ["Cal Raleigh", "Aaron Judge", "", ""]
-# If mode increases, default new players to single-season
+
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
     for idx in range(prev_count, player_count):
         single_key = f"comp_single_year_{idx}"
         st.session_state[single_key] = True
 st.session_state["comp_prev_player_count"] = player_count
-# Initialize state for all player slots up-front to avoid missing keys when switching modes.
+
 for idx in range(MAX_PLAYERS):
     name_key = f"comp_player_{idx}"
     id_key = f"comp_player_{idx}_id"
@@ -1646,35 +1544,16 @@ with controls_container:
         year_start_key = f"comp_year_{idx}_start"
         year_end_key = f"comp_year_{idx}_end"
         with year_cols[idx]:
-            single = st.checkbox(
-                f"Single season (Player {label})",
-                key=single_key,
-            )
+            single = st.checkbox(f"Single season (Player {label})", key=single_key)
             if single:
-                year_single = st.selectbox(
-                    f"Season (Player {label})",
-                    years_desc,
-                    index=0,
-                    key=year_single_key,
-                )
+                year_single = st.selectbox(f"Season (Player {label})", years_desc, index=0, key=year_single_key)
                 year_start = year_single
                 year_end = year_single
             else:
-                year_start = st.selectbox(
-                    f"Season Start (Player {label})",
-                    years_desc,
-                    index=0,
-                    key=year_start_key,
-                )
-                year_end = st.selectbox(
-                    f"Season End (Player {label})",
-                    years_desc,
-                    index=0,
-                    key=year_end_key,
-                )
+                year_start = st.selectbox(f"Season Start (Player {label})", years_desc, index=0, key=year_start_key)
+                year_end = st.selectbox(f"Season End (Player {label})", years_desc, index=0, key=year_end_key)
         year_ranges.append((min(year_start, year_end), max(year_start, year_end)))
 
-    # Ensure visible player slots have a default name before rendering inputs
     for idx in range(player_count):
         name_key = f"comp_player_{idx}"
         if not st.session_state.get(name_key) and default_names[idx]:
@@ -1688,11 +1567,7 @@ with controls_container:
         id_key = f"comp_player_{idx}_id"
         mode_key = f"comp_player_{idx}_mode"
         with input_cols[idx]:
-            mode_val = st.selectbox(
-                f"Player {label} Input",
-                ["Name", "FanGraphs ID"],
-                key=mode_key,
-            )
+            mode_val = st.selectbox(f"Player {label} Input", ["Name", "FanGraphs ID"], key=mode_key)
             if mode_val == "Name":
                 name_input = st.text_input(f"Player {label}", key=name_key)
                 id_input = st.session_state.get(id_key, "")
@@ -1767,7 +1642,6 @@ for idx, cfg in enumerate(player_inputs):
         "label_char": label,
     })
 
-# Ensure column labels are unique
 seen_labels = set()
 for idx, pdata in enumerate(players_data):
     base = pdata["display_name"]
@@ -1781,7 +1655,6 @@ for idx, pdata in enumerate(players_data):
 
 dfs = [p["df"] for p in players_data]
 
-# build stats
 stat_exclusions = {"Season"}
 numeric_sets = []
 for df in dfs:
@@ -1794,7 +1667,6 @@ if len(numeric_sets) == 1:
     numeric_stats = list(numeric_sets[0] - stat_exclusions)
 else:
     numeric_stats = list(set.intersection(*numeric_sets) - stat_exclusions)
-# Ensure Age is available even if represented as a string span.
 if all("Age" in df.columns for df in dfs) and "Age" not in numeric_stats:
     numeric_stats.append("Age")
 
@@ -1832,7 +1704,6 @@ def add_stat_callback(stat_key: str, select_key: str, reset_key: str, sentinel: 
     if not preset_base_candidates and stat_options:
         preset_base_candidates = [stat_options[0]]
     preset_base_config = [{"Stat": stat, "Show": True} for stat in preset_base_candidates]
-
     config = st.session_state.get(stat_key, preset_base_config)
     config = normalize_stat_rows(config, preset_base_config)
     if not any(row["Stat"] == choice for row in config):
@@ -1852,7 +1723,6 @@ def remove_stat_callback(stat_key: str, select_key: str, reset_key: str, sentine
     if not preset_base_candidates and stat_options:
         preset_base_candidates = [stat_options[0]]
     preset_base_config = [{"Stat": stat, "Show": True} for stat in preset_base_candidates]
-
     config = st.session_state.get(stat_key, preset_base_config)
     config = normalize_stat_rows(config, preset_base_config)
     new_config = [row for row in config if row.get("Stat") != choice]
@@ -1873,7 +1743,6 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
             return []
         if not players or len(players) < 2:
             return []
-
         for stat in stats_list:
             if stat == "W-L":
                 vals = []
@@ -1893,17 +1762,14 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
                 vals = []
                 for p in players:
                     raw_v = p["row"].get(stat, np.nan)
-                    # Apply the same transformation used when rendering the table
                     trans_v = transform_stat_value(stat, raw_v)
                     try:
                         num = float(trans_v) if pd.notna(trans_v) else np.nan
                     except Exception:
                         num = np.nan
                     vals.append(num)
-
             if pd.isna(vals[pidx]):
                 continue
-
             is_lower_better = stat in globals().get("lower_better", set())
             better = True
             for idx, other in enumerate(vals):
@@ -1923,7 +1789,6 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
                 leads.append(stat)
         return leads
 
-    # Dynamically handle "Player X leads" for X in A..D
     if preset_name.startswith("Player ") and preset_name.endswith(" leads"):
         try:
             letter = preset_name.split()[1]
@@ -1972,11 +1837,7 @@ def normalize_stat_rows(rows, fallback):
         if not isinstance(row, dict):
             continue
         stat_name = row.get("Stat")
-        if (
-            not stat_name
-            or stat_name not in stat_options
-            or stat_name in seen_stats
-        ):
+        if not stat_name or stat_name not in stat_options or stat_name in seen_stats:
             continue
         show_val = row.get("Show", True)
         if pd.isna(show_val):
@@ -1993,7 +1854,6 @@ def normalize_stat_rows(rows, fallback):
 
 
 def move_stat_row(delta: int, index: int, fallback):
-    """Move a stat row up/down and persist."""
     rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
     target = index + delta
     if 0 <= target < len(rows):
@@ -2004,7 +1864,6 @@ def move_stat_row(delta: int, index: int, fallback):
 
 
 def toggle_stat_show(index: int, state_key: str, fallback):
-    """Toggle the Show flag for a row and persist."""
     rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
     if 0 <= index < len(rows):
         rows[index]["Show"] = bool(st.session_state.get(state_key, True))
@@ -2013,7 +1872,6 @@ def toggle_stat_show(index: int, state_key: str, fallback):
         st.session_state[manual_stat_update_key] = True
 
 
-# Initialize state once
 if stat_state_key not in st.session_state:
     st.session_state[stat_preset_key] = default_preset_name
     current_preset_for_base = st.session_state[stat_preset_key]
@@ -2062,7 +1920,6 @@ with stat_builder_container:
     add_col, remove_col = st.columns(2)
     sentinel_add = "Select stat to add"
     sentinel_remove = "Select stat to remove"
-
     add_options = [sentinel_add] + available_stats
     remove_options = [sentinel_remove] + stats_in_config
 
@@ -2070,7 +1927,6 @@ with stat_builder_container:
         st.session_state[add_select_key] = sentinel_add
     if st.session_state.pop(add_reset_key, False):
         st.session_state[add_select_key] = sentinel_add
-
     if st.session_state.get(remove_select_key) not in remove_options:
         st.session_state[remove_select_key] = sentinel_remove
     if st.session_state.pop(remove_reset_key, False):
@@ -2086,7 +1942,6 @@ with stat_builder_container:
             on_change=add_stat_callback,
             args=(stat_state_key, add_select_key, add_reset_key, sentinel_add),
         )
-
     with remove_col:
         st.selectbox(
             "Remove stat",
@@ -2113,7 +1968,7 @@ with stat_builder_container:
         st.markdown('<div class="table-row">', unsafe_allow_html=True)
         up_col, down_col, stat_col, show_col = st.columns([0.25, 0.25, .25, 1])
         with up_col:
-             st.button(
+            st.button(
                 "▲",
                 key=f"stat_up_{idx}",
                 disabled=idx == 0,
@@ -2153,39 +2008,30 @@ if not stats_order:
     st.stop()
 
 
-# formatting
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
-
     upper_stat = stat.upper()
     if upper_stat == "FRV":
         return f"{int(round(float(val)))}"
-
     if upper_stat == "ARM":
         return f"{int(round(float(val)))}"
-
     if upper_stat == "AGE":
         if isinstance(val, str):
             return val
         v = float(val)
         return f"{int(round(v))}" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-
     if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
         v = float(val)
         if abs(v - round(v)) < 1e-9:
             return f"{int(round(v))}.0"
         return f"{v:.1f}"
-
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
-
     if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
         return f"{float(val):.3f}".lstrip("0")
-
     if upper_stat in {"WRC+", "OPS+"}:
         return f"{int(round(float(val)))}"
-
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
@@ -2194,17 +2040,11 @@ def format_stat(stat: str, val) -> str:
         if v <= 1:
             v *= 100
         return f"{v:.1f}%"
-
     v = float(val)
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
-# comparison table
 def transform_stat_value(stat: str, raw_val):
-    """
-    Normalize or derive stat values before formatting/comparison.
-    Whiff% is not provided directly, so derive it from Contact% (100 - Contact%).
-    """
     if stat == "Contact%":
         if pd.isna(raw_val):
             return np.nan
@@ -2212,14 +2052,13 @@ def transform_stat_value(stat: str, raw_val):
             contact = float(raw_val)
         except Exception:
             return np.nan
-        # Contact% may come in as a fraction (0.78) or percentage (78.0).
         if contact <= 1:
             contact *= 100
         return 100 - contact
     return raw_val
 
 
-label_map = { # in stat drop down, change display names
+label_map = {
     "HardHit%": "Hard Hit%",
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",
@@ -2233,10 +2072,8 @@ comparison_rows = []
 winner_map: dict[str, set[str]] = {}
 col_order = [p["col_label"] for p in players_data]
 for stat in stats_order:
-    # Skip stats not common to all players
     if any(stat not in pdata["df"].columns for pdata in players_data):
         continue
-
     raw_label = label_map.get(stat, stat)
     values = []
     numeric_vals = []
@@ -2275,7 +2112,7 @@ table_df = pd.DataFrame(comparison_rows, columns=["Stat"] + col_order)
 for pdata in players_data:
     pdata["headshot"] = get_headshot_url(pdata["display_name"], pdata["df"])
 esc = html.escape
-# Even column widths for all modes
+
 if player_count == 2:
     stat_col_width = "calc(100% / 3)"
     player_col_width = "calc(100% / 3)"
@@ -2293,7 +2130,6 @@ if player_count == 2:
 else:
     headshot_width = f"clamp(110px, calc(80vw / {player_count + 1}), 140px)"
     headshot_col_width = f"clamp(125px, calc(84vw / {player_count + 1}), 160px)"
-    # Smaller text for 3–4 player layouts
     player_name_size = ".9rem"
     player_meta_size = ".95rem"
 name_style_attr = f' style="font-size:{player_name_size}; line-height:1.1;"' if player_count > 2 else ""
@@ -2302,13 +2138,11 @@ with right_col:
     if table_df.empty:
         st.warning("No stats available to compare.")
     else:
-        # Build headshot + table HTML
         rows = [
             f"<div class=\"compare-card\" style=\"--stat-col-width: {stat_col_width}; --headshot-col-width: {headshot_col_width}px; --headshot-img-width: {headshot_width}px; --player-name-size: {player_name_size}; --player-meta-size: {player_meta_size};\">",
             f"  <div class=\"headshot-row\" style=\"grid-template-columns: {grid_template};\">",
         ]
         if player_count == 2:
-            # left player
             pdata = players_data[0]
             img_html = f'<img src="{esc(pdata["headshot"])}" width="{headshot_width}" />' if pdata["headshot"] else ""
             rows.extend([
@@ -2319,7 +2153,6 @@ with right_col:
                 "    </div>",
             ])
             rows.append("    <div class=\"headshot-spacer\"></div>")
-            # right player
             pdata = players_data[1]
             img_html = f'<img src="{esc(pdata["headshot"])}" width="{headshot_width}" />' if pdata["headshot"] else ""
             rows.extend([
@@ -2358,7 +2191,7 @@ with right_col:
         rows.extend([
             "    </colgroup>",
             "    <thead>",
-            f"      <tr class=\"overall-row\">",
+            "      <tr class=\"overall-row\">",
             f"        <th colspan=\"{player_count + 1}\">Overall Stats</th>",
             "      </tr>",
             "    </thead>",
@@ -2401,4 +2234,3 @@ with right_col:
         st.caption("Screenshot to save")
         st.caption("Find a player's Fangraphs/MLB ID in their Fangraphs/MLB profile URL")
         st.caption("TZ records ended in 2001, DRS started in 2002")
-      
