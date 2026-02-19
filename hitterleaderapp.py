@@ -22,16 +22,37 @@ st.set_page_config(layout="wide")
 @st.cache_data(ttl=3600, max_entries=3)
 def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
 
-    def get_primary_fielding(year_start, year_end):
+    def get_primary_fielding(year_start, year_end, batting_df = None):
         """Get one row per player from fielding stats - their primary position."""
         fielding = pybaseball.fielding_stats(year_start, year_end, qual=0)
+        st.write(fielding.head())
         if fielding is None or fielding.empty:
             return pd.DataFrame()
         if "Inn" in fielding.columns:
+            total_inn = fielding.groupby("IDfg")["Inn"].sum().rename("TotalInn")
+        else:
+            total_inn = pd.Series(dtype=float)
+        
+        if "Inn" in fielding.columns:
             fielding = fielding.sort_values("Inn", ascending=False)
         fielding = fielding.drop_duplicates(subset=["IDfg"], keep="first")
-        return fielding[["IDfg", "Pos"]].rename(columns={"Pos": "DefPos"})
+        fielding = fielding[["IDfg", "Pos"]].rename(columns={"Pos": "DefPos"})
+        fielding = fielding.join(total_inn, on="IDfg")
 
+        # DH detection using total innings across all positions
+        if batting_df is not None and "PA" in batting_df.columns:
+            pa_per_player = (
+                batting_df[batting_df["Team"] == "TOT"].set_index("IDfg")["PA"].combine_first(batting_df.drop_duplicates("IDfg").set_index("IDfg")["PA"]) )
+            for fg_id, pa in pa_per_player.items():
+                estimated_total_inn = (float(pa) / 4.1) * 9
+                field_inn = fielding.loc[fielding["IDfg"] == fg_id, "TotalInn"].values
+                field_inn = float(field_inn[0]) if len(field_inn) > 0 else 0
+                if field_inn == 0 or (estimated_total_inn / field_inn) > 3:
+                    if fg_id in fielding["IDfg"].values:
+                        fielding.loc[fielding["IDfg"] == fg_id, "DefPos"] = "DH"
+                    else:
+                        fielding = pd.concat([fielding, pd.DataFrame([{"IDfg": fg_id, "DefPos": "DH", "TotalInn": 0}])], ignore_index=True)
+        return fielding[["IDfg", "DefPos"]]
     def build_team_display_map(df: pd.DataFrame, year: int) -> dict:
         team_map = {}
         for fg_id, grp in df.groupby("IDfg"):
@@ -60,7 +81,7 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
             df["IDfg"] = pd.to_numeric(df["IDfg"], errors="coerce")
             df["TeamDisplay"] = df["IDfg"].map(build_team_display_map(df, start_year))
 
-        fielding = get_primary_fielding(start_year, start_year)
+        fielding = get_primary_fielding(start_year, start_year, batting_df=df)
         if not fielding.empty:
             df = df.merge(fielding, on="IDfg", how="left")
 
@@ -83,7 +104,7 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         if yr_data.empty:
             continue
 
-        fielding = get_primary_fielding(year, year)
+        fielding = get_primary_fielding(year, year, batting_df=yr_data)
         if not fielding.empty:
             yr_data = yr_data.merge(fielding, on="IDfg", how="left")
 
@@ -1082,7 +1103,7 @@ if stat in df.columns:
 else:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
-
+st.write(df)
 if not df.empty and "TeamDisplay" not in df.columns:
     df["TeamDisplay"] = "2+ Teams"
 cards = []
