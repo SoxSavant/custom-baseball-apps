@@ -35,15 +35,16 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
     def build_team_display_map(df: pd.DataFrame, year: int) -> dict:
         team_map = {}
         for fg_id, grp in df.groupby("IDfg"):
-            teams = grp["Team"].dropna().astype(str).str.upper().tolist()
-            # remove TOT for individual team list
-            teams = [normalize_team_code(t, year) for t in teams if t != "TOT"]
+            raw_teams = grp["Team"].dropna().astype(str).str.strip().str.upper().tolist()
+            # Filter out junk values and TOT
+            teams = [normalize_team_code(t, year) for t in raw_teams if t not in {"TOT", "---", "--", "-", ""}]
             teams = sorted(set(t for t in teams if t))
-            if not teams and not grp.empty:
-                # fallback if only TOT exists
-                first_team = grp["Team"].dropna().iloc[0]
-                teams = [normalize_team_code(first_team, year)]
-            team_map[fg_id] = compute_team_display(teams)
+            if teams:
+                team_map[fg_id] = compute_team_display(teams)
+            else:
+            # Only TOT or junk rows — count distinct real teams from TOT row count
+            # Just show N/A, single team players won't hit this
+                team_map[fg_id] = "2+ Teams"
         return team_map
 
     # ----------------------------
@@ -56,6 +57,7 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
 
         # TeamDisplay mapping
         if "Team" in df.columns:
+            df["IDfg"] = pd.to_numeric(df["IDfg"], errors="coerce")
             df["TeamDisplay"] = df["IDfg"].map(build_team_display_map(df, start_year))
 
         fielding = get_primary_fielding(start_year, start_year)
@@ -85,7 +87,15 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         if not fielding.empty:
             yr_data = yr_data.merge(fielding, on="IDfg", how="left")
 
-        yr_data = yr_data[yr_data["Team"].notna() & (yr_data["Team"] != "TOT")]
+        # Keep individual team rows; for players who only have TOT, keep TOT as fallback
+        tot_ids = set(yr_data.loc[yr_data["Team"] == "TOT", "IDfg"])
+        has_individual = set(yr_data.loc[yr_data["Team"] != "TOT", "IDfg"])
+        tot_only_ids = tot_ids - has_individual
+
+        non_tot = yr_data[yr_data["Team"] != "TOT"]
+        tot_fallback = yr_data[(yr_data["Team"] == "TOT") & (yr_data["IDfg"].isin(tot_only_ids))]
+        yr_data = pd.concat([non_tot, tot_fallback], ignore_index=True)
+        yr_data = yr_data[yr_data["Team"].notna()]
 
         if position != "all" and "DefPos" in yr_data.columns:
             pos_values = POSITION_FILTER_MAP.get(position, [])
@@ -190,10 +200,11 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 def compute_team_display(teams: list[str]) -> str:
     if not teams:
-        return "N/A"
+        return "2+ Teams"  
     if len(teams) == 1:
         return teams[0]
-    return f"{len(teams)} Teams"
+    return "2+ Teams"
+
 
 
 # ----------------------------
@@ -686,7 +697,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     elif len(teams) == 1:
         result["TeamDisplay"] = teams[0]
     else:
-        result["TeamDisplay"] = f"{len(teams)} Teams"
+        result["TeamDisplay"] = compute_team_display(teams)
 
     result["Teams"] = teams
 
@@ -1073,7 +1084,7 @@ else:
     df = pd.DataFrame()
 
 if not df.empty and "TeamDisplay" not in df.columns:
-    df["TeamDisplay"] = "N/A"
+    df["TeamDisplay"] = "2+ Teams"
 cards = []
 for _, row in df.iterrows():
     name = row.get("Name", "")
