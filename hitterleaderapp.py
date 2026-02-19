@@ -25,7 +25,6 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
     def get_primary_fielding(year_start, year_end, batting_df = None):
         """Get one row per player from fielding stats - their primary position."""
         fielding = pybaseball.fielding_stats(year_start, year_end, qual=0)
-        st.write(fielding.head())
         if fielding is None or fielding.empty:
             return pd.DataFrame()
         if "Inn" in fielding.columns:
@@ -1103,7 +1102,6 @@ if stat in df.columns:
 else:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
-st.write(df)
 if not df.empty and "TeamDisplay" not in df.columns:
     df["TeamDisplay"] = "2+ Teams"
 cards = []
@@ -1158,6 +1156,14 @@ if st.session_state.get("hl_show_min_pa", False):
         min_pa_display = 0
     title += f" (min {min_pa_display} PA)"
 
+# Build disclaimer if position filtered and fielding stat selected
+FIELDING_STATS = {"FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"}
+footer_middle = ""
+if position_val != "all" and stat in FIELDING_STATS:
+    pos_label = POSITION_OPTIONS.get(position_val, position_val)
+    stat_label = label_map.get(stat, stat)
+    footer_middle = f'<p>Total {stat_label} among primary {pos_label}</p>'
+
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{title}</div>
@@ -1166,6 +1172,7 @@ grid_html = f"""
     </div>
     <div class="footer">
         <p>By: Sox_Savant</p>
+        {footer_middle}
         <p>Data: FanGraphs</p>
     </div>
 </div>
@@ -1194,6 +1201,7 @@ full_html = f"""
     margin-bottom: 2rem;
     text-align: center;
 }}
+
 .players-grid {{
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1235,8 +1243,8 @@ html, body {{
 }}
 .footer {{
     display: flex;
-    justify-content: space-evenly;
-    gap: 25rem;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 1rem;
 }}
 .footer p {{
@@ -1244,6 +1252,14 @@ html, body {{
     font-size: 0.9rem;
     color: #666;
     font-family: "Source Sans Pro";
+    flex: 1;
+    text-align: center
+}}
+.footer p:first-child {{
+    text-align: left;
+}}
+.footer p:last-child {{
+    text-align: right;
 }}
 </style>
 </head>
