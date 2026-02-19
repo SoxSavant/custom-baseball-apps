@@ -21,20 +21,43 @@ st.set_page_config(layout="wide")
 
 @st.cache_data(ttl=3600, max_entries=3)
 def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
-    
+
     def get_primary_fielding(year_start, year_end):
         """Get one row per player from fielding stats - their primary position."""
         fielding = pybaseball.fielding_stats(year_start, year_end, qual=0)
         if fielding is None or fielding.empty:
             return pd.DataFrame()
-        # Keep only the position with most innings per player
         if "Inn" in fielding.columns:
             fielding = fielding.sort_values("Inn", ascending=False)
         fielding = fielding.drop_duplicates(subset=["IDfg"], keep="first")
         return fielding[["IDfg", "Pos"]].rename(columns={"Pos": "DefPos"})
 
+    def build_team_display_map(df: pd.DataFrame, year: int) -> dict:
+        team_map = {}
+        for fg_id, grp in df.groupby("IDfg"):
+            teams = grp["Team"].dropna().astype(str).str.upper().tolist()
+            # remove TOT for individual team list
+            teams = [normalize_team_code(t, year) for t in teams if t != "TOT"]
+            teams = sorted(set(t for t in teams if t))
+            if not teams and not grp.empty:
+                # fallback if only TOT exists
+                first_team = grp["Team"].dropna().iloc[0]
+                teams = [normalize_team_code(first_team, year)]
+            team_map[fg_id] = compute_team_display(teams)
+        return team_map
+
+    # ----------------------------
+    #  SINGLE YEAR
+    # ----------------------------
     if start_year == end_year:
         df = batting_stats(start_year, end_year, qual=min_pa, split_seasons=False)
+        if df.empty:
+            return pd.DataFrame()
+
+        # TeamDisplay mapping
+        if "Team" in df.columns:
+            df["TeamDisplay"] = df["IDfg"].map(build_team_display_map(df, start_year))
+
         fielding = get_primary_fielding(start_year, start_year)
         if not fielding.empty:
             df = df.merge(fielding, on="IDfg", how="left")
@@ -44,55 +67,58 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
             df["DefPos"] = df["DefPos"].astype(str).str.upper()
             df = df[df["DefPos"].isin([p.upper() for p in pos_values])]
 
-        if not df.empty and "Team" in df.columns:
-            df["TeamDisplay"] = df["Team"].apply(lambda t: normalize_team_code(str(t), start_year) or "N/A")
-
         return df
-    else:
-        frames = []
-        num_years = end_year - start_year + 1
-        pre_filter_pa = max(1, min_pa // (num_years * 2)) if min_pa > 0 else 0
 
-        for year in range(start_year, end_year + 1):
-            yr_data = batting_stats(year, year, qual=pre_filter_pa, split_seasons=False)
-            yr_data = yr_data.drop_duplicates(subset=["IDfg"], keep="first")
-            fielding = get_primary_fielding(year, year)
-            if not fielding.empty:
-                yr_data = yr_data.merge(fielding, on="IDfg", how="left")
+    # ----------------------------
+    #  MULTI YEAR
+    # ----------------------------
+    frames = []
+    num_years = end_year - start_year + 1
+    pre_filter_pa = max(1, min_pa // (num_years * 2)) if min_pa > 0 else 0
 
-            if "Team" in yr_data.columns:
-                yr_data = yr_data[yr_data["Team"].notna() & (yr_data["Team"] != "TOT")]
+    for year in range(start_year, end_year + 1):
+        yr_data = batting_stats(year, year, qual=pre_filter_pa, split_seasons=False)
+        if yr_data.empty:
+            continue
 
-            if position != "all" and "DefPos" in yr_data.columns:
-                pos_values = POSITION_FILTER_MAP.get(position, [])
-                yr_data["DefPos"] = yr_data["DefPos"].astype(str).str.upper()
-                yr_data = yr_data[yr_data["DefPos"].isin([p.upper() for p in pos_values])]
+        fielding = get_primary_fielding(year, year)
+        if not fielding.empty:
+            yr_data = yr_data.merge(fielding, on="IDfg", how="left")
 
-            if not yr_data.empty:
-                yr_data['Season'] = year
-                frames.append(yr_data)
+        yr_data = yr_data[yr_data["Team"].notna() & (yr_data["Team"] != "TOT")]
 
-        if not frames:
-            return pd.DataFrame()
+        if position != "all" and "DefPos" in yr_data.columns:
+            pos_values = POSITION_FILTER_MAP.get(position, [])
+            yr_data["DefPos"] = yr_data["DefPos"].astype(str).str.upper()
+            yr_data = yr_data[yr_data["DefPos"].isin([p.upper() for p in pos_values])]
 
-        combined = pd.concat(frames, ignore_index=True)
-        combined = optimize_dtypes(combined)
+        if not yr_data.empty:
+            yr_data["Season"] = year
+            frames.append(yr_data)
 
-        grouped_rows = []
-        combined = combined[combined["IDfg"].notna()]
-        for player_id, grp in combined.groupby("IDfg"):
-            name = grp["Name"].iloc[0] if not grp.empty else None
-            row = aggregate_player_group(grp, name)
-            if row is not None and len(row):
-                grouped_rows.append(row)
+    if not frames:
+        return pd.DataFrame()
 
-        result = pd.DataFrame(grouped_rows)
-        result = optimize_dtypes(result)
+    combined = pd.concat(frames, ignore_index=True)
+    combined = optimize_dtypes(combined)
 
-        if not result.empty and min_pa > 0:
-            result = result[pd.to_numeric(result.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
+    # Aggregate per player
+    grouped_rows = []
+    combined = combined[combined["IDfg"].notna()]
+    for player_id, grp in combined.groupby("IDfg"):
+        name = grp["Name"].iloc[0] if not grp.empty else None
+        row = aggregate_player_group(grp, name)
+        if row is not None and len(row):
+            grouped_rows.append(row)
 
-        return result
+    result = pd.DataFrame(grouped_rows)
+    result = optimize_dtypes(result)
+
+    if not result.empty and min_pa > 0:
+        result = result[pd.to_numeric(result.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
+
+    return result
+
 
 
 
@@ -649,13 +675,20 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     if name:
         result["Name"] = name
 
-    teams = grp.get("Team", pd.Series([], dtype=str)).dropna().astype(str).tolist()
-    teams = [t.strip().upper() for t in teams if t.strip()]
+    teams = grp.loc[grp["Team"].notna() & (grp["Team"] != "TOT"), "Team"].astype(str).tolist()
     teams = [normalize_team_code(t, int(grp["Season"].iloc[0]) if "Season" in grp.columns else 2025) for t in teams]
     teams = collapse_athletics(sorted(set([t for t in teams if t])))
 
+    # set display
+    if not teams:
+    # fallback: if only TOT row exists
+        result["TeamDisplay"] = "TOT"
+    elif len(teams) == 1:
+        result["TeamDisplay"] = teams[0]
+    else:
+        result["TeamDisplay"] = f"{len(teams)} Teams"
+
     result["Teams"] = teams
-    result["TeamDisplay"] = compute_team_display(teams)
 
     try:
         if "Season" in grp.columns:
@@ -904,15 +937,15 @@ label_map = {
 # causing an IndentationError that silently killed the entire script)
 POSITION_OPTIONS = {
     "all": "All Positions",
-    "C": "Catchers",
-    "1B": "First Basemen",
-    "2B": "Second Basemen",
-    "3B": "Third Basemen",
-    "SS": "Shortss",
-    "LF": "Left Fielders",
-    "CF": "Center Fielders",
-    "RF": "Right Fielders",
-    "OF": "Outfielders",
+    "C": "C",
+    "1B": "1B",
+    "2B": "2B",
+    "3B": "3B",
+    "SS": "SS",
+    "LF": "LF",
+    "CF": "CF",
+    "RF": "RF",
+    "OF": "OF",
     "DH": "DH",
 }
 
@@ -1081,7 +1114,7 @@ title_label = label_map.get(stat, stat)
 
 # Include position in the graphic title if filtered
 pos_display = POSITION_OPTIONS.get(position_val, "")
-pos_suffix = f" — {pos_display}" if position_val != "all" else ""
+pos_suffix = f" ({pos_display})" if position_val != "all" else ""
 
 title = f"{span_label} {title_label} Leaders{pos_suffix}"
 if st.session_state.get("hl_sort_worst", False):
