@@ -22,7 +22,7 @@ st.set_page_config(layout="wide")
 @st.cache_data(ttl=3600, max_entries=3)
 def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
 
-    def get_primary_fielding(year_start, year_end, batting_df = None):
+    def get_primary_fielding(year_start, year_end, batting_df=None):
         """Get one row per player from fielding stats - their primary position."""
         fielding = pybaseball.fielding_stats(year_start, year_end, qual=0)
         if fielding is None or fielding.empty:
@@ -31,7 +31,7 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
             total_inn = fielding.groupby("IDfg")["Inn"].sum().rename("TotalInn")
         else:
             total_inn = pd.Series(dtype=float)
-        
+
         if "Inn" in fielding.columns:
             fielding = fielding.sort_values("Inn", ascending=False)
         fielding = fielding.drop_duplicates(subset=["IDfg"], keep="first")
@@ -41,7 +41,10 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         # DH detection using total innings across all positions
         if batting_df is not None and "PA" in batting_df.columns:
             pa_per_player = (
-                batting_df[batting_df["Team"] == "TOT"].set_index("IDfg")["PA"].combine_first(batting_df.drop_duplicates("IDfg").set_index("IDfg")["PA"]) )
+                batting_df[batting_df["Team"] == "TOT"].set_index("IDfg")["PA"].combine_first(
+                    batting_df.drop_duplicates("IDfg").set_index("IDfg")["PA"]
+                )
+            )
             for fg_id, pa in pa_per_player.items():
                 estimated_total_inn = (float(pa) / 4.1) * 9
                 field_inn = fielding.loc[fielding["IDfg"] == fg_id, "TotalInn"].values
@@ -50,20 +53,21 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
                     if fg_id in fielding["IDfg"].values:
                         fielding.loc[fielding["IDfg"] == fg_id, "DefPos"] = "DH"
                     else:
-                        fielding = pd.concat([fielding, pd.DataFrame([{"IDfg": fg_id, "DefPos": "DH", "TotalInn": 0}])], ignore_index=True)
+                        fielding = pd.concat(
+                            [fielding, pd.DataFrame([{"IDfg": fg_id, "DefPos": "DH", "TotalInn": 0}])],
+                            ignore_index=True,
+                        )
         return fielding[["IDfg", "DefPos"]]
+
     def build_team_display_map(df: pd.DataFrame, year: int) -> dict:
         team_map = {}
         for fg_id, grp in df.groupby("IDfg"):
             raw_teams = grp["Team"].dropna().astype(str).str.strip().str.upper().tolist()
-            # Filter out junk values and TOT
             teams = [normalize_team_code(t, year) for t in raw_teams if t not in {"TOT", "---", "--", "-", ""}]
             teams = sorted(set(t for t in teams if t))
             if teams:
                 team_map[fg_id] = compute_team_display(teams)
             else:
-            # Only TOT or junk rows — count distinct real teams from TOT row count
-            # Just show N/A, single team players won't hit this
                 team_map[fg_id] = "2+ Teams"
         return team_map
 
@@ -83,6 +87,21 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         fielding = get_primary_fielding(start_year, start_year, batting_df=df)
         if not fielding.empty:
             df = df.merge(fielding, on="IDfg", how="left")
+
+        # Map H -> Hits for consistency with multi-year path
+        if "H" in df.columns and "Hits" not in df.columns:
+            df["Hits"] = df["H"]
+
+        # Compute XBH for single year
+        if "XBH" not in df.columns or df.get("XBH", pd.Series(dtype=float)).isna().all():
+            for col in ["2B", "3B", "HR"]:
+                if col not in df.columns:
+                    df[col] = np.nan
+            df["XBH"] = (
+                pd.to_numeric(df["2B"], errors="coerce").fillna(0)
+                + pd.to_numeric(df["3B"], errors="coerce").fillna(0)
+                + pd.to_numeric(df["HR"], errors="coerce").fillna(0)
+            )
 
         if position != "all" and "DefPos" in df.columns:
             pos_values = POSITION_FILTER_MAP.get(position, [])
@@ -150,20 +169,18 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
     return result
 
 
-
-
 def optimize_dtypes(df):
     if df.empty:
         return df
     df = df.copy()
-    float_cols = df.select_dtypes(include=['float64']).columns
+    float_cols = df.select_dtypes(include=["float64"]).columns
     for col in float_cols:
-        if col not in ['AVG', 'OBP', 'SLG', 'wOBA', 'xwOBA', 'xBA', 'xSLG']:
-            df[col] = df[col].astype('float32')
-    int_cols = df.select_dtypes(include=['int64']).columns
+        if col not in ["AVG", "OBP", "SLG", "wOBA", "xwOBA", "xBA", "xSLG"]:
+            df[col] = df[col].astype("float32")
+    int_cols = df.select_dtypes(include=["int64"]).columns
     for col in int_cols:
         if df[col].max() < 2147483647:
-            df[col] = df[col].astype('int32')
+            df[col] = df[col].astype("int32")
     return df
 
 
@@ -220,19 +237,16 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 def compute_team_display(teams: list[str]) -> str:
     if not teams:
-        return "2+ Teams"  
+        return "2+ Teams"
     if len(teams) == 1:
         return teams[0]
     return "2+ Teams"
-
 
 
 # ----------------------------
 #  External Data Loaders
 # ----------------------------
 
-# Position values our UI uses -> what FanGraphs Pos column contains
-# FanGraphs fielding Pos values: C, 1B, 2B, 3B, SS, LF, CF, RF, OF, DH
 POSITION_FILTER_MAP = {
     "all": None,
     "C":   ["C"],
@@ -247,18 +261,16 @@ POSITION_FILTER_MAP = {
     "DH":  ["DH"],
 }
 
+
 @st.cache_data(ttl=600, max_entries=10)
 def batting_stats(start_year: int, end_year: int, qual=0, split_seasons=False):
     try:
         df = pybaseball.batting_stats(start_year, end_year, qual=qual, split_seasons=split_seasons)
-
         if df is None or df.empty:
             return pd.DataFrame()
         return df
-
     except Exception:
         return pd.DataFrame()
-
 
 
 @st.cache_data(show_spinner=False, ttl=600, max_entries=10)
@@ -710,9 +722,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
     teams = [normalize_team_code(t, int(grp["Season"].iloc[0]) if "Season" in grp.columns else 2025) for t in teams]
     teams = collapse_athletics(sorted(set([t for t in teams if t])))
 
-    # set display
     if not teams:
-    # fallback: if only TOT row exists
         result["TeamDisplay"] = "TOT"
     elif len(teams) == 1:
         result["TeamDisplay"] = teams[0]
@@ -811,6 +821,16 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
             tb = singles + 2 * doubles + 3 * triples + 4 * hr
         else:
             tb = np.nan
+
+    # XBH = 2B + 3B + HR
+    if pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
+        result["XBH"] = doubles + triples + hr
+    else:
+        result["XBH"] = np.nan
+
+    # Map H -> Hits for display (keep H internally for rate stat calculations)
+    if pd.notna(h):
+        result["Hits"] = h
 
     if pd.notna(ab) and ab > 0 and pd.notna(h):
         result["AVG"] = h / ab
@@ -950,7 +970,7 @@ def transform_stat_value(stat: str, raw_val):
 STAT_ALLOWLIST = [
     "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "Hits", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
     "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
     "FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM",
@@ -962,10 +982,12 @@ label_map = {
     "EV": "Avg Exit Velo",
     "Contact%": "Whiff%",
     "O-Swing%": "Chase%",
+    "Hits": "Hits",
 }
 
-# BUG FIX 3: POSITION_OPTIONS moved to module level (was inside `with col1:` block,
-# causing an IndentationError that silently killed the entire script)
+# Stats where a LOWER value is better (so default sort = ascending to show leaders)
+lower_better = {"K%", "O-Swing%", "Contact%", "SO", "GB%"}
+
 POSITION_OPTIONS = {
     "all": "All Positions",
     "C": "C",
@@ -1007,10 +1029,12 @@ if "hl_position" not in st.session_state:
 if "hl_span" not in st.session_state:
     st.session_state["hl_span"] = False
 
+
 def on_year_change():
     s = st.session_state
     if not s.get("hl_span", False):
         s["hl_end_year"] = s["hl_start_year"]
+
 
 st.markdown(
     """
@@ -1041,7 +1065,7 @@ with col1:
         min_value=1900,
         max_value=current_year,
         key="hl_start_year",
-        on_change=on_year_change
+        on_change=on_year_change,
     )
     if st.session_state.get("hl_span", False):
         end_year = st.number_input(
@@ -1049,7 +1073,7 @@ with col1:
             min_value=2025,
             max_value=current_year,
             key="hl_end_year",
-            on_change=on_year_change
+            on_change=on_year_change,
         )
     else:
         end_year = st.session_state["hl_start_year"]
@@ -1058,10 +1082,9 @@ with col1:
         "Min PA",
         min_value=0,
         max_value=20000,
-        key="hl_min_pa"
+        key="hl_min_pa",
     )
 
-    # BUG FIX 2: position_filter selectbox now inside col1 with correct indentation
     position_filter = st.selectbox(
         "Position",
         options=list(POSITION_OPTIONS.keys()),
@@ -1072,19 +1095,18 @@ with col1:
     st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
 
-# BUG FIX 1 (call site): pass position_val into load_filtered_data
 min_pa_val = int(st.session_state.get("hl_min_pa", 0))
 position_val = st.session_state.get("hl_position", "all")
 df = load_filtered_data(start_year, end_year, min_pa_val, position_val)
 
-# Slim df to only columns we actually use (reduces memory, cleans up debug output)
+# Slim df to only columns we actually use
 if not df.empty:
     keep_cols = set(STAT_ALLOWLIST) | {
         "Name", "Team", "TeamDisplay", "IDfg", "Age",
         "mlbam", "MLBID", "key_mlbam", "mlbam_id", "DefPos",
+        "H",  # keep raw H for internal use even though we display "Hits"
     }
     df = df[[c for c in df.columns if c in keep_cols]]
-
 
 if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
     player_names = df["Name"].tolist()
@@ -1096,14 +1118,25 @@ if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
             if col in df.columns:
                 df[col] = df[col].fillna(0)
 
-if stat in df.columns:
-    df = df.sort_values(by=stat, ascending=st.session_state.get("hl_sort_worst", False))
+# Determine sort direction based on whether stat is lower-is-better
+stat_col_to_sort = stat
+if stat_col_to_sort in df.columns:
+    stat_is_lower_better = stat in lower_better
+    sort_worst = st.session_state.get("hl_sort_worst", False)
+    # lower-is-better + not showing worst  → ascending (lowest = best)
+    # lower-is-better + showing worst      → descending (highest = worst)
+    # higher-is-better + not showing worst → descending (highest = best)
+    # higher-is-better + showing worst     → ascending (lowest = worst)
+    ascending = (stat_is_lower_better and not sort_worst) or (not stat_is_lower_better and sort_worst)
+    df = df.sort_values(by=stat_col_to_sort, ascending=ascending)
     df = df.head(10)
 else:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
+
 if not df.empty and "TeamDisplay" not in df.columns:
     df["TeamDisplay"] = "2+ Teams"
+
 cards = []
 for _, row in df.iterrows():
     name = row.get("Name", "")
@@ -1139,10 +1172,9 @@ for _, row in df.iterrows():
     '''
     cards.append(card_html)
 
-span_label = f"{int(start_year)}" if start_year == end_year else f"{int(start_year)}–{int(end_year)}"
+span_label = f"{int(start_year)}" if start_year == end_year else f"{int(start_year)}\u2013{int(end_year)}"
 title_label = label_map.get(stat, stat)
 
-# Include position in the graphic title if filtered
 pos_display = POSITION_OPTIONS.get(position_val, "")
 pos_suffix = f" ({pos_display})" if position_val != "all" else ""
 
@@ -1156,7 +1188,6 @@ if st.session_state.get("hl_show_min_pa", False):
         min_pa_display = 0
     title += f" (min {min_pa_display} PA)"
 
-# Build disclaimer if position filtered and fielding stat selected
 FIELDING_STATS = {"FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"}
 footer_middle = ""
 if position_val != "all" and stat in FIELDING_STATS:
@@ -1201,7 +1232,6 @@ full_html = f"""
     margin-bottom: 2rem;
     text-align: center;
 }}
-
 .players-grid {{
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1253,7 +1283,7 @@ html, body {{
     color: #666;
     font-family: "Source Sans Pro";
     flex: 1;
-    text-align: center
+    text-align: center;
 }}
 .footer p:first-child {{
     text-align: left;
