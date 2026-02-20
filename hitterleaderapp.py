@@ -486,7 +486,8 @@ def load_fielding_for_players(player_names: list[str], start_year: int, end_year
     if frames:
         combined = pd.concat(frames, ignore_index=True)
         combined["NameKey"] = combined["NameKey"].astype(str)
-        savant_data = combined.groupby("NameKey", as_index=False).agg({"FRV": "sum", "ARM": "sum", "RANGE": "sum", "OAA": "sum"})
+        agg_cols = {c: "sum" for c in ["FRV", "ARM", "RANGE", "OAA"] if c in combined.columns}
+        savant_data = combined.groupby("NameKey", as_index=False).agg(agg_cols)
     fangraphs_data = load_fangraphs_fielding(player_names, start_year, end_year)
     if not savant_data.empty and not fangraphs_data.empty:
         result = savant_data.merge(fangraphs_data, on="NameKey", how="outer")
