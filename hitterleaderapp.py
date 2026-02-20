@@ -1204,7 +1204,7 @@ with col1:
     if is_span:
         end_year = st.number_input(
             "End Year",
-            min_value=2025,
+            min_value=1900,
             max_value=current_year,
             key="hl_end_year",
             on_change=on_year_change,
