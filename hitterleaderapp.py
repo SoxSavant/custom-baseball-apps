@@ -57,7 +57,7 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
                             [fielding, pd.DataFrame([{"IDfg": fg_id, "DefPos": "DH", "TotalInn": 0}])],
                             ignore_index=True,
                         )
-        return fielding[["IDfg", "DefPos"]]
+        return fielding[["IDfg", "DefPos", "TotalInn"]] if "TotalInn" in fielding.columns else fielding[["IDfg", "DefPos"]]
 
     def build_team_display_map(df: pd.DataFrame, year: int) -> dict:
         team_map = {}
@@ -1031,6 +1031,10 @@ if "hl_position" not in st.session_state:
     st.session_state["hl_position"] = "all"
 if "hl_span" not in st.session_state:
     st.session_state["hl_span"] = False
+if "hl_show_player_pa" not in st.session_state:
+    st.session_state["hl_show_player_pa"] = False
+if "hl_show_innings" not in st.session_state:
+    st.session_state["hl_show_innings"] = False
 
 
 def on_year_change():
@@ -1097,6 +1101,8 @@ with col1:
 
     st.checkbox("Show worst", key="hl_sort_worst")
     st.checkbox("Show min PA", key="hl_show_min_pa")
+    st.checkbox("Show player PA", key="hl_show_player_pa")
+    st.checkbox("Show player innings", key="hl_show_innings")
 
 min_pa_val = int(st.session_state.get("hl_min_pa", 0))
 position_val = st.session_state.get("hl_position", "all")
@@ -1106,7 +1112,7 @@ df = load_filtered_data(start_year, end_year, min_pa_val, position_val)
 if not df.empty:
     keep_cols = set(STAT_ALLOWLIST) | {
         "Name", "Team", "TeamDisplay", "IDfg", "Age",
-        "mlbam", "MLBID", "key_mlbam", "mlbam_id", "DefPos",
+        "mlbam", "MLBID", "key_mlbam", "mlbam_id", "DefPos", "TotalInn",
         "H", "TB",  # keep raw H and TB for internal use
     }
     df = df[[c for c in df.columns if c in keep_cols]]
@@ -1163,6 +1169,22 @@ for _, row in df.iterrows():
     except Exception:
         pass
 
+    # OPTIONAL PLAYER PA DISPLAY
+    pa_val = row.get("PA", np.nan)
+    player_pa_display = (
+        f'<div class="player-pa">{int(pa_val)} PA</div>'
+        if st.session_state.get("hl_show_player_pa", False) and pd.notna(pa_val)
+        else ""
+    )
+
+    # OPTIONAL PLAYER INNINGS DISPLAY
+    innings_val = row.get("TotalInn", np.nan)
+    player_innings_display = (
+        f'<div class="player-innings">{int(innings_val)} Inn.</div>'
+        if st.session_state.get("hl_show_innings", False) and pd.notna(innings_val) and innings_val > 0
+        else ""
+    )
+
     src = get_headshot_url_from_row(src_row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
     card_html = f'''
@@ -1171,6 +1193,8 @@ for _, row in df.iterrows():
       <div class="player-name">{name}</div>
       <div class="player-team">{team}</div>
       <div class="player-stat">{display_val}</div>
+      {player_pa_display}
+      {player_innings_display}
     </div>
     '''
     cards.append(card_html)
@@ -1267,6 +1291,14 @@ full_html = f"""
     font-weight: 900;
     font-size: 1.15rem;
     margin-top: 0.25rem;
+}}
+.player-pa {{
+    color: #666;
+    font-size: 1rem;
+}}
+.player-innings {{
+    color: #666;
+    font-size: 1rem;
 }}
 html, body {{
     margin: 0px;
