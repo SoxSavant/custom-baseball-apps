@@ -38,7 +38,6 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         fielding = fielding[["IDfg", "Pos"]].rename(columns={"Pos": "DefPos"})
         fielding = fielding.join(total_inn, on="IDfg")
 
-        # DH detection using total innings across all positions
         if batting_df is not None and "PA" in batting_df.columns:
             pa_per_player = (
                 batting_df[batting_df["Team"] == "TOT"].set_index("IDfg")["PA"].combine_first(
@@ -79,7 +78,6 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         if df.empty:
             return pd.DataFrame()
 
-        # TeamDisplay mapping
         if "Team" in df.columns:
             df["IDfg"] = pd.to_numeric(df["IDfg"], errors="coerce")
             df["TeamDisplay"] = df["IDfg"].map(build_team_display_map(df, start_year))
@@ -88,11 +86,9 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         if not fielding.empty:
             df = df.merge(fielding, on="IDfg", how="left")
 
-        # Map H -> Hits for consistency with multi-year path
         if "H" in df.columns and "Hits" not in df.columns:
             df["Hits"] = df["H"]
 
-        # Compute XBH and TB for single year
         for col in ["H", "2B", "3B", "HR"]:
             if col not in df.columns:
                 df[col] = np.nan
@@ -114,7 +110,7 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         return df
 
     # ----------------------------
-    #  MULTI YEAR
+    #  MULTI YEAR (aggregated)
     # ----------------------------
     frames = []
     num_years = end_year - start_year + 1
@@ -129,7 +125,6 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         if not fielding.empty:
             yr_data = yr_data.merge(fielding, on="IDfg", how="left")
 
-        # Keep individual team rows; for players who only have TOT, keep TOT as fallback
         tot_ids = set(yr_data.loc[yr_data["Team"] == "TOT", "IDfg"])
         has_individual = set(yr_data.loc[yr_data["Team"] != "TOT", "IDfg"])
         tot_only_ids = tot_ids - has_individual
@@ -154,7 +149,6 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
     combined = pd.concat(frames, ignore_index=True)
     combined = optimize_dtypes(combined)
 
-    # Aggregate per player
     grouped_rows = []
     combined = combined[combined["IDfg"].notna()]
     for player_id, grp in combined.groupby("IDfg"):
@@ -170,6 +164,124 @@ def load_filtered_data(start_year, end_year, min_pa=0, position="all"):
         result = result[pd.to_numeric(result.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
 
     return result
+
+
+# ----------------------------
+#  SPLIT SEASON DATA LOADING
+# ----------------------------
+
+@st.cache_data(ttl=3600, max_entries=3)
+def load_split_season_data(start_year, end_year, min_pa=0, position="all"):
+    """
+    Returns one row per player-season (not aggregated across years).
+    Used when 'Split seasons' is active so the leaderboard shows the
+    best individual season within the span.
+    """
+
+    def get_primary_fielding_year(year, batting_df=None):
+        fielding = pybaseball.fielding_stats(year, year, qual=0)
+        if fielding is None or fielding.empty:
+            return pd.DataFrame()
+        if "Inn" in fielding.columns:
+            total_inn = fielding.groupby("IDfg")["Inn"].sum().rename("TotalInn")
+            fielding = fielding.sort_values("Inn", ascending=False)
+        else:
+            total_inn = pd.Series(dtype=float)
+        fielding = fielding.drop_duplicates(subset=["IDfg"], keep="first")
+        fielding = fielding[["IDfg", "Pos"]].rename(columns={"Pos": "DefPos"})
+        fielding = fielding.join(total_inn, on="IDfg")
+        if batting_df is not None and "PA" in batting_df.columns:
+            pa_per_player = (
+                batting_df[batting_df["Team"] == "TOT"].set_index("IDfg")["PA"].combine_first(
+                    batting_df.drop_duplicates("IDfg").set_index("IDfg")["PA"]
+                )
+            )
+            for fg_id, pa in pa_per_player.items():
+                estimated_total_inn = (float(pa) / 4.1) * 9
+                field_inn = fielding.loc[fielding["IDfg"] == fg_id, "TotalInn"].values
+                field_inn = float(field_inn[0]) if len(field_inn) > 0 else 0
+                if field_inn == 0 or (estimated_total_inn / field_inn) > 3:
+                    if fg_id in fielding["IDfg"].values:
+                        fielding.loc[fielding["IDfg"] == fg_id, "DefPos"] = "DH"
+                    else:
+                        fielding = pd.concat(
+                            [fielding, pd.DataFrame([{"IDfg": fg_id, "DefPos": "DH", "TotalInn": 0}])],
+                            ignore_index=True,
+                        )
+        return fielding[["IDfg", "DefPos", "TotalInn"]] if "TotalInn" in fielding.columns else fielding[["IDfg", "DefPos"]]
+
+    frames = []
+    for year in range(start_year, end_year + 1):
+        yr_data = batting_stats(year, year, qual=min_pa, split_seasons=False)
+        if yr_data is None or yr_data.empty:
+            continue
+
+        fielding = get_primary_fielding_year(year, batting_df=yr_data)
+        if not fielding.empty:
+            yr_data = yr_data.merge(fielding, on="IDfg", how="left")
+
+        # Resolve TOT rows: prefer individual team rows
+        tot_ids = set(yr_data.loc[yr_data["Team"] == "TOT", "IDfg"])
+        has_individual = set(yr_data.loc[yr_data["Team"] != "TOT", "IDfg"])
+        tot_only_ids = tot_ids - has_individual
+        non_tot = yr_data[yr_data["Team"] != "TOT"]
+        tot_fallback = yr_data[(yr_data["Team"] == "TOT") & (yr_data["IDfg"].isin(tot_only_ids))]
+        yr_data = pd.concat([non_tot, tot_fallback], ignore_index=True)
+        yr_data = yr_data[yr_data["Team"].notna()]
+
+        # Collapse multi-team players to one row per player for this season
+        yr_data["IDfg"] = pd.to_numeric(yr_data["IDfg"], errors="coerce")
+        collapsed = []
+        for fg_id, grp in yr_data.groupby("IDfg"):
+            # Build team display
+            raw_teams = grp["Team"].dropna().astype(str).str.strip().str.upper().tolist()
+            teams = [normalize_team_code(t, year) for t in raw_teams if t not in {"TOT", "---", "--", "-", ""}]
+            teams = sorted(set(t for t in teams if t))
+            team_display = compute_team_display(teams) if teams else "2+ Teams"
+
+            # Use TOT row if available for stat aggregation, else sum
+            tot_row = grp[grp["Team"] == "TOT"]
+            if not tot_row.empty:
+                base = tot_row.iloc[0].to_dict()
+            else:
+                base = grp.iloc[0].to_dict()
+
+            base["TeamDisplay"] = team_display
+            base["Season"] = year
+            collapsed.append(base)
+
+        yr_data = pd.DataFrame(collapsed)
+
+        # Position filter
+        if position != "all" and "DefPos" in yr_data.columns:
+            pos_values = POSITION_FILTER_MAP.get(position, [])
+            yr_data["DefPos"] = yr_data["DefPos"].astype(str).str.upper()
+            yr_data = yr_data[yr_data["DefPos"].isin([p.upper() for p in pos_values])]
+
+        # Derived stats
+        if "H" in yr_data.columns and "Hits" not in yr_data.columns:
+            yr_data["Hits"] = yr_data["H"]
+        for col in ["H", "2B", "3B", "HR"]:
+            if col not in yr_data.columns:
+                yr_data[col] = np.nan
+        _2b = pd.to_numeric(yr_data["2B"], errors="coerce")
+        _3b = pd.to_numeric(yr_data["3B"], errors="coerce")
+        _hr = pd.to_numeric(yr_data["HR"], errors="coerce")
+        _h  = pd.to_numeric(yr_data["H"],  errors="coerce")
+        yr_data["XBH"] = _2b.fillna(0) + _3b.fillna(0) + _hr.fillna(0)
+        _1b = _h - _2b - _3b - _hr
+        yr_data["TB"] = (_1b.fillna(0) + 2*_2b.fillna(0) + 3*_3b.fillna(0) + 4*_hr.fillna(0)).where(
+            _h.notna() & _2b.notna() & _3b.notna() & _hr.notna(), other=np.nan
+        )
+
+        if not yr_data.empty:
+            frames.append(yr_data)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+    return optimize_dtypes(combined)
 
 
 def optimize_dtypes(df):
@@ -825,13 +937,11 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None) -> dict:
         else:
             tb = np.nan
 
-    # XBH = 2B + 3B + HR
     if pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
         result["XBH"] = doubles + triples + hr
     else:
         result["XBH"] = np.nan
 
-    # Map H -> Hits for display (keep H internally for rate stat calculations)
     if pd.notna(h):
         result["Hits"] = h
 
@@ -988,7 +1098,6 @@ label_map = {
     "Hits": "Hits",
 }
 
-# Stats where a LOWER value is better (so default sort = ascending to show leaders)
 lower_better = {"K%", "O-Swing%", "Contact%", "SO", "GB%"}
 
 POSITION_OPTIONS = {
@@ -1019,28 +1128,35 @@ with meta_col:
     )
 
 current_year = date.today().year
-if "hl_start_year" not in st.session_state:
-    st.session_state["hl_start_year"] = 2025
-if "hl_end_year" not in st.session_state:
-    st.session_state["hl_end_year"] = 2025
-if "hl_stat" not in st.session_state:
-    st.session_state["hl_stat"] = "WAR"
-if "hl_min_pa" not in st.session_state:
-    st.session_state["hl_min_pa"] = 502
-if "hl_position" not in st.session_state:
-    st.session_state["hl_position"] = "all"
-if "hl_span" not in st.session_state:
-    st.session_state["hl_span"] = False
-if "hl_show_player_pa" not in st.session_state:
-    st.session_state["hl_show_player_pa"] = False
-if "hl_show_innings" not in st.session_state:
-    st.session_state["hl_show_innings"] = False
+
+# Session state defaults
+for key, default in [
+    ("hl_start_year", 2025),
+    ("hl_end_year", 2025),
+    ("hl_stat", "WAR"),
+    ("hl_min_pa", 502),
+    ("hl_position", "all"),
+    ("hl_span", False),
+    ("hl_split_seasons", False),
+    ("hl_show_player_pa", False),
+    ("hl_show_innings", False),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 
 def on_year_change():
     s = st.session_state
     if not s.get("hl_span", False):
         s["hl_end_year"] = s["hl_start_year"]
+
+
+def on_span_change():
+    s = st.session_state
+    if not s.get("hl_span", False):
+        s["hl_end_year"] = s["hl_start_year"]
+        # Auto-disable split seasons when span is turned off
+        s["hl_split_seasons"] = False
 
 
 st.markdown(
@@ -1065,8 +1181,19 @@ stat = st.selectbox(
 col1, col2 = st.columns([.5, 2])
 
 with col1:
-    st.checkbox("Multi-year span", key="hl_span", on_change=on_year_change)
-    start_label = "Start Year" if st.session_state.get("hl_span", False) else "Year"
+    st.checkbox("Multi-year span", key="hl_span", on_change=on_span_change)
+
+    is_span = st.session_state.get("hl_span", False)
+
+    # "Split seasons" only appears when multi-year span is enabled
+    if is_span:
+        st.checkbox(
+            "Split seasons",
+            key="hl_split_seasons",
+            help="Show each player's best individual season within the range rather than their combined stats",
+        )
+
+    start_label = "Start Year" if is_span else "Year"
     start_year = st.number_input(
         start_label,
         min_value=1900,
@@ -1074,7 +1201,7 @@ with col1:
         key="hl_start_year",
         on_change=on_year_change,
     )
-    if st.session_state.get("hl_span", False):
+    if is_span:
         end_year = st.number_input(
             "End Year",
             min_value=2025,
@@ -1106,14 +1233,27 @@ with col1:
 
 min_pa_val = int(st.session_state.get("hl_min_pa", 0))
 position_val = st.session_state.get("hl_position", "all")
-df = load_filtered_data(start_year, end_year, min_pa_val, position_val)
+
+# Split seasons is only active when multi-year span is also on
+split_seasons_active = (
+    st.session_state.get("hl_split_seasons", False)
+    and st.session_state.get("hl_span", False)
+)
+
+# ----------------------------
+#  Load data
+# ----------------------------
+if split_seasons_active:
+    df = load_split_season_data(start_year, end_year, min_pa_val, position_val)
+else:
+    df = load_filtered_data(start_year, end_year, min_pa_val, position_val)
 
 # Slim df to only columns we actually use
 if not df.empty:
     keep_cols = set(STAT_ALLOWLIST) | {
-        "Name", "Team", "TeamDisplay", "IDfg", "Age",
+        "Name", "Team", "TeamDisplay", "IDfg", "Age", "Season",
         "mlbam", "MLBID", "key_mlbam", "mlbam_id", "DefPos", "TotalInn",
-        "H", "TB",  # keep raw H and TB for internal use
+        "H", "TB",
     }
     df = df[[c for c in df.columns if c in keep_cols]]
 
@@ -1127,17 +1267,15 @@ if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
             if col in df.columns:
                 df[col] = df[col].fillna(0)
 
-# Determine sort direction based on whether stat is lower-is-better
-stat_col_to_sort = stat
-if stat_col_to_sort in df.columns:
+# ----------------------------
+#  Sort & take top 10
+# ----------------------------
+if stat in df.columns:
     stat_is_lower_better = stat in lower_better
     sort_worst = st.session_state.get("hl_sort_worst", False)
-    # lower-is-better + not showing worst  → ascending (lowest = best)
-    # lower-is-better + showing worst      → descending (highest = worst)
-    # higher-is-better + not showing worst → descending (highest = best)
-    # higher-is-better + showing worst     → ascending (lowest = worst)
     ascending = (stat_is_lower_better and not sort_worst) or (not stat_is_lower_better and sort_worst)
-    df = df.sort_values(by=stat_col_to_sort, ascending=ascending)
+
+    df = df.sort_values(by=stat, ascending=ascending)
     df = df.head(10)
 else:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
@@ -1146,6 +1284,9 @@ else:
 if not df.empty and "TeamDisplay" not in df.columns:
     df["TeamDisplay"] = "2+ Teams"
 
+# ----------------------------
+#  Build cards
+# ----------------------------
 cards = []
 for _, row in df.iterrows():
     name = row.get("Name", "")
@@ -1153,6 +1294,11 @@ for _, row in df.iterrows():
     raw_val = row.get(stat, np.nan)
     transformed = transform_stat_value(stat, raw_val)
     display_val = format_stat(stat, transformed)
+
+    # In split-season mode, append the season year under the team
+    if split_seasons_active and "Season" in row.index and pd.notna(row.get("Season")):
+        season_yr = int(row["Season"])
+        team = f"{team} ({season_yr})"
 
     src_row = row
     try:
@@ -1169,7 +1315,6 @@ for _, row in df.iterrows():
     except Exception:
         pass
 
-    # OPTIONAL PLAYER PA DISPLAY
     pa_val = row.get("PA", np.nan)
     player_pa_display = (
         f'<div class="player-pa">{int(pa_val)} PA</div>'
@@ -1177,7 +1322,6 @@ for _, row in df.iterrows():
         else ""
     )
 
-    # OPTIONAL PLAYER INNINGS DISPLAY
     innings_val = row.get("TotalInn", np.nan)
     player_innings_display = (
         f'<div class="player-innings">{int(innings_val)} Inn.</div>'
@@ -1199,13 +1343,20 @@ for _, row in df.iterrows():
     '''
     cards.append(card_html)
 
+# ----------------------------
+#  Title
+# ----------------------------
 span_label = f"{int(start_year)}" if start_year == end_year else f"{int(start_year)}\u2013{int(end_year)}"
 title_label = label_map.get(stat, stat)
-
 pos_display = POSITION_OPTIONS.get(position_val, "")
 pos_suffix = f" ({pos_display})" if position_val != "all" else ""
 
-title = f"{span_label} {title_label} Leaders{pos_suffix}"
+split_label = ""
+if split_seasons_active:
+    split_label += " Single Season "
+
+title = f"{span_label} {split_label} {title_label} Leaders{pos_suffix}"
+
 if st.session_state.get("hl_sort_worst", False):
     title += " (Worst)"
 if st.session_state.get("hl_show_min_pa", False):
