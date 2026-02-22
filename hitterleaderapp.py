@@ -233,13 +233,11 @@ def load_split_season_data(start_year, end_year, min_pa=0, position="all"):
         yr_data["IDfg"] = pd.to_numeric(yr_data["IDfg"], errors="coerce")
         collapsed = []
         for fg_id, grp in yr_data.groupby("IDfg"):
-            # Build team display
             raw_teams = grp["Team"].dropna().astype(str).str.strip().str.upper().tolist()
             teams = [normalize_team_code(t, year) for t in raw_teams if t not in {"TOT", "---", "--", "-", ""}]
             teams = sorted(set(t for t in teams if t))
             team_display = compute_team_display(teams) if teams else "2+ Teams"
 
-            # Use TOT row if available for stat aggregation, else sum
             tot_row = grp[grp["Team"] == "TOT"]
             if not tot_row.empty:
                 base = tot_row.iloc[0].to_dict()
@@ -1078,7 +1076,7 @@ def transform_stat_value(stat: str, raw_val):
 
 
 # ----------------------------
-#  UI
+#  UI Constants
 # ----------------------------
 
 STAT_ALLOWLIST = [
@@ -1115,6 +1113,26 @@ POSITION_OPTIONS = {
     "DH": "DH",
 }
 
+TEAM_OPTIONS = {
+    "all": "All Teams",
+    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
+    "CHC": "CHC", "CIN": "CIN", "CLE": "CLE", "COL": "COL",
+    "CHW": "CHW", "DET": "DET", "HOU": "HOU", "KCR": "KCR",
+    "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL",
+    "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "ATH": "ATH",
+    "PHI": "PHI", "PIT": "PIT", "SDP": "SDP", "SEA": "SEA",
+    "SFG": "SFG", "STL": "STL", "TBR": "TBR", "TEX": "TEX",
+    "TOR": "TOR", "WSN": "WSN",
+}
+
+# Mode constants
+MODE_SINGLE   = "Single Season"
+MODE_SPLIT    = "Split Seasons"
+MODE_MULTI    = "Multi-Year Span"
+
+# ----------------------------
+#  Page header
+# ----------------------------
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Hitter Leaderboard")
@@ -1130,35 +1148,25 @@ with meta_col:
 
 current_year = date.today().year
 
-# Session state defaults
+# ----------------------------
+#  Session state defaults
+# ----------------------------
 for key, default in [
-    ("hl_start_year", 2025),
+    ("hl_year", 2025),
+    ("hl_start_year", 2024),
     ("hl_end_year", 2025),
     ("hl_stat", "WAR"),
     ("hl_min_pa", 502),
     ("hl_position", "all"),
-    ("hl_span", False),
-    ("hl_split_seasons", False),
+    ("hl_team", "all"),
+    ("hl_mode", MODE_SINGLE),
     ("hl_show_player_pa", False),
     ("hl_show_innings", False),
+    ("hl_sort_worst", False),
+    ("hl_show_min_pa", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-
-def on_year_change():
-    s = st.session_state
-    if not s.get("hl_span", False):
-        s["hl_end_year"] = s["hl_start_year"]
-
-
-def on_span_change():
-    s = st.session_state
-    if not s.get("hl_span", False):
-        s["hl_end_year"] = s["hl_start_year"]
-        # Auto-disable split seasons when span is turned off
-        s["hl_split_seasons"] = False
-
 
 st.markdown(
     """
@@ -1172,6 +1180,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ----------------------------
+#  Controls
+# ----------------------------
 stat = st.selectbox(
     "Stat",
     STAT_ALLOWLIST,
@@ -1182,72 +1193,102 @@ stat = st.selectbox(
 col1, col2 = st.columns([.5, 2])
 
 with col1:
-    st.checkbox("Multi-year span", key="hl_span", on_change=on_span_change)
-
-    is_span = st.session_state.get("hl_span", False)
-
-    # "Split seasons" only appears when multi-year span is enabled
-    if is_span:
-        st.checkbox(
-            "Split seasons",
-            key="hl_split_seasons",
-            help="Show each player's best individual season within the range rather than their combined stats",
-        )
-
-    start_label = "Start Year" if is_span else "Year"
-    start_year = st.number_input(
-        start_label,
-        min_value=1900,
-        max_value=current_year,
-        key="hl_start_year",
-        on_change=on_year_change,
+    # Mode radio — single select, 3 options
+    mode = st.radio(
+        "Mode",
+        options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI],
+        key="hl_mode",
     )
-    if is_span:
-        end_year = st.number_input(
+
+    # Year inputs depend on mode
+    if mode == MODE_SINGLE:
+        st.number_input(
+            "Year",
+            min_value=1900,
+            max_value=current_year,
+            key="hl_year",
+        )
+        start_year = st.session_state["hl_year"]
+        end_year   = st.session_state["hl_year"]
+
+    else:  # Split Seasons or Multi-Year Span — both need a range
+        st.number_input(
+            "Start Year",
+            min_value=1900,
+            max_value=current_year,
+            value=st.session_state.get("hl_start_year", 2024),
+            key="hl_start_year",
+        )
+        st.number_input(
             "End Year",
             min_value=1900,
             max_value=current_year,
+             value=st.session_state.get("hl_end_year", 2025),
             key="hl_end_year",
-            on_change=on_year_change,
         )
-    else:
-        end_year = st.session_state["hl_start_year"]
+        start_year = st.session_state["hl_start_year"]
+        end_year   = st.session_state["hl_end_year"]
+        # Guard: end year must be >= start year
+        if end_year < start_year:
+            end_year = start_year
 
-    min_pa = st.number_input(
+    st.number_input(
         "Min PA",
         min_value=0,
         max_value=20000,
         key="hl_min_pa",
     )
 
-    position_filter = st.selectbox(
+    st.selectbox(
         "Position",
         options=list(POSITION_OPTIONS.keys()),
         format_func=lambda x: POSITION_OPTIONS[x],
         key="hl_position",
     )
 
-    st.checkbox("Show worst", key="hl_sort_worst")
-    st.checkbox("Show min PA", key="hl_show_min_pa")
-    st.checkbox("Show player PA", key="hl_show_player_pa")
+    # Team selector: disabled (greyed out) in Multi-Year Span mode
+    team_disabled = (mode == MODE_MULTI)
+    st.selectbox(
+        "Team",
+        options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x],
+        key="hl_team",
+        disabled=team_disabled,
+        help="Team filter is not available for multi-year span mode, I had difficulty aggregating players who played for multiple teams or were traded midseason" if team_disabled else None,
+    )
+
+    st.checkbox("Show worst",       key="hl_sort_worst")
+    st.checkbox("Show min PA",      key="hl_show_min_pa")
+    st.checkbox("Show player PA",   key="hl_show_player_pa")
     st.checkbox("Show player innings", key="hl_show_innings")
 
-min_pa_val = int(st.session_state.get("hl_min_pa", 0))
-position_val = st.session_state.get("hl_position", "all")
+# Resolved values
+min_pa_val    = int(st.session_state.get("hl_min_pa", 0))
+position_val  = st.session_state.get("hl_position", "all")
+# If team selector was disabled, treat as "all"
+team_val      = "all" if team_disabled else st.session_state.get("hl_team", "all")
 
-# Split seasons is only active when multi-year span is also on
-split_seasons_active = (
-    st.session_state.get("hl_split_seasons", False)
-    and st.session_state.get("hl_span", False)
-)
+split_seasons_active = (mode == MODE_SPLIT)
+multi_span_active    = (mode == MODE_MULTI)
 
 # ----------------------------
 #  Load data
 # ----------------------------
 if split_seasons_active:
     df = load_split_season_data(start_year, end_year, min_pa_val, position_val)
+    if team_val != "all" and not df.empty and "Team" in df.columns:
+        df = df[df["Team"].apply(
+            lambda v: normalize_team_code(str(v).upper().strip(), start_year) == team_val
+            if pd.notna(v) else False
+        )]
 else:
+    # Single season OR multi-year span (no team filter for multi)
     df = load_filtered_data(start_year, end_year, min_pa_val, position_val)
+    if team_val != "all" and not df.empty and "Team" in df.columns:
+        df = df[df["Team"].apply(
+            lambda v: normalize_team_code(str(v).upper().strip(), start_year) == team_val
+            if pd.notna(v) else False
+        )]
 
 # Slim df to only columns we actually use
 if not df.empty:
@@ -1271,14 +1312,13 @@ if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
 # ----------------------------
 #  Sort & take top 10
 # ----------------------------
-if stat in df.columns:
+if not df.empty and stat in df.columns:
     stat_is_lower_better = stat in lower_better
     sort_worst = st.session_state.get("hl_sort_worst", False)
     ascending = (stat_is_lower_better and not sort_worst) or (not stat_is_lower_better and sort_worst)
-
     df = df.sort_values(by=stat, ascending=ascending)
     df = df.head(10)
-else:
+elif not df.empty:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
 
@@ -1290,11 +1330,11 @@ if not df.empty and "TeamDisplay" not in df.columns:
 # ----------------------------
 cards = []
 for _, row in df.iterrows():
-    name = row.get("Name", "")
-    team = row.get("TeamDisplay", "")
-    raw_val = row.get(stat, np.nan)
-    transformed = transform_stat_value(stat, raw_val)
-    display_val = format_stat(stat, transformed)
+    name     = row.get("Name", "")
+    team     = row.get("TeamDisplay", "")
+    raw_val  = row.get(stat, np.nan)
+    transformed  = transform_stat_value(stat, raw_val)
+    display_val  = format_stat(stat, transformed)
 
     # In split-season mode, append the season year under the team
     if split_seasons_active and "Season" in row.index and pd.notna(row.get("Season")):
@@ -1331,7 +1371,7 @@ for _, row in df.iterrows():
     )
 
     src = get_headshot_url_from_row(src_row)
-    img_html = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
+    img_html  = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
     card_html = f'''
     <div class="player-card">
       {img_html}
@@ -1347,16 +1387,27 @@ for _, row in df.iterrows():
 # ----------------------------
 #  Title
 # ----------------------------
-span_label = f"{int(start_year)}" if start_year == end_year else f"{int(start_year)}\u2013{int(end_year)}"
+if mode == MODE_SINGLE:
+    span_label = f"{int(start_year)}"
+else:
+    span_label = f"{int(start_year)}\u2013{int(end_year)}"
+
 title_label = label_map.get(stat, stat)
 pos_display = POSITION_OPTIONS.get(position_val, "")
-pos_suffix = f" ({pos_display})" if position_val != "all" else ""
+pos_suffix  = f" ({pos_display})" if position_val != "all" else ""
 
-split_label = ""
-if split_seasons_active:
-    split_label += " Single Season "
+team_label = ""
+if team_val != "all":
+    team_label = TEAM_OPTIONS.get(team_val, "")
 
-title = f"{span_label} {split_label} {title_label} Leaders{pos_suffix}"
+mode_label = ""
+if mode == MODE_SPLIT:
+    mode_label = " Single Season"
+
+title = f"{span_label}{mode_label} {team_label} {title_label} Leaders{pos_suffix}".strip()
+# Clean up any double spaces
+import re as _re
+title = _re.sub(r"  +", " ", title)
 
 if st.session_state.get("hl_sort_worst", False):
     title += " (Worst)"
@@ -1370,7 +1421,7 @@ if st.session_state.get("hl_show_min_pa", False):
 FIELDING_STATS = {"FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"}
 footer_middle = ""
 if position_val != "all" and stat in FIELDING_STATS:
-    pos_label = POSITION_OPTIONS.get(position_val, position_val)
+    pos_label  = POSITION_OPTIONS.get(position_val, position_val)
     stat_label = label_map.get(stat, stat)
     footer_middle = f'<p>Total {stat_label} among primary {pos_label}</p>'
 
@@ -1489,6 +1540,9 @@ html, body {{
 with col2:
     components.html(full_html, height=800)
 
+# ----------------------------
+#  MLBAM overrides
+# ----------------------------
 if not df.empty:
     st.markdown("---")
     st.write("Manual MLBAM overrides (enter MLBAM id to fix headshot)")
