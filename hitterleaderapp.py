@@ -403,6 +403,7 @@ def load_savant_frv_year(year: int) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     df = df.rename(columns={"name": "NameRaw", "total_runs": "FRV", "arm_runs": "ARM", "range_runs": "RANGE"})
+    
     df["Name"] = df["NameRaw"].astype(str).str.strip()
     df["NameKey"] = df["Name"].apply(normalize_statcast_name)
     for metric in ["FRV", "ARM", "RANGE"]:
@@ -1261,7 +1262,9 @@ with col1:
     st.checkbox("Show min PA",      key="hl_show_min_pa")
     st.checkbox("Show player PA",   key="hl_show_player_pa")
     st.checkbox("Show player innings", key="hl_show_innings")
-
+if stat == "FRV":
+    if start_year < 2018:
+        st.warning("⚠️ FRV may be understated for catchers before 2018 due to missing framing data from Baseball Savant.")
 # Resolved values
 min_pa_val    = int(st.session_state.get("hl_min_pa", 0))
 position_val  = st.session_state.get("hl_position", "all")
@@ -1301,13 +1304,27 @@ if not df.empty:
 
 if not df.empty and stat in ["FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"]:
     player_names = df["Name"].tolist()
-    fielding_data = load_fielding_for_players(player_names, start_year, end_year)
-    if not fielding_data.empty:
+    if split_seasons_active and "Season" in df.columns:
+        # Merge fielding per year so split season rows get the correct single-year value
         df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-        df = df.merge(fielding_data, on="NameKey", how="left", suffixes=("", "_fielding"))
-        for col in ["FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "UZR", "FRM"]:
-            if col in df.columns:
-                df[col] = df[col].fillna(0)
+        fielding_frames = []
+        for yr in df["Season"].dropna().unique():
+            yr = int(yr)
+            yr_fielding = load_fielding_for_players(player_names, yr, yr)
+            if not yr_fielding.empty:
+                yr_fielding["Season"] = yr
+                fielding_frames.append(yr_fielding)
+        if fielding_frames:
+            all_fielding = pd.concat(fielding_frames, ignore_index=True)
+            df = df.merge(all_fielding, on=["NameKey", "Season"], how="left", suffixes=("", "_fielding"))
+    else:
+        fielding_data = load_fielding_for_players(player_names, start_year, end_year)
+        if not fielding_data.empty:
+            df["NameKey"] = df["Name"].apply(normalize_statcast_name)
+            df = df.merge(fielding_data, on="NameKey", how="left", suffixes=("", "_fielding"))
+    for col in ["FRV", "OAA", "ARM", "RANGE", "DRS", "TZ", "UZR", "FRM"]:
+        if col in df.columns:
+            df[col] = df[col].fillna(0)
 
 # ----------------------------
 #  Sort & take top 10
