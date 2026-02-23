@@ -15,10 +15,6 @@ import pybaseball
 
 st.set_page_config(layout="wide")
 
-# ----------------------------
-#  HELPERS / CONSTANTS
-# ----------------------------
-
 POSITION_FILTER_MAP = {
     "all": None,
     "C":   ["C"],
@@ -70,7 +66,6 @@ label_map = {
     "Hits":     "Hits",
 }
 
-# Stats where lower is better (so a decrease = improvement)
 lower_better = {"K%", "O-Swing%", "Contact%", "SO", "GB%"}
 
 HEADSHOT_BASES = [
@@ -96,10 +91,6 @@ HEADSHOT_BREF_BASES = [
 
 FIELDING_STATS = {"FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"}
 
-
-# ----------------------------
-#  UTILITY FUNCTIONS
-# ----------------------------
 
 def normalize_statcast_name(name: str) -> str:
     if not name or not isinstance(name, str):
@@ -232,10 +223,6 @@ def transform_stat_value(stat: str, raw_val):
     return raw_val
 
 
-# ----------------------------
-#  DATA LOADING
-# ----------------------------
-
 @st.cache_data(ttl=600, max_entries=10)
 def batting_stats_cached(year: int, qual=0):
     try:
@@ -295,14 +282,12 @@ def get_primary_fielding(year: int, batting_df=None) -> pd.DataFrame:
 
 
 def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.DataFrame:
-    """Load and process a single year of batting stats."""
     df = batting_stats_cached(year, qual=min_pa)
     if df is None or df.empty:
         return pd.DataFrame()
 
     df["IDfg"] = pd.to_numeric(df["IDfg"], errors="coerce")
 
-    # Resolve TOT rows
     tot_ids = set(df.loc[df["Team"] == "TOT", "IDfg"])
     has_individual = set(df.loc[df["Team"] != "TOT", "IDfg"])
     tot_only_ids = tot_ids - has_individual
@@ -311,7 +296,6 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
     df = pd.concat([non_tot, tot_fallback], ignore_index=True)
     df = df[df["Team"].notna()]
 
-    # Collapse multi-team players to one row per player
     fielding = get_primary_fielding(year, batting_df=df)
     if not fielding.empty:
         df = df.merge(fielding, on="IDfg", how="left")
@@ -322,11 +306,9 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
         teams = [normalize_team_code(t, year) for t in raw_teams if t not in {"TOT", "---", "--", "-", ""}]
         teams = sorted(set(t for t in teams if t))
 
-        # Prefer TOT row for stats, otherwise first row
         tot_row = grp[grp["Team"] == "TOT"]
         base = tot_row.iloc[0].to_dict() if not tot_row.empty else grp.iloc[0].to_dict()
 
-        # TeamDisplay
         if len(teams) == 1:
             base["TeamDisplay"] = teams[0]
         elif teams:
@@ -334,10 +316,8 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
         else:
             base["TeamDisplay"] = "---"
 
-        # Store raw teams list for filtering
         base["_teams_list"] = teams
 
-        # DefPos: use most-innings position across all rows
         if "DefPos" in grp.columns:
             base["DefPos"] = grp.dropna(subset=["DefPos"])["DefPos"].iloc[0] if not grp.dropna(subset=["DefPos"]).empty else base.get("DefPos", "")
 
@@ -345,7 +325,6 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
 
     df = pd.DataFrame(collapsed)
 
-    # Derived stats
     if "H" in df.columns and "Hits" not in df.columns:
         df["Hits"] = df["H"]
     for col in ["H", "2B", "3B", "HR"]:
@@ -361,7 +340,6 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
         _h.notna() & _2b.notna() & _3b.notna() & _hr.notna(), other=np.nan
     )
 
-    # Position filter
     if position != "all" and "DefPos" in df.columns:
         pos_values = POSITION_FILTER_MAP.get(position, [])
         df["DefPos"] = df["DefPos"].astype(str).str.upper()
@@ -369,10 +347,6 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
 
     return df
 
-
-# ----------------------------
-#  STATCAST FIELDING
-# ----------------------------
 
 @st.cache_data(show_spinner=False, ttl=600, max_entries=10)
 def load_savant_frv_year(year: int) -> pd.DataFrame:
@@ -477,10 +451,6 @@ def load_fielding_for_year(player_names: list, year: int) -> pd.DataFrame:
         return fg_data
     return pd.DataFrame()
 
-
-# ----------------------------
-#  HEADSHOT HELPERS
-# ----------------------------
 
 @st.cache_data(show_spinner=False)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
@@ -654,35 +624,24 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
     return HEADSHOT_PLACEHOLDER
 
 
-# ----------------------------
-#  CORE RISERS/FALLERS LOGIC
-# ----------------------------
-
 def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
                      position: str = "all", team: str = "all") -> pd.DataFrame:
-    """
-    Load two years of data, find players present in both with >= min_pa each year,
-    compute the delta (end - start) for all stats.
-    """
     df_start = load_single_year(start_year, min_pa=min_pa, position=position)
     df_end   = load_single_year(end_year,   min_pa=min_pa, position=position)
 
     if df_start.empty or df_end.empty:
         return pd.DataFrame()
 
-    # Team filter: player must have played for that team in BOTH years
+    # Team filter: end year only
     if team != "all":
         def played_for_team(teams_list, yr):
             if not teams_list:
                 return False
             return any(normalize_team_code(t, yr) == team for t in teams_list)
 
-        if "_teams_list" in df_start.columns:
-            df_start = df_start[df_start["_teams_list"].apply(lambda t: played_for_team(t, start_year))]
         if "_teams_list" in df_end.columns:
             df_end = df_end[df_end["_teams_list"].apply(lambda t: played_for_team(t, end_year))]
 
-    # Merge on IDfg — only players in both years
     df_start["IDfg"] = pd.to_numeric(df_start["IDfg"], errors="coerce")
     df_end["IDfg"]   = pd.to_numeric(df_end["IDfg"],   errors="coerce")
 
@@ -693,7 +652,6 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
     if df_start.empty or df_end.empty:
         return pd.DataFrame()
 
-    # Numeric columns to diff
     skip_meta = {"Name", "Team", "TeamDisplay", "_teams_list", "DefPos", "TotalInn",
                  "mlbam", "MLBID", "key_mlbam", "mlbam_id", "Season"}
     numeric_cols = [
@@ -717,25 +675,22 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
             "DefPos": row_e.get("DefPos", ""),
             "TotalInn": row_e.get("TotalInn", np.nan),
         }
-        # Carry over MLBAM for headshots
         for hcol in ["mlbam", "MLBID", "key_mlbam", "mlbam_id"]:
             if hcol in row_e.index and pd.notna(row_e.get(hcol)):
                 record[hcol] = row_e[hcol]
             elif hcol in row_s.index and pd.notna(row_s.get(hcol)):
                 record[hcol] = row_s[hcol]
 
-        # Raw end-year values (for display context)
         for col in numeric_cols:
             try:
                 s_val = pd.to_numeric(row_s[col] if col in row_s.index else np.nan, errors="coerce")
                 e_val = pd.to_numeric(row_e[col] if col in row_e.index else np.nan, errors="coerce")
                 record[f"{col}_start"] = s_val
                 record[f"{col}_end"]   = e_val
-                record[col] = e_val - s_val   # delta
+                record[col] = e_val - s_val
             except Exception:
                 record[col] = np.nan
 
-        # PA for display
         record["PA_start"] = pd.to_numeric(row_s.get("PA", np.nan), errors="coerce")
         record["PA_end"]   = pd.to_numeric(row_e.get("PA", np.nan), errors="coerce")
 
@@ -765,9 +720,6 @@ with meta_col:
 
 current_year = date.today().year
 
-# ----------------------------
-#  SESSION STATE DEFAULTS
-# ----------------------------
 for key, default in [
     ("rf_start_year",   2024),
     ("rf_end_year",     2025),
@@ -776,7 +728,7 @@ for key, default in [
     ("rf_position",     "all"),
     ("rf_team",         "all"),
     ("rf_show_fallers", False),
-    ("rf_show_min_pa",  False),
+    ("rf_show_min_pa",  True),
     ("rf_show_player_pa", False),
     ("rf_show_innings", False),
 ]:
@@ -793,9 +745,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------------------
-#  CONTROLS
-# ----------------------------
 stat = st.selectbox(
     "Stat",
     STAT_ALLOWLIST,
@@ -828,7 +777,7 @@ with col1:
         options=list(TEAM_OPTIONS.keys()),
         format_func=lambda x: TEAM_OPTIONS[x],
         key="rf_team",
-        help="Only players on this team in BOTH years are shown",
+        help="Filters by team in the end year only",
     )
 
     st.checkbox("Show Fallers",      key="rf_show_fallers")
@@ -839,22 +788,17 @@ with col1:
 if stat == "FRV" and start_year < 2018:
     st.warning("⚠️ FRV may be understated for catchers before 2018 due to missing framing data from Baseball Savant.")
 
-# Resolved values
 min_pa_val   = int(st.session_state.get("rf_min_pa", 0))
 position_val = st.session_state.get("rf_position", "all")
 team_val     = st.session_state.get("rf_team", "all")
 show_fallers = st.session_state.get("rf_show_fallers", False)
 
-# ----------------------------
-#  LOAD DATA
-# ----------------------------
 if end_year > start_year:
     with st.spinner("Loading data..."):
         df = load_risers_data(start_year, end_year, min_pa_val, position_val, team_val)
 else:
     df = pd.DataFrame()
 
-# Attach fielding stats if needed
 if not df.empty and stat in FIELDING_STATS:
     player_names = df["Name"].tolist()
     f_start = load_fielding_for_year(player_names, start_year)
@@ -879,29 +823,27 @@ if not df.empty and stat in FIELDING_STATS:
         elif e_col in df.columns:
             df[fcol] = df[e_col]
 
-# ----------------------------
-#  SORT & TAKE TOP 10
-# ----------------------------
 if not df.empty and stat in df.columns:
     stat_is_lower_better = stat in lower_better
-    # Risr = improvement = more positive (or more negative for lower_better)
-    # "Fallers" = the opposite
     if stat_is_lower_better:
-        # lower_better: a big negative delta means improvement (riser)
-        # ascending=True gives most-negative (biggest improvement) first
         ascending = not show_fallers
     else:
         ascending = show_fallers
 
     df = df.sort_values(by=stat, ascending=ascending)
+
+    # Only show improvements for risers, only declines for fallers
+    numeric_delta = pd.to_numeric(df[stat], errors="coerce")
+    if stat_is_lower_better:
+        df = df[numeric_delta < 0] if not show_fallers else df[numeric_delta > 0]
+    else:
+        df = df[numeric_delta > 0] if not show_fallers else df[numeric_delta < 0]
+
     df = df.head(10)
 elif not df.empty:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
 
-# ----------------------------
-#  BUILD CARDS
-# ----------------------------
 cards = []
 for _, row in df.iterrows():
     name    = row.get("Name", "")
@@ -913,7 +855,6 @@ for _, row in df.iterrows():
     is_positive = pd.notna(transformed_delta) and float(transformed_delta) > 0
     display_val = format_stat(stat, transformed_delta, show_sign=is_positive)
 
-    # End-year raw value for context subtitle
     end_val_raw = row.get(f"{stat}_end", np.nan)
     transformed_end = transform_stat_value(stat, end_val_raw)
     end_display = format_stat(stat, transformed_end) if pd.notna(end_val_raw) else ""
@@ -956,14 +897,12 @@ for _, row in df.iterrows():
     src = get_headshot_url_from_row(src_row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
 
-    # Color the delta: green for improvement, red for decline
     if stat in lower_better:
         is_improvement = pd.notna(transformed_delta) and float(transformed_delta) < 0
     else:
         is_improvement = is_positive
     delta_class = "stat-positive" if is_improvement else "stat-negative"
 
-    # End-year context
     end_context = f'<div class="player-endval">{stat_label}: {end_display}</div>' if end_display else ""
 
     card_html = f'''
@@ -979,9 +918,6 @@ for _, row in df.iterrows():
     '''
     cards.append(card_html)
 
-# ----------------------------
-#  BUILD TITLE
-# ----------------------------
 title_stat_label = label_map.get(stat, stat)
 pos_suffix   = f" ({POSITION_OPTIONS.get(position_val, '')})" if position_val != "all" else ""
 team_prefix  = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
@@ -991,9 +927,8 @@ title = f"Top {team_prefix}{title_stat_label} {riser_label}{pos_suffix}: {int(st
 
 min_pa_subtitle = ""
 if st.session_state.get("rf_show_min_pa", False):
-    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA per year</div>'
+    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA each year</div>'
 
-# Footer fielding note
 footer_middle = ""
 if position_val != "all" and stat in FIELDING_STATS:
     footer_middle = f'<p>Total {title_stat_label} among primary {POSITION_OPTIONS.get(position_val, position_val)}</p>'
@@ -1023,7 +958,7 @@ full_html = f"""
     background: #ffffff;
     border: 1px solid #d0d0d0;
     border-radius: 12px;
-    padding: 3rem 4rem;
+    padding: 2rem 2rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.06);
     margin: 0 auto;
     width: 100%;
@@ -1045,18 +980,21 @@ full_html = f"""
     margin-top: -0.5rem;
 }}
 .players-grid {{
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    justify-items: center;
-    row-gap: 2.5rem;
-    column-gap: 4rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2.5rem 1rem;
+}}
+.player-card {{
+    flex: 0 0 145px;
+    width: 145px;
 }}
 .player-card {{
     text-align: center;
 }}
 .player-card img {{
-    width: 155px;
-    height: 155px;
+    width: 145px;
+    height: 145px;
     object-fit: cover;
     border-radius: 6px;
     border: 1px solid #e0e0e0;
@@ -1073,7 +1011,7 @@ full_html = f"""
 }}
 .player-stat {{
     font-weight: 900;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     margin-top: 0.25rem;
 }}
 .stat-positive {{
@@ -1084,7 +1022,7 @@ full_html = f"""
 }}
 .player-endval {{
     color: #888;
-    font-size: 0.82rem;
+    font-size: .9rem;
     margin-top: 0.1rem;
 }}
 .player-pa {{
@@ -1106,7 +1044,7 @@ html, body {{
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 1.5rem;
+    margin-top: .5rem;
 }}
 .footer p {{
     margin: 0;
@@ -1128,9 +1066,6 @@ html, body {{
 with col2:
     components.html(full_html, height=850)
 
-# ----------------------------
-#  MLBAM OVERRIDES
-# ----------------------------
 if not df.empty:
     st.markdown("---")
     st.write("Manual MLBAM overrides (enter MLBAM id to fix headshot)")

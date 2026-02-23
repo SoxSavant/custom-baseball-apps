@@ -1509,7 +1509,7 @@ full_html = f"""
 }}
 .player-stat {{
     font-weight: 900;
-    font-size: 1.15rem;
+    font-size: 1.3rem;
     margin-top: 0.25rem;
 }}
 .player-pa {{
@@ -1530,7 +1530,7 @@ html, body {{
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 1rem;
+    margin-top: .5rem;
 }}
 .footer p {{
     margin: 0;
