@@ -752,7 +752,7 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
 # ----------------------------
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Hitter Risers & Fallers")
+    st.title("Year-over-Year Hitter Risers & Fallers")
 with meta_col:
     st.markdown(
         """
