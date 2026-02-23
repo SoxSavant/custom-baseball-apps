@@ -5,8 +5,6 @@ import unicodedata
 import html
 import requests
 import re
-from bs4 import BeautifulSoup
-from pybaseball.statcast_fielding import statcast_outs_above_average
 import io
 from pathlib import Path
 from datetime import date
@@ -15,26 +13,12 @@ import pybaseball
 
 st.set_page_config(layout="wide")
 
-POSITION_FILTER_MAP = {
-    "all": None,
-    "C":   ["C"],
-    "1B":  ["1B"],
-    "2B":  ["2B"],
-    "3B":  ["3B"],
-    "SS":  ["SS"],
-    "LF":  ["LF"],
-    "CF":  ["CF"],
-    "RF":  ["RF"],
-    "OF":  ["LF", "CF", "RF", "OF"],
-    "DH":  ["DH"],
-}
+STATCAST_START_YEAR = 2015
+STATCAST_RATE_STATS = {"Barrel%", "HardHit%", "EV"}
 
-POSITION_OPTIONS = {
-    "all": "All Positions",
-    "C":  "C",  "1B": "1B", "2B": "2B", "3B": "3B",
-    "SS": "SS", "LF": "LF", "CF": "CF", "RF": "RF",
-    "OF": "OF", "DH": "DH",
-}
+# ----------------------------
+#  CONSTANTS
+# ----------------------------
 
 TEAM_OPTIONS = {
     "all": "All Teams",
@@ -49,28 +33,33 @@ TEAM_OPTIONS = {
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "Hits", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Z-Swing%", "Swing%", "Contact%", "WPA", "Clutch",
-    "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%", "LA",
-    "FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM",
+    "WAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB", "K/9", "BB/9",
+    "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "Contact%",
+    "O-Swing%", "GB%", "FB%", "CG", "ShO",
 ]
 
 label_map = {
     "HardHit%": "Hard Hit%",
     "WAR":      "fWAR",
     "EV":       "Avg Exit Velo",
-    "Contact%": "Whiff%",
     "O-Swing%": "Chase%",
-    "Hits":     "Hits",
+    "Contact%": "Whiff%",
 }
 
-lower_better = {"K%", "O-Swing%", "Contact%", "SO", "GB%"}
+# For pitchers, lower is better for these stats
+lower_better = {
+    "HardHit%", "Barrel%", "EV", "ERA", "xERA", "FIP", "xFIP", "BB", "HBP", "HR",
+    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP", "ERA-", "FIP-",
+    "FB%", "SIERA", "Z-Swing%", "Pull%", "LD%", "L"
+}
 
 HEADSHOT_BASES = [
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
+]
+HEADSHOT_BREF_BASES = [
+    "https://content-static.baseball-reference.com/req/202406/images/headshots/{folder}/{bref_id}.jpg",
+    "https://content-static.baseball-reference.com/req/202310/images/headshots/{folder}/{bref_id}.jpg",
 ]
 HEADSHOT_CHECK_TIMEOUT = 1.0
 HEADSHOT_USER_AGENT = "headshot-fetcher/1.0"
@@ -84,13 +73,16 @@ HEADSHOT_PLACEHOLDER = (
     "YycvPgo8L3N2Zz4="
 )
 
-HEADSHOT_BREF_BASES = [
-    "https://content-static.baseball-reference.com/req/202406/images/headshots/{folder}/{bref_id}.jpg",
-    "https://content-static.baseball-reference.com/req/202310/images/headshots/{folder}/{bref_id}.jpg",
-]
+SUM_STATS = {"G", "GS", "W", "L", "SV", "HLD", "BS", "SO", "BB", "HR", "ER", "H", "HBP",
+             "IBB", "WP", "BK", "R", "WAR", "CG", "ShO", "TBF"}
+RATE_STATS = {"FIP", "xFIP", "xERA", "WHIP", "K/9", "BB/9", "HR/9", "K%", "BB%",
+              "K-BB%", "Barrel%", "HardHit%", "EV", "O-Swing%", "GB%", "FB%",
+              "LD%", "HR/FB", "BABIP", "SIERA", "ERA-", "FIP-"}
 
-FIELDING_STATS = {"FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM"}
 
+# ----------------------------
+#  UTILITY FUNCTIONS
+# ----------------------------
 
 def normalize_statcast_name(name: str) -> str:
     if not name or not isinstance(name, str):
@@ -123,13 +115,50 @@ def normalize_team_code(team: str, year: int) -> str | None:
     return team
 
 
+def ip_to_outs(value) -> float:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return np.nan
+    if isinstance(value, str):
+        match = re.search(r"[-+]?[0-9]+(?:\.[0-9]+)?", value)
+        if not match:
+            return np.nan
+        try:
+            v = float(match.group(0))
+        except Exception:
+            return np.nan
+    else:
+        try:
+            v = float(value)
+        except Exception:
+            return np.nan
+    innings = int(np.floor(v))
+    fractional = v - innings
+    if abs(fractional - 0.1) < 0.05:
+        outs_extra = 1
+    elif abs(fractional - 0.2) < 0.05:
+        outs_extra = 2
+    else:
+        outs_extra = int(round(fractional * 3))
+        outs_extra = min(max(outs_extra, 0), 2)
+    return innings * 3 + outs_extra
+
+
+def outs_to_ip(outs: float) -> float:
+    if pd.isna(outs):
+        return np.nan
+    total_outs = float(outs)
+    innings = int(total_outs // 3)
+    remainder = int(round(total_outs % 3))
+    return innings + remainder / 10
+
+
 def optimize_dtypes(df):
     if df.empty:
         return df
     df = df.copy()
     float_cols = df.select_dtypes(include=["float64"]).columns
     for col in float_cols:
-        if col not in ["AVG", "OBP", "SLG", "wOBA", "xwOBA", "xBA", "xSLG"]:
+        if col not in {"ERA", "FIP", "xFIP", "WHIP", "K/9", "BB/9"}:
             df[col] = df[col].astype("float32")
     int_cols = df.select_dtypes(include=["int64"]).columns
     for col in int_cols:
@@ -143,19 +172,13 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FRV", "ARM"}:
-        v = int(round(float(val)))
-        if show_sign and v > 0:
-            return f"+{v}"
-        return f"{v}"
-
     if upper_stat == "AGE":
         if isinstance(val, str):
             return val
         v = float(val)
         return f"{int(round(v))}" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    if upper_stat in {"WAR", "FWAR", "EV"}:
         v = float(val)
         formatted = f"{abs(v):.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(abs(v)))}.0"
         if show_sign and v > 0:
@@ -164,30 +187,41 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
             return f"-{formatted}"
         return formatted
 
-    if upper_stat in {"WPA", "CLUTCH"}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "K/9", "BB/9", "HR/9"}:
         v = float(val)
+        formatted = f"{abs(v):.2f}"
         if show_sign and v > 0:
-            return f"+{v:.2f}"
-        return f"{v:.2f}"
-
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        v = float(val)
-        formatted = f"{abs(v):.3f}".lstrip("0") or "0"
-        if show_sign and v > 0:
-            return f"+.{formatted.lstrip('.')}" if formatted.startswith(".") else f"+{formatted}"
+            return f"+{formatted}"
         elif v < 0:
-            raw = f"{abs(v):.3f}".lstrip("0") or "0"
-            return f"-.{raw.lstrip('.')}" if raw.startswith(".") else f"-{raw}"
+            return f"-{formatted}"
         return formatted
 
-    if upper_stat in {"WRC+", "OPS+"}:
+    if upper_stat == "WHIP":
+        v = float(val)
+        formatted = f"{abs(v):.3f}"
+        if show_sign and v > 0:
+            return f"+{formatted}"
+        elif v < 0:
+            return f"-{formatted}"
+        return formatted
+
+    if upper_stat == "IP":
+        v = float(val)
+        formatted = f"{abs(v):.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(abs(v)))}.0"
+        if show_sign and v > 0:
+            return f"+{formatted}"
+        elif v < 0:
+            return f"-{formatted}"
+        return formatted
+
+    if upper_stat in {"ERA-", "FIP-"}:
         v = int(round(float(val)))
         if show_sign and v > 0:
             return f"+{v}"
         return f"{v}"
 
     if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
+        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
@@ -223,10 +257,14 @@ def transform_stat_value(stat: str, raw_val):
     return raw_val
 
 
+# ----------------------------
+#  DATA LOADING
+# ----------------------------
+
 @st.cache_data(ttl=600, max_entries=10)
-def batting_stats_cached(year: int, qual=0):
+def pitching_stats_cached(year: int, qual=0):
     try:
-        df = pybaseball.batting_stats(year, year, qual=qual, split_seasons=False)
+        df = pybaseball.pitching_stats(year, year, qual=qual, split_seasons=False)
         if df is None or df.empty:
             return pd.DataFrame()
         return df
@@ -234,78 +272,22 @@ def batting_stats_cached(year: int, qual=0):
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=3600, max_entries=10)
-def fielding_stats_cached(year: int):
-    try:
-        df = pybaseball.fielding_stats(year, year, qual=0)
-        if df is None or df.empty:
-            return pd.DataFrame()
-        return df
-    except Exception:
-        return pd.DataFrame()
-
-
-def get_primary_fielding(year: int, batting_df=None) -> pd.DataFrame:
-    fielding = fielding_stats_cached(year)
-    if fielding is None or fielding.empty:
-        return pd.DataFrame()
-    if "Inn" in fielding.columns:
-        total_inn = fielding.groupby("IDfg")["Inn"].sum().rename("TotalInn")
-        fielding = fielding.sort_values("Inn", ascending=False)
-    else:
-        total_inn = pd.Series(dtype=float)
-    fielding = fielding.drop_duplicates(subset=["IDfg"], keep="first")
-    fielding = fielding[["IDfg", "Pos"]].rename(columns={"Pos": "DefPos"})
-    if len(total_inn):
-        fielding = fielding.join(total_inn, on="IDfg")
-
-    if batting_df is not None and "PA" in batting_df.columns:
-        pa_per_player = (
-            batting_df[batting_df["Team"] == "TOT"].set_index("IDfg")["PA"].combine_first(
-                batting_df.drop_duplicates("IDfg").set_index("IDfg")["PA"]
-            )
-        )
-        for fg_id, pa in pa_per_player.items():
-            estimated_total_inn = (float(pa) / 4.1) * 9
-            field_inn = fielding.loc[fielding["IDfg"] == fg_id, "TotalInn"].values if "TotalInn" in fielding.columns else []
-            field_inn = float(field_inn[0]) if len(field_inn) > 0 else 0
-            if field_inn == 0 or (estimated_total_inn / field_inn) > 3:
-                if fg_id in fielding["IDfg"].values:
-                    fielding.loc[fielding["IDfg"] == fg_id, "DefPos"] = "DH"
-                else:
-                    fielding = pd.concat(
-                        [fielding, pd.DataFrame([{"IDfg": fg_id, "DefPos": "DH", "TotalInn": 0}])],
-                        ignore_index=True,
-                    )
-    cols = ["IDfg", "DefPos", "TotalInn"] if "TotalInn" in fielding.columns else ["IDfg", "DefPos"]
-    return fielding[cols]
-
-
-def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.DataFrame:
-    df = batting_stats_cached(year, qual=min_pa)
+def load_single_year(year: int, min_ip: int = 0) -> pd.DataFrame:
+    """Load and process a single year of pitching stats, one row per pitcher."""
+    df = pitching_stats_cached(year, qual=min_ip)
     if df is None or df.empty:
         return pd.DataFrame()
 
     df["IDfg"] = pd.to_numeric(df["IDfg"], errors="coerce")
 
-    tot_ids = set(df.loc[df["Team"] == "TOT", "IDfg"])
-    has_individual = set(df.loc[df["Team"] != "TOT", "IDfg"])
-    tot_only_ids = tot_ids - has_individual
-    non_tot = df[df["Team"] != "TOT"]
-    tot_fallback = df[(df["Team"] == "TOT") & (df["IDfg"].isin(tot_only_ids))]
-    df = pd.concat([non_tot, tot_fallback], ignore_index=True)
-    df = df[df["Team"].notna()]
-
-    fielding = get_primary_fielding(year, batting_df=df)
-    if not fielding.empty:
-        df = df.merge(fielding, on="IDfg", how="left")
-
+    # Collapse multi-team pitchers to one row
     collapsed = []
     for fg_id, grp in df.groupby("IDfg"):
         raw_teams = grp["Team"].dropna().astype(str).str.strip().str.upper().tolist()
         teams = [normalize_team_code(t, year) for t in raw_teams if t not in {"TOT", "---", "--", "-", ""}]
         teams = sorted(set(t for t in teams if t))
 
+        # For stats, prefer TOT row if it exists
         tot_row = grp[grp["Team"] == "TOT"]
         base = tot_row.iloc[0].to_dict() if not tot_row.empty else grp.iloc[0].to_dict()
 
@@ -317,33 +299,9 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
             base["TeamDisplay"] = "---"
 
         base["_teams_list"] = teams
-
-        if "DefPos" in grp.columns:
-            base["DefPos"] = grp.dropna(subset=["DefPos"])["DefPos"].iloc[0] if not grp.dropna(subset=["DefPos"]).empty else base.get("DefPos", "")
-
         collapsed.append(base)
 
     df = pd.DataFrame(collapsed)
-
-    if "H" in df.columns and "Hits" not in df.columns:
-        df["Hits"] = df["H"]
-    for col in ["H", "2B", "3B", "HR"]:
-        if col not in df.columns:
-            df[col] = np.nan
-    _2b = pd.to_numeric(df["2B"], errors="coerce")
-    _3b = pd.to_numeric(df["3B"], errors="coerce")
-    _hr = pd.to_numeric(df["HR"], errors="coerce")
-    _h  = pd.to_numeric(df["H"],  errors="coerce")
-    df["XBH"] = _2b.fillna(0) + _3b.fillna(0) + _hr.fillna(0)
-    _1b = _h - _2b - _3b - _hr
-    df["TB"] = (_1b.fillna(0) + 2 * _2b.fillna(0) + 3 * _3b.fillna(0) + 4 * _hr.fillna(0)).where(
-        _h.notna() & _2b.notna() & _3b.notna() & _hr.notna(), other=np.nan
-    )
-
-    if position != "all" and "DefPos" in df.columns:
-        pos_values = POSITION_FILTER_MAP.get(position, [])
-        df["DefPos"] = df["DefPos"].astype(str).str.upper()
-        df = df[df["DefPos"].isin([p.upper() for p in pos_values])]
 
     # Convert Contact% to Whiff% in place so deltas are computed correctly
     if "Contact%" in df.columns:
@@ -356,109 +314,9 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
     return df
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
-def load_savant_frv_year(year: int) -> pd.DataFrame:
-    url = (
-        "https://baseballsavant.mlb.com/leaderboard/fielding-run-value?"
-        f"gameType=Regular&seasonStart={year}&seasonEnd={year}"
-        "&type=fielder&position=&minInnings=0&minResults=1&csv=true"
-    )
-    try:
-        resp = requests.get(url, timeout=30)
-        resp.raise_for_status()
-        data = io.StringIO(resp.content.decode("utf-8"))
-        df = pd.read_csv(data)
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.rename(columns={"name": "NameRaw", "total_runs": "FRV", "arm_runs": "ARM", "range_runs": "RANGE"})
-    df["Name"] = df["NameRaw"].astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-    for metric in ["FRV", "ARM", "RANGE"]:
-        df[metric] = pd.to_numeric(df.get(metric), errors="coerce")
-    return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
-
-
-@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
-def load_savant_oaa_year(year: int) -> pd.DataFrame:
-    try:
-        df = statcast_outs_above_average(year, "all")
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    name_col = None
-    for col in ["player_name", "last_name, first_name", "name"]:
-        if col in df.columns:
-            name_col = col
-            break
-    if not name_col:
-        return pd.DataFrame()
-    if name_col == "last_name, first_name":
-        df["Name"] = df[name_col].apply(lambda x: (str(x) or "").strip())
-    else:
-        df["Name"] = df[name_col].astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-    oaa_col = next((c for c in ["outs_above_average", "oaa"] if c in df.columns), None)
-    if not oaa_col:
-        return pd.DataFrame()
-    df["OAA"] = pd.to_numeric(df[oaa_col], errors="coerce")
-    return df[["NameKey", "Name", "OAA"]]
-
-
-@st.cache_data(show_spinner=False, ttl=600, max_entries=5)
-def load_fangraphs_fielding(player_names: list, start_year: int, end_year: int) -> pd.DataFrame:
-    if not player_names:
-        return pd.DataFrame()
-    try:
-        df = pybaseball.fielding_stats(start_year, end_year, qual=0, split_seasons=False)
-        if df is None or df.empty:
-            return pd.DataFrame()
-        df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-        target_keys = set([normalize_statcast_name(n) for n in player_names])
-        df = df[df["NameKey"].isin(target_keys)]
-        if df.empty:
-            return pd.DataFrame()
-        result = df.groupby("NameKey", as_index=False).agg({"DRS": "sum", "TZ": "sum", "UZR": "sum", "FRM": "sum"})
-        return result
-    except Exception:
-        return pd.DataFrame()
-
-
-def load_fielding_for_year(player_names: list, year: int) -> pd.DataFrame:
-    if not player_names:
-        return pd.DataFrame()
-    target_keys = set([normalize_statcast_name(n) for n in player_names])
-    frames = []
-    frv = load_savant_frv_year(year)
-    if frv is not None and not frv.empty:
-        frv = frv[frv["NameKey"].isin(target_keys)]
-        if not frv.empty:
-            frames.append(frv)
-    oaa = load_savant_oaa_year(year)
-    if oaa is not None and not oaa.empty:
-        oaa = oaa[oaa["NameKey"].isin(target_keys)]
-        if not oaa.empty:
-            frames.append(oaa)
-
-    savant_data = pd.DataFrame()
-    if frames:
-        combined = pd.concat(frames, ignore_index=True)
-        agg_cols = {c: "sum" for c in ["FRV", "ARM", "RANGE", "OAA"] if c in combined.columns}
-        savant_data = combined.groupby("NameKey", as_index=False).agg(agg_cols)
-
-    fg_data = load_fangraphs_fielding(player_names, year, year)
-
-    if not savant_data.empty and not fg_data.empty:
-        return savant_data.merge(fg_data, on="NameKey", how="outer")
-    elif not savant_data.empty:
-        return savant_data
-    elif not fg_data.empty:
-        return fg_data
-    return pd.DataFrame()
-
+# ----------------------------
+#  HEADSHOT HELPERS
+# ----------------------------
 
 @st.cache_data(show_spinner=False)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
@@ -632,10 +490,18 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
     return HEADSHOT_PLACEHOLDER
 
 
-def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
-                     position: str = "all", team: str = "all") -> pd.DataFrame:
-    df_start = load_single_year(start_year, min_pa=min_pa, position=position)
-    df_end   = load_single_year(end_year,   min_pa=min_pa, position=position)
+# ----------------------------
+#  CORE RISERS/FALLERS LOGIC
+# ----------------------------
+
+def load_risers_data(start_year: int, end_year: int, min_ip: int = 0,
+                     team: str = "all") -> pd.DataFrame:
+    """
+    Load two years of pitching data, find pitchers in both with >= min_ip each year,
+    compute the delta (end - start) for all stats.
+    """
+    df_start = load_single_year(start_year, min_ip=min_ip)
+    df_end   = load_single_year(end_year,   min_ip=min_ip)
 
     if df_start.empty or df_end.empty:
         return pd.DataFrame()
@@ -653,6 +519,13 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
     df_start["IDfg"] = pd.to_numeric(df_start["IDfg"], errors="coerce")
     df_end["IDfg"]   = pd.to_numeric(df_end["IDfg"],   errors="coerce")
 
+    # Apply min_ip filter properly — use IP column directly
+    if min_ip > 0:
+        if "IP" in df_start.columns:
+            df_start = df_start[pd.to_numeric(df_start["IP"], errors="coerce").fillna(0) >= min_ip]
+        if "IP" in df_end.columns:
+            df_end = df_end[pd.to_numeric(df_end["IP"], errors="coerce").fillna(0) >= min_ip]
+
     common_ids = set(df_start["IDfg"].dropna()) & set(df_end["IDfg"].dropna())
     df_start = df_start[df_start["IDfg"].isin(common_ids)].set_index("IDfg")
     df_end   = df_end[df_end["IDfg"].isin(common_ids)].set_index("IDfg")
@@ -660,8 +533,8 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
     if df_start.empty or df_end.empty:
         return pd.DataFrame()
 
-    skip_meta = {"Name", "Team", "TeamDisplay", "_teams_list", "DefPos", "TotalInn",
-                 "mlbam", "MLBID", "key_mlbam", "mlbam_id", "Season"}
+    skip_meta = {"Name", "Team", "TeamDisplay", "_teams_list", "mlbam", "MLBID",
+                 "key_mlbam", "mlbam_id", "Season"}
     numeric_cols = [
         c for c in df_end.columns
         if c not in skip_meta
@@ -680,9 +553,9 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
             "IDfg": fg_id,
             "Name": row_e.get("Name", row_s.get("Name", "")),
             "TeamDisplay": row_e.get("TeamDisplay", ""),
-            "DefPos": row_e.get("DefPos", ""),
-            "TotalInn": row_e.get("TotalInn", np.nan),
         }
+
+        # Carry over MLBAM for headshots
         for hcol in ["mlbam", "MLBID", "key_mlbam", "mlbam_id"]:
             if hcol in row_e.index and pd.notna(row_e.get(hcol)):
                 record[hcol] = row_e[hcol]
@@ -695,12 +568,12 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
                 e_val = pd.to_numeric(row_e[col] if col in row_e.index else np.nan, errors="coerce")
                 record[f"{col}_start"] = s_val
                 record[f"{col}_end"]   = e_val
-                record[col] = e_val - s_val
+                record[col] = e_val - s_val  # delta
             except Exception:
                 record[col] = np.nan
 
-        record["PA_start"] = pd.to_numeric(row_s.get("PA", np.nan), errors="coerce")
-        record["PA_end"]   = pd.to_numeric(row_e.get("PA", np.nan), errors="coerce")
+        record["IP_start"] = pd.to_numeric(row_s.get("IP", np.nan), errors="coerce")
+        record["IP_end"]   = pd.to_numeric(row_e.get("IP", np.nan), errors="coerce")
 
         result_rows.append(record)
 
@@ -715,7 +588,7 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
 # ----------------------------
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Year-over-Year Hitter Risers & Fallers")
+    st.title("Year-over-Year Pitcher Risers & Fallers")
 with meta_col:
     st.markdown(
         """
@@ -728,17 +601,18 @@ with meta_col:
 
 current_year = date.today().year
 
+# ----------------------------
+#  SESSION STATE DEFAULTS
+# ----------------------------
 for key, default in [
-    ("rf_start_year",   2024),
-    ("rf_end_year",     2025),
-    ("rf_stat",         "WAR"),
-    ("rf_min_pa",       300),
-    ("rf_position",     "all"),
-    ("rf_team",         "all"),
-    ("rf_show_fallers", False),
-    ("rf_show_min_pa",  True),
-    ("rf_show_player_pa", False),
-    ("rf_show_innings", False),
+    ("pr_start_year",     2024),
+    ("pr_end_year",       2025),
+    ("pr_stat",           "ERA"),
+    ("pr_min_ip",         100),
+    ("pr_team",           "all"),
+    ("pr_show_fallers",   False),
+    ("pr_show_min_ip",    True),
+    ("pr_show_player_ip", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -753,86 +627,61 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ----------------------------
+#  CONTROLS
+# ----------------------------
 stat = st.selectbox(
     "Stat",
     STAT_ALLOWLIST,
-    key="rf_stat",
+    key="pr_stat",
     format_func=lambda x: label_map.get(x, x),
 )
 
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    st.number_input("Start Year", min_value=1900, max_value=current_year, key="rf_start_year")
-    st.number_input("End Year",   min_value=1900, max_value=current_year, key="rf_end_year")
+    st.number_input("Start Year", min_value=1900, max_value=current_year, key="pr_start_year")
+    st.number_input("End Year",   min_value=1900, max_value=current_year, key="pr_end_year")
 
-    start_year = st.session_state["rf_start_year"]
-    end_year   = st.session_state["rf_end_year"]
+    start_year = st.session_state["pr_start_year"]
+    end_year   = st.session_state["pr_end_year"]
     if end_year <= start_year:
         st.warning("End Year must be greater than Start Year.")
 
-    st.number_input("Min PA (each year)", min_value=0, max_value=20000, key="rf_min_pa")
-
-    st.selectbox(
-        "Position",
-        options=list(POSITION_OPTIONS.keys()),
-        format_func=lambda x: POSITION_OPTIONS[x],
-        key="rf_position",
-    )
+    st.number_input("Min IP (each year)", min_value=0, max_value=5000, key="pr_min_ip")
 
     st.selectbox(
         "Team",
         options=list(TEAM_OPTIONS.keys()),
         format_func=lambda x: TEAM_OPTIONS[x],
-        key="rf_team",
+        key="pr_team",
         help="Filters by team in the end year only",
     )
 
-    st.checkbox("Show Fallers",      key="rf_show_fallers")
-    st.checkbox("Show min PA",       key="rf_show_min_pa")
-    st.checkbox("Show player PA",    key="rf_show_player_pa")
-    st.checkbox("Show player innings", key="rf_show_innings")
+    st.checkbox("Show Fallers",       key="pr_show_fallers")
+    st.checkbox("Show min IP",        key="pr_show_min_ip")
+    st.checkbox("Show player IP",     key="pr_show_player_ip")
 
-if stat == "FRV" and start_year < 2018:
-    st.warning("⚠️ FRV may be understated for catchers before 2018 due to missing framing data from Baseball Savant.")
+# Resolved values
+min_ip_val   = int(st.session_state.get("pr_min_ip", 0))
+team_val     = st.session_state.get("pr_team", "all")
+show_fallers = st.session_state.get("pr_show_fallers", False)
 
-min_pa_val   = int(st.session_state.get("rf_min_pa", 0))
-position_val = st.session_state.get("rf_position", "all")
-team_val     = st.session_state.get("rf_team", "all")
-show_fallers = st.session_state.get("rf_show_fallers", False)
-
+# ----------------------------
+#  LOAD DATA
+# ----------------------------
 if end_year > start_year:
     with st.spinner("Loading data..."):
-        df = load_risers_data(start_year, end_year, min_pa_val, position_val, team_val)
+        df = load_risers_data(start_year, end_year, min_ip_val, team_val)
 else:
     df = pd.DataFrame()
 
-if not df.empty and stat in FIELDING_STATS:
-    player_names = df["Name"].tolist()
-    f_start = load_fielding_for_year(player_names, start_year)
-    f_end   = load_fielding_for_year(player_names, end_year)
-
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-
-    for fs, suffix in [(f_start, "_start"), (f_end, "_end")]:
-        if fs.empty:
-            continue
-        for fcol in ["FRV", "ARM", "RANGE", "OAA", "DRS", "TZ", "UZR", "FRM"]:
-            if fcol not in fs.columns:
-                continue
-            merged = df[["NameKey"]].merge(fs[["NameKey", fcol]], on="NameKey", how="left")
-            df[f"{fcol}{suffix}"] = merged[fcol].fillna(0).values
-
-    for fcol in ["FRV", "ARM", "RANGE", "OAA", "DRS", "TZ", "UZR", "FRM"]:
-        s_col = f"{fcol}_start"
-        e_col = f"{fcol}_end"
-        if s_col in df.columns and e_col in df.columns:
-            df[fcol] = df[e_col] - df[s_col]
-        elif e_col in df.columns:
-            df[fcol] = df[e_col]
-
+# ----------------------------
+#  SORT & FILTER
+# ----------------------------
 if not df.empty and stat in df.columns:
     stat_is_lower_better = stat in lower_better
+
     if stat_is_lower_better:
         ascending = not show_fallers
     else:
@@ -852,32 +701,33 @@ elif not df.empty:
     st.error(f"Column '{stat}' not found. Available columns: {', '.join(df.columns)}")
     df = pd.DataFrame()
 
+# ----------------------------
+#  BUILD CARDS
+# ----------------------------
 cards = []
 for _, row in df.iterrows():
-    name    = row.get("Name", "")
-    team    = row.get("TeamDisplay", "")
+    name      = row.get("Name", "")
+    team      = row.get("TeamDisplay", "")
     raw_delta = row.get(stat, np.nan)
-    display_delta = raw_delta
 
+    display_delta = raw_delta
     transformed_delta = display_delta
-    # Contact%/Whiff% delta is already on 0-100 scale after conversion in load_single_year
-    # Divide by 100 so format_stat's '* 100 if v <= 1' brings it back to the right value
     if stat == "Contact%" and pd.notna(transformed_delta):
         transformed_delta = float(transformed_delta) / 100
     is_positive = pd.notna(transformed_delta) and float(transformed_delta) > 0
     display_val = format_stat(stat, transformed_delta, show_sign=is_positive)
 
+    # End-year value for context
     end_val_raw = row.get(f"{stat}_end", np.nan)
     if stat == "Contact%" and pd.notna(end_val_raw):
         end_val_raw = float(end_val_raw) / 100
     end_display = format_stat(stat, end_val_raw) if pd.notna(end_val_raw) else ""
     stat_label = label_map.get(stat, stat)
-    team_subtitle = f"{team}"
 
     src_row = row
     try:
         pos = list(df.index).index(row.name)
-        key = f"rf_mlbam_override_{pos}"
+        key = f"pr_mlbam_override_{pos}"
         override_val = st.session_state.get(key, "")
         if override_val and str(override_val).strip():
             try:
@@ -888,28 +738,22 @@ for _, row in df.iterrows():
     except Exception:
         pass
 
-    pa_start = row.get("PA_start", np.nan)
-    pa_end   = row.get("PA_end",   np.nan)
-    player_pa_display = ""
-    if st.session_state.get("rf_show_player_pa", False):
-        parts_pa = []
-        if pd.notna(pa_start):
-            parts_pa.append(f"{int(pa_start)}")
-        if pd.notna(pa_end):
-            parts_pa.append(f"{int(pa_end)}")
-        if parts_pa:
-            player_pa_display = f'<div class="player-pa">{" → ".join(parts_pa)} PA</div>'
-
-    innings_val = row.get("TotalInn", np.nan)
-    player_innings_display = (
-        f'<div class="player-innings">{int(innings_val)} Inn.</div>'
-        if st.session_state.get("rf_show_innings", False) and pd.notna(innings_val) and innings_val > 0
-        else ""
-    )
+    ip_start = row.get("IP_start", np.nan)
+    ip_end   = row.get("IP_end",   np.nan)
+    player_ip_display = ""
+    if st.session_state.get("pr_show_player_ip", False):
+        parts_ip = []
+        if pd.notna(ip_start):
+            parts_ip.append(format_stat("IP", ip_start))
+        if pd.notna(ip_end):
+            parts_ip.append(format_stat("IP", ip_end))
+        if parts_ip:
+            player_ip_display = f'<div class="player-ip">{" → ".join(parts_ip)} IP</div>'
 
     src = get_headshot_url_from_row(src_row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(str(name))}"/>'
 
+    # Color: green = improvement, red = decline
     if stat in lower_better:
         is_improvement = pd.notna(transformed_delta) and float(transformed_delta) < 0
     else:
@@ -922,40 +766,36 @@ for _, row in df.iterrows():
     <div class="player-card">
       {img_html}
       <div class="player-name">{name}</div>
-      <div class="player-team">{team_subtitle}</div>
+      <div class="player-team">{team}</div>
       <div class="player-stat {delta_class}">{display_val}</div>
       {end_context}
-      {player_pa_display}
-      {player_innings_display}
+      {player_ip_display}
     </div>
     '''
     cards.append(card_html)
 
+# ----------------------------
+#  BUILD TITLE
+# ----------------------------
 title_stat_label = label_map.get(stat, stat)
-pos_suffix   = f" ({POSITION_OPTIONS.get(position_val, '')})" if position_val != "all" else ""
 team_prefix  = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
 riser_label  = "Fallers" if show_fallers else "Risers"
 
-title = f"Top {team_prefix}{title_stat_label} {riser_label}{pos_suffix}: {int(start_year)} → {int(end_year)}"
+title = f"Top {team_prefix}{title_stat_label} {riser_label}: {int(start_year)} → {int(end_year)}"
 
-min_pa_subtitle = ""
-if st.session_state.get("rf_show_min_pa", False):
-    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA each year</div>'
-
-footer_middle = ""
-if position_val != "all" and stat in FIELDING_STATS:
-    footer_middle = f'<p>Total {title_stat_label} among primary {POSITION_OPTIONS.get(position_val, position_val)}</p>'
+min_ip_subtitle = ""
+if st.session_state.get("pr_show_min_ip", False):
+    min_ip_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_val} IP each year</div>'
 
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{title}</div>
-    {min_pa_subtitle}
+    {min_ip_subtitle}
     <div class="players-grid">
         {''.join(cards) if cards else '<div style="padding:2rem;color:#999;">No data found. Try adjusting your filters or years.</div>'}
     </div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        {footer_middle}
         <p>Data: FanGraphs</p>
     </div>
 </div>
@@ -996,13 +836,11 @@ full_html = f"""
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 2.5rem 1rem;
+    gap: 2rem 1rem;
 }}
 .player-card {{
     flex: 0 0 145px;
     width: 145px;
-}}
-.player-card {{
     text-align: center;
 }}
 .player-card img {{
@@ -1038,14 +876,10 @@ full_html = f"""
     font-size: .9rem;
     margin-top: 0.1rem;
 }}
-.player-pa {{
+.player-ip {{
     color: #666;
     font-size: 0.9rem;
     margin-top: 0.1rem;
-}}
-.player-innings {{
-    color: #666;
-    font-size: 0.9rem;
 }}
 html, body {{
     margin: 0;
@@ -1079,6 +913,9 @@ html, body {{
 with col2:
     components.html(full_html, height=850)
 
+# ----------------------------
+#  MLBAM OVERRIDES
+# ----------------------------
 if not df.empty:
     st.markdown("---")
     st.write("Manual MLBAM overrides (enter MLBAM id to fix headshot)")
@@ -1092,7 +929,7 @@ if not df.empty:
             idx = df.index[player_idx]
             row = df.loc[idx]
             with cols_row[col_idx]:
-                key = f"rf_mlbam_override_{player_idx}"
+                key = f"pr_mlbam_override_{player_idx}"
                 default_val = ""
                 if "mlbam_override" in df.columns and pd.notna(row.get("mlbam_override")):
                     try:
