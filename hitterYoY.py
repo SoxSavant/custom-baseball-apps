@@ -15,6 +15,23 @@ import pybaseball
 
 st.set_page_config(page_title="Hitter Year-over-Year", layout="wide", page_icon="⚾",)
 
+st.markdown(
+    """
+    <style>
+        [data-testid="stToolbar"] {visibility: hidden;}
+        [data-testid="stDecoration"] {display: none;}
+        [data-testid="stStatusWidget"] {display: none;} 
+        .viewerBadge_link__qRi_k {display: none;}
+        div.ag-header-cell[col-id="ag-RowSelector"],
+        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
+        div.ag-center-cols-container [col-id="ag-RowSelector"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 POSITION_FILTER_MAP = {
     "all": None,
     "C":   ["C"],

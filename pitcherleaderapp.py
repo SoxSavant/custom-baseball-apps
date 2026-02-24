@@ -14,6 +14,23 @@ import pybaseball
 
 st.set_page_config(page_title="Custom Pitcher Leaderboard", layout="wide", page_icon="⚾",)
 
+st.markdown(
+    """
+    <style>
+        [data-testid="stToolbar"] {visibility: hidden;}
+        [data-testid="stDecoration"] {display: none;}
+        [data-testid="stStatusWidget"] {display: none;} 
+        .viewerBadge_link__qRi_k {display: none;}
+        div.ag-header-cell[col-id="ag-RowSelector"],
+        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
+        div.ag-center-cols-container [col-id="ag-RowSelector"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 STATCAST_START_YEAR = 2015
 STATCAST_RATE_STATS = {"Barrel%", "HardHit%", "EV"}
 

@@ -14,7 +14,22 @@ from pybaseball import batting_stats, fielding_stats, bwar_bat
 from datetime import date
 import requests
 
-
+st.markdown(
+    """
+    <style>
+        [data-testid="stToolbar"] {visibility: hidden;}
+        [data-testid="stDecoration"] {display: none;}
+        [data-testid="stStatusWidget"] {display: none;} 
+        .viewerBadge_link__qRi_k {display: none;}
+        div.ag-header-cell[col-id="ag-RowSelector"],
+        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
+        div.ag-center-cols-container [col-id="ag-RowSelector"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
 GRID_THEME = "balham"

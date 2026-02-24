@@ -18,6 +18,23 @@ plt.rcdefaults()
 
 st.set_page_config(page_title="Custom Hitter Savant Page", layout="wide", page_icon="⚾",)
 
+st.markdown(
+    """
+    <style>
+        [data-testid="stToolbar"] {visibility: hidden;}
+        [data-testid="stDecoration"] {display: none;}
+        [data-testid="stStatusWidget"] {display: none;} 
+        .viewerBadge_link__qRi_k {display: none;}
+        div.ag-header-cell[col-id="ag-RowSelector"],
+        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
+        div.ag-center-cols-container [col-id="ag-RowSelector"] {
+            display: none !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Pitcher Savant Page")
