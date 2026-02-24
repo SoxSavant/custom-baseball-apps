@@ -12,7 +12,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Custom Pitcher Leaderboard", layout="wide", page_icon="⚾",)
 
 STATCAST_START_YEAR = 2015
 STATCAST_RATE_STATS = {"Barrel%", "HardHit%", "EV"}

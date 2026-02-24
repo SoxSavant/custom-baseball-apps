@@ -15,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 from io import BytesIO
 
-st.set_page_config(page_title="Player Comparison App", layout="wide")
+st.set_page_config(page_title="Custom Pitcher Comparison", layout="wide", page_icon="⚾",)
 
 st.markdown(
     """

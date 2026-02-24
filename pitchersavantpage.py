@@ -16,7 +16,7 @@ from pybaseball import pitching_stats, playerid_lookup, bwar_pitch
 
 plt.rcdefaults()
 
-st.set_page_config(page_title="Custom Pitcher Savant Page", layout="wide")
+st.set_page_config(page_title="Custom Hitter Savant Page", layout="wide", page_icon="⚾",)
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:

@@ -15,7 +15,7 @@ from pybaseball.statcast_fielding import statcast_outs_above_average
 import requests
 from bs4 import BeautifulSoup
 
-st.set_page_config(page_title="Player Comparison App", layout="wide")
+st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾",)
 
 st.markdown(
     """

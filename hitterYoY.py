@@ -13,7 +13,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Hitter Year-over-Year", layout="wide", page_icon="⚾",)
 
 POSITION_FILTER_MAP = {
     "all": None,
