@@ -314,7 +314,7 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
         elif teams:
             base["TeamDisplay"] = "2+ Teams"
         else:
-            base["TeamDisplay"] = "---"
+            base["TeamDisplay"] = "2+ Teams"
 
         base["_teams_list"] = teams
 

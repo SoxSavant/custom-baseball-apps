@@ -34,8 +34,8 @@ TEAM_OPTIONS = {
 
 STAT_ALLOWLIST = [
     "WAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB", "K/9", "BB/9",
-    "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "Contact%",
-    "O-Swing%", "GB%", "FB%", "CG", "ShO",
+    "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
+    "O-Swing%", "Contact%", "GB%", "FB%", "CG", "ShO"
 ]
 
 label_map = {
@@ -296,7 +296,7 @@ def load_single_year(year: int, min_ip: int = 0) -> pd.DataFrame:
         elif teams:
             base["TeamDisplay"] = "2+ Teams"
         else:
-            base["TeamDisplay"] = "---"
+            base["TeamDisplay"] = "2+ Teams"
 
         base["_teams_list"] = teams
         collapsed.append(base)
