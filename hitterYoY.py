@@ -13,24 +13,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(page_title="Hitter Year-over-Year", layout="wide", page_icon="⚾",)
-
-st.markdown(
-    """
-    <style>
-        [data-testid="stToolbar"] {visibility: hidden;}
-        [data-testid="stDecoration"] {display: none;}
-        [data-testid="stStatusWidget"] {display: none;} 
-        .viewerBadge_link__qRi_k {display: none;}
-        div.ag-header-cell[col-id="ag-RowSelector"],
-        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
-        div.ag-center-cols-container [col-id="ag-RowSelector"] {
-            display: none !important;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.set_page_config(layout="wide")
 
 POSITION_FILTER_MAP = {
     "all": None,
@@ -838,15 +821,18 @@ if not df.empty and stat in FIELDING_STATS:
             if fcol not in fs.columns:
                 continue
             merged = df[["NameKey"]].merge(fs[["NameKey", fcol]], on="NameKey", how="left")
-            df[f"{fcol}{suffix}"] = merged[fcol].fillna(0).values
+            df[f"{fcol}{suffix}"] = merged[fcol].values  # no fillna — keep NaN if not found
 
     for fcol in ["FRV", "ARM", "RANGE", "OAA", "DRS", "TZ", "UZR", "FRM"]:
         s_col = f"{fcol}_start"
         e_col = f"{fcol}_end"
         if s_col in df.columns and e_col in df.columns:
-            df[fcol] = df[e_col] - df[s_col]
+            s = pd.to_numeric(df[s_col], errors="coerce")
+            e = pd.to_numeric(df[e_col], errors="coerce")
+            # Only compute delta where both years have data
+            df[fcol] = e - s
         elif e_col in df.columns:
-            df[fcol] = df[e_col]
+            df[fcol] = pd.to_numeric(df[e_col], errors="coerce")
 
 if not df.empty and stat in df.columns:
     stat_is_lower_better = stat in lower_better
