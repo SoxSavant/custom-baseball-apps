@@ -736,8 +736,10 @@ def load_risers_data(start_year: int, end_year: int, min_pa: int = 0,
             except Exception:
                 record[col] = np.nan
 
-        record["PA_start"] = pd.to_numeric(row_s.get("PA", np.nan), errors="coerce")
-        record["PA_end"]   = pd.to_numeric(row_e.get("PA", np.nan), errors="coerce")
+        record["PA_start"]      = pd.to_numeric(row_s.get("PA",       np.nan), errors="coerce")
+        record["PA_end"]        = pd.to_numeric(row_e.get("PA",       np.nan), errors="coerce")
+        record["TotalInn_start"] = pd.to_numeric(row_s.get("TotalInn", np.nan), errors="coerce")
+        record["TotalInn_end"]   = pd.to_numeric(row_e.get("TotalInn", np.nan), errors="coerce")
 
         result_rows.append(record)
 
@@ -777,11 +779,13 @@ for key, default in [
     ("rf_show_player_pa", False),
     ("rf_show_innings", False),
     ("rf_alltime_mode", False),
+    ("rf_min_inn", 0),
+    ("rf_show_min_inn", False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
 
-alltime_mode = st.checkbox("All-Time Mode (600 PA, 1955–present)", key="rf_alltime_mode")
+alltime_mode = st.checkbox("🕰️ All-Time Mode (600 PA, 1955–present)", key="rf_alltime_mode")
 
 st.markdown(
     """
@@ -810,6 +814,7 @@ with col1:
     if alltime_mode:
         st.info(f"Showing all-time best/worst single-season changes (min {ALLTIME_MIN_PA} PA each year)")
         min_pa_val   = ALLTIME_MIN_PA
+        min_inn_val  = 0
         position_val = "all"
         team_val     = "all"
         start_year   = None
@@ -825,6 +830,7 @@ with col1:
             st.warning("End Year must be greater than Start Year.")
 
         st.number_input("Min PA (each year)", min_value=0, max_value=20000, key="rf_min_pa")
+        st.number_input("Min Inn (each year)", min_value=0, max_value=10000, key="rf_min_inn", help="Minimum innings played in both years. Useful for filtering out DH-only seasons for fielding stats.")
 
         st.selectbox(
             "Position",
@@ -842,11 +848,13 @@ with col1:
         )
 
         min_pa_val   = int(st.session_state.get("rf_min_pa", 0))
+        min_inn_val  = int(st.session_state.get("rf_min_inn", 0))
         position_val = st.session_state.get("rf_position", "all")
         team_val     = st.session_state.get("rf_team", "all")
 
     st.checkbox("Show Fallers",        key="rf_show_fallers")
     st.checkbox("Show min PA",         key="rf_show_min_pa")
+    st.checkbox("Show min innings",    key="rf_show_min_inn")
     st.checkbox("Show player PA",      key="rf_show_player_pa")
     if not alltime_mode:
         st.checkbox("Show player innings", key="rf_show_innings")
@@ -884,6 +892,17 @@ elif end_year > start_year:
         df = load_risers_data(start_year, end_year, min_pa_val, position_val, team_val)
 else:
     df = pd.DataFrame()
+
+# Apply minimum innings filter (uses TotalInn from fielding merge in load_single_year)
+# We need innings for both years — store them in load_risers_data
+if not df.empty and min_inn_val > 0 and "TotalInn_start" in df.columns and "TotalInn_end" in df.columns:
+    inn_start = pd.to_numeric(df["TotalInn_start"], errors="coerce").fillna(0)
+    inn_end   = pd.to_numeric(df["TotalInn_end"],   errors="coerce").fillna(0)
+    df = df[(inn_start >= min_inn_val) & (inn_end >= min_inn_val)]
+elif not df.empty and min_inn_val > 0 and "TotalInn" in df.columns:
+    # fallback: only end year innings available
+    inn_end = pd.to_numeric(df["TotalInn"], errors="coerce").fillna(0)
+    df = df[inn_end >= min_inn_val]
 
 if not df.empty and stat in FIELDING_STATS:
     player_names = df["Name"].tolist()
@@ -1032,6 +1051,8 @@ min_pa_subtitle = ""
 if st.session_state.get("rf_show_min_pa", False):
     display_min_pa = ALLTIME_MIN_PA if alltime_mode else min_pa_val
     min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min_pa} PA each year</div>'
+if st.session_state.get("rf_show_min_inn", False) and min_inn_val > 0:
+    min_pa_subtitle += f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn each year</div>'
 
 footer_middle = ""
 if position_val != "all" and stat in FIELDING_STATS:
