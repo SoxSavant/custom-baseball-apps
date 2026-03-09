@@ -1484,7 +1484,7 @@ with left_col:
 
 current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
-MAX_PLAYERS = 4
+MAX_PLAYERS = 5
 default_names = ["Shohei Ohtani", "Aaron Judge", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
