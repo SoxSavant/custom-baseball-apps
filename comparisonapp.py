@@ -166,7 +166,7 @@ with meta_col:
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
 STAT_PRESETS = {
-    "My Preference": [
+    "Default": [
         "bWAR",
         "WAR",
         "G",
@@ -312,6 +312,7 @@ STAT_PRESETS = {
     "Player B leads": [],
     "Player C leads": [],
     "Player D leads": [],
+    "Player E leads": [],
 }
 
 STAT_ALLOWLIST = [
@@ -1464,13 +1465,14 @@ def get_headshot_url(name: str, df: pd.DataFrame) -> str | None:
 
 
 # --------------------- Layout containers ---------------------
-player_mode_options = ["2 players", "3 players", "4 players"]
+player_mode_options = ["2 players", "3 players", "4 players", "5 players"]
 player_mode = st.radio("", player_mode_options, index=0, horizontal=True)
 player_count = int(player_mode.split()[0])
 column_weights_map = {
     "2 players": [1, 1],
     "3 players": [1, 1.5],
     "4 players": [1, 2],
+    "5 players": [1,2.5]
 }
 column_weights = column_weights_map.get(player_mode, [1, 1])
 
@@ -1483,7 +1485,7 @@ with left_col:
 current_year = 2025
 years_desc = list(range(current_year, 1870, -1))
 MAX_PLAYERS = 4
-default_names = ["Cal Raleigh", "Aaron Judge", "", ""]
+default_names = ["Shohei Ohtani", "Aaron Judge", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
@@ -1679,7 +1681,7 @@ if not stat_options:
     st.error("No numeric stats available to display.")
     st.stop()
 
-default_preset_name = "My Preference"
+default_preset_name = "Default"
 stat_preset_key = "comp_stat_preset_select"
 preset_options = list(STAT_PRESETS.keys())
 stat_state_key = "comp_stat_config"
