@@ -1128,7 +1128,7 @@ full_html = f"""
 .player-name {{
     font-weight: 800;
     margin-top: 0.35rem;
-    font-size: 1.3rem;
+    font-size: 1.1rem;
 }}
 .player-team {{
     color: #666;
