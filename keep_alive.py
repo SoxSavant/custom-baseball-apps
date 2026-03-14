@@ -19,10 +19,14 @@ def wake_app(url):
         browser = p.chromium.launch()
         page = browser.new_page()
         print(f"Waking {url}...")
-        page.goto(url, wait_until="networkidle")
-        time.sleep(15)  # let WebSocket fully establish
-        print(f"Done: {url}")
-        browser.close()
+        try:
+            page.goto(url, wait_until="networkidle", timeout = 60000)
+            time.sleep(15)  
+            print(f"Done: {url}")
+        except Exception as e:
+            print(f"Failed to wake {url}: {e}")
+        finally:
+            browser.close()
 
 for app in APPS:
     wake_app(app)
