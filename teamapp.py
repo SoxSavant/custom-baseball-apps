@@ -75,7 +75,7 @@ st.markdown(
 )
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Team Savant Page App")
+    st.title("Custom Team Hitter Savant Page")
 with meta_col:
     st.markdown(
         """
