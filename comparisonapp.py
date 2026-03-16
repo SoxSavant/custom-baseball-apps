@@ -315,14 +315,12 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
-COMBO_STATS = [
-    "WAR", "bWAR", "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "AVG", "OBP", "SLG", "ISO", "BABIP",
-    "HR", "SB", "RBI", "R", "H", "1B", "2B", "3B", "XBH", "TB", "BB", "IBB", "SO", "PA", "AB", "G",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%",
-    "Barrel%", "HardHit%", "EV",
-    "GB%", "FB%", "LD%", "Pull%",
-    "Age", "Off", "Def", "BsR", "WPA", "Clutch",
-    "FRV", "OAA", "ARM", "DRS", "TZ", "UZR", "FRM",
+STAT_ALLOWLIST = [
+    "WAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
+    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
+    "Pull%", "FRV", "OAA", "ARM", "DRS", "TZ", "FRM", "UZR", "Age",
 ]
 STATCAST_FIELDING_START_YEAR = 2016
 STATCAST_HITTING_START_YEAR = 2015
