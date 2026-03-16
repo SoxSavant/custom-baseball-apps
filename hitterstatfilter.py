@@ -12,7 +12,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(page_title="Custom Hitter Stat Combo Leaderboard", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Hitter Stat Filter Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -528,7 +528,7 @@ def get_headshot_url_from_row(row: pd.Series) -> str:
 # ----------------------------
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Hitter Stat Combo Leaderboard")
+    st.title("Hitter Stat Filter Leaderboard")
 with meta_col:
     st.markdown(
         '<div style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
@@ -570,16 +570,12 @@ st.markdown("""
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
+    num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="sc_num_stats")
     st.number_input("Year", min_value=1900, max_value=current_year, key="sc_year")
     st.number_input("Min PA", min_value=0, max_value=20000, key="sc_min_pa")
-    st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
-                 format_func=lambda x: POSITION_OPTIONS[x], key="sc_position")
-    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
-                 format_func=lambda x: TEAM_OPTIONS[x], key="sc_team")
 
-    st.markdown("---")
-    num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="sc_num_stats")
-    st.markdown("---")
+   
+
 
     # Per-stat filter rows
     for i in range(num_stats):
@@ -594,7 +590,6 @@ with col1:
         new_stat = st.selectbox(
             f"Stat {i+1}",
             COMBO_STATS,
-            index=COMBO_STATS.index(current_stat) if current_stat in COMBO_STATS else 0,
             key=stat_key,
             format_func=lambda x: label_map.get(x, x),
             label_visibility="collapsed",
@@ -608,7 +603,7 @@ with col1:
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            op = st.selectbox("Op", [">=", "<="], index=0 if current_op == ">=" else 1,
+            op = st.selectbox("Op", [">=", "<="],
                               key=op_key, label_visibility="collapsed")
         with val_col:
             default_val = STAT_DEFAULTS.get(new_stat, 0.0)
@@ -619,10 +614,14 @@ with col1:
             else:
                 step = 1.0
             st.number_input(
-                f"Value {i+1}", value=float(current_val), step=step,
+                f"Value {i+1}", step=step,
                 key=val_key, label_visibility="collapsed",
                 format="%.1f" if step < 1 else "%.0f",
             )
+    st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
+                 format_func=lambda x: POSITION_OPTIONS[x], key="sc_position")
+    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
+                 format_func=lambda x: TEAM_OPTIONS[x], key="sc_team")
 
     st.checkbox("Show player PA", key="sc_show_pa")
     st.checkbox("Only display top 10", key="sc_top10")
