@@ -86,7 +86,7 @@ STAT_DEFAULTS = {
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
     "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450,
     "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 250, "G": 140,
-    "Age": 30, "Clutch": 1.0,
+    "Age": 30, "Clutch": 1.0, "FRV": 10, "OAA": 10, "ARM": 3, "DRS": 10, "TZ": 5, "UZR": 5, "FRM": 10,
 }
 
 HEADSHOT_BASES = [
@@ -151,6 +151,8 @@ def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
     upper = stat.upper()
+    if upper in {"FRV", "ARM"}:
+        return f"{int(round(float(val)))}"
     if upper in {"WAR", "OFF", "DEF", "BSR", "EV", "AVG EXIT VELO"}:
         v = float(val)
         return f"{v:.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(v))}.0"
