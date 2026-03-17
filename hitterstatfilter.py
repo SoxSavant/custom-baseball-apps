@@ -113,7 +113,6 @@ MAX_DISPLAY = 30
 def update_stat_default(i):
     stat = st.session_state[f"sc_stat_{i}"]
     st.session_state[f"sc_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
-    # also flip the operator
     st.session_state[f"sc_op_{i}"] = "<=" if stat in LOWER_BETTER else ">="
 
 def normalize_statcast_name(name: str) -> str:
@@ -172,13 +171,14 @@ def format_stat(stat: str, val) -> str:
 
 
 def format_threshold(stat: str, val: float, op: str) -> str:
-    """Format threshold for display in title, e.g. '30+ HR' or 'K% ≤ 20%'"""
     label = label_map.get(stat, stat)
     formatted = format_stat(stat, val)
+    # Strip trailing % so "10%+ K%" becomes "10+ K%"
+    numeric = formatted.rstrip("%")
     if op == ">=":
-        return f"{formatted}+ {label}"
+        return f"{numeric}+ {label}"
     else:
-        return f"{label} ≤ {formatted}"
+        return f"≤{numeric} {label}"
 
 
 # ----------------------------
@@ -288,11 +288,11 @@ def load_savant_oaa_year(year: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False, ttl=600, max_entries=5)
-def load_fangraphs_fielding(player_names: list, start_year: int, end_year: int) -> pd.DataFrame:
+def load_fangraphs_fielding(player_names: list, year: int) -> pd.DataFrame:
     if not player_names:
         return pd.DataFrame()
     try:
-        df = pybaseball.fielding_stats(start_year, end_year, qual=0, split_seasons=False)
+        df = pybaseball.fielding_stats(year, year, qual=0)
         if df is None or df.empty:
             return pd.DataFrame()
         df["NameKey"] = df["Name"].apply(normalize_statcast_name)
@@ -327,7 +327,7 @@ def load_fielding_for_players(player_names: list, year: int) -> pd.DataFrame:
         combined = pd.concat(frames, ignore_index=True)
         agg_cols = {c: "sum" for c in ["FRV", "ARM", "RANGE", "OAA"] if c in combined.columns}
         savant_data = combined.groupby("NameKey", as_index=False).agg(agg_cols)
-    fg_data = load_fangraphs_fielding(player_names, year, year)
+    fg_data = load_fangraphs_fielding(player_names, year)
     if not savant_data.empty and not fg_data.empty:
         return savant_data.merge(fg_data, on="NameKey", how="outer")
     elif not savant_data.empty:
@@ -357,14 +357,27 @@ def load_year(year: int, min_pa: int = 0, position: str = "all") -> pd.DataFrame
     if not fielding.empty:
         df = df.merge(fielding, on="IDfg", how="left")
 
-    # Collapse multi-team players
+    def is_junk_team(t: str) -> bool:
+        # True for TOT, blanks, and any dash-only strings like "---" or "- - -"
+        return t == "TOT" or t.replace(" ", "").replace("-", "") == ""
+
+    # Collapse multi-team players — always show "2+ Teams" if traded
     collapsed = []
     for fg_id, grp in df.groupby("IDfg"):
         raw_teams = grp["Team"].dropna().astype(str).str.strip().str.upper().tolist()
-        teams = sorted(set(t for t in [normalize_team_code(x, year) for x in raw_teams if x not in {"TOT","---","--","-",""}] if t))
+        teams = sorted(set(
+            t for t in [normalize_team_code(x, year) for x in raw_teams if not is_junk_team(x)]
+            if t
+        ))
         tot_row = grp[grp["Team"] == "TOT"]
         base = tot_row.iloc[0].to_dict() if not tot_row.empty else grp.iloc[0].to_dict()
-        base["TeamDisplay"] = teams[0] if len(teams) == 1 else "2+ Teams"
+        if len(teams) == 1:
+            base["TeamDisplay"] = teams[0]
+        elif len(teams) > 1:
+            base["TeamDisplay"] = "2+ Teams"
+        else:
+            fallback = next((x for x in raw_teams if not is_junk_team(x)), "")
+            base["TeamDisplay"] = fallback if fallback else "2+ Teams"
         base["_teams_list"] = teams
         if "DefPos" in grp.columns:
             nd = grp.dropna(subset=["DefPos"])
@@ -395,7 +408,7 @@ def load_year(year: int, min_pa: int = 0, position: str = "all") -> pd.DataFrame
 
 
 # ----------------------------
-#  HEADSHOT FUNCTIONS (from leaderboard)
+#  HEADSHOT FUNCTIONS
 # ----------------------------
 
 @st.cache_data(show_spinner=False)
@@ -574,9 +587,6 @@ with col1:
     st.number_input("Year", min_value=1900, max_value=current_year, key="sc_year")
     st.number_input("Min PA", min_value=0, max_value=20000, key="sc_min_pa")
 
-   
-
-
     # Per-stat filter rows
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
@@ -586,7 +596,6 @@ with col1:
 
         current_stat = st.session_state.get(stat_key, COMBO_STATS[0])
 
-        # When stat changes, flip default operator based on lower_better
         new_stat = st.selectbox(
             f"Stat {i+1}",
             COMBO_STATS,
@@ -597,7 +606,6 @@ with col1:
             args=(i,),
         )
 
-        # Default operator based on whether stat is lower-better
         default_op = "<=" if new_stat in LOWER_BETTER else ">="
         current_op = st.session_state.get(op_key, default_op)
 
@@ -608,15 +616,21 @@ with col1:
         with val_col:
             default_val = STAT_DEFAULTS.get(new_stat, 0.0)
             current_val = st.session_state.get(val_key, default_val)
-            # Step size based on stat type
-            if "%" in new_stat or new_stat in {"AVG","OBP","SLG","OPS","wOBA","ISO","BABIP","EV"}:
+            # Three tiers: rate stats need 3dp, % stats need 1dp, counting stats are integers
+            RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
+            if new_stat in RATE_STATS_3DP:
+                step = 0.001
+                fmt = "%.3f"
+            elif "%" in new_stat or new_stat in {"EV"}:
                 step = 0.1
+                fmt = "%.1f"
             else:
                 step = 1.0
+                fmt = "%.0f"
             st.number_input(
                 f"Value {i+1}", step=step,
                 key=val_key, label_visibility="collapsed",
-                format="%.1f" if step < 1 else "%.0f",
+                format=fmt,
             )
     st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
                  format_func=lambda x: POSITION_OPTIONS[x], key="sc_position")
@@ -677,16 +691,12 @@ if not df.empty:
         if stat not in df.columns:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
-        # Normalize: FanGraphs stores percentages as 0-1 decimals.
-        # If user entered e.g. 15 for 15%, convert threshold to 0.15
         compare_val = val
         if stat in PCT_STATS:
             median_col = col_vals.median()
             if pd.notna(median_col) and median_col <= 1:
-                # column is 0-1, so convert user-entered 0-100 value to 0-1
                 if val > 1:
                     compare_val = val / 100
-            # Contact% is stored as contact rate; user enters Whiff% threshold
             if stat == "Contact%":
                 contact_threshold = 1 - (compare_val if compare_val <= 1 else compare_val / 100)
                 if op == ">=":
@@ -700,7 +710,6 @@ if not df.empty:
             mask = mask & (col_vals <= compare_val)
     df = df[mask]
     total_qualified = len(df)
-    # Sort by first stat descending (or ascending if lower_better)
     if active_filters:
         sort_stat, sort_op, _ = active_filters[0]
         if sort_stat in df.columns:
@@ -718,7 +727,6 @@ for card_pos, (_, row) in enumerate(df.iterrows()):
     name = row.get("Name", "")
     team = row.get("TeamDisplay", "")
 
-    # Show each filter stat value on the card
     stat_lines = []
     for stat, op, threshold in active_filters:
         val = row.get(stat, np.nan)
@@ -769,7 +777,6 @@ if not cards:
 else:
     body = "".join(cards)
 
-# Dynamic grid: up to 5 per row, flex wrap
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
