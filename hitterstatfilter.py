@@ -12,7 +12,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(page_title="Hitting Stat Filter Leaderboard", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Hitter Stat Filter Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -178,7 +178,7 @@ def format_threshold(stat: str, val: float, op: str) -> str:
     if op == ">=":
         return f"{numeric}+ {label}"
     else:
-        return f"≤ {numeric} {label}"
+        return f"≤{numeric} {label}"
 
 
 # ----------------------------
@@ -559,11 +559,9 @@ for key, default in [
     ("sc_min_pa",     300),
     ("sc_position",   "all"),
     ("sc_team",       "all"),
-    ("rf_show_min_pa",  False),
+
     ("sc_stat_0",     "HR"),   ("sc_op_0",  ">="), ("sc_val_0",  25.0),
     ("sc_stat_1",     "SB"),   ("sc_op_1",  ">="), ("sc_val_1",  30.0),
-    ("sc_stat_2",     "K%"),   ("sc_op_2",  "<="), ("sc_val_2",  20.0),
-    ("sc_stat_3",     "BB%"),  ("sc_op_3",  ">="), ("sc_val_3",  10.0),
     ("sc_show_pa",    False),
     ("sc_top10", False),
 ]:
@@ -594,11 +592,13 @@ with col1:
         op_key   = f"sc_op_{i}"
         val_key  = f"sc_val_{i}"
 
-        current_stat = st.session_state.get(stat_key, COMBO_STATS[0])
+        current_stat = st.session_state.get(stat_key)
+        stat_index = COMBO_STATS.index(current_stat) if current_stat in COMBO_STATS else 0
 
         new_stat = st.selectbox(
             f"Stat {i+1}",
             COMBO_STATS,
+            index=stat_index,
             key=stat_key,
             format_func=lambda x: label_map.get(x, x),
             label_visibility="collapsed",
@@ -608,10 +608,12 @@ with col1:
 
         default_op = "<=" if new_stat in LOWER_BETTER else ">="
         current_op = st.session_state.get(op_key, default_op)
+        op_index = 0 if current_op == ">=" else 1
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
             op = st.selectbox("Op", [">=", "<="],
+                              index=op_index,
                               key=op_key, label_visibility="collapsed")
         with val_col:
             default_val = STAT_DEFAULTS.get(new_stat, 0.0)
@@ -638,7 +640,6 @@ with col1:
                  format_func=lambda x: TEAM_OPTIONS[x], key="sc_team")
 
     st.checkbox("Show player PA", key="sc_show_pa")
-    st.checkbox("Show min PA",         key="rf_show_min_pa")
     st.checkbox("Only display top 10", key="sc_top10")
 
 # ----------------------------
@@ -768,11 +769,6 @@ pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" el
 team_suffix = f"({team_val}) " if team_val != "all" else ""
 title = f"{filter_str} in {year_val} {team_suffix}{pos_suffix}"
 
-min_pa_subtitle = ""
-if st.session_state.get("rf_show_min_pa", False):
-    display_min_pa = min_pa_val
-    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min_pa} PA</div>'
-
 overflow_note = ""
 display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
 if total_qualified > display_limit:
@@ -786,7 +782,6 @@ else:
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
-    {min_pa_subtitle}
     {overflow_note}
     <div class="players-grid">{body}</div>
     <div class="footer">
@@ -824,13 +819,6 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     margin-bottom: 1.2rem;
     text-align: center;
     line-height: 1.2;
-}}
-.leaderboard-subtitle {{
-    text-align: center;
-    color: #888;
-    font-size: 1.2rem;
-    margin-bottom: 1rem;
-    margin-top: -0.5rem;
 }}
 .overflow-note {{
     text-align: center;
