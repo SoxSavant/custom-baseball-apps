@@ -15,7 +15,7 @@ from datetime import date
 import requests
 
 
-st.set_page_config(page_title="Custom Team Pitcher Savant Page", layout="wide", page_icon="⚾",)
+st.set_page_config(page_title="Custom Team Pitching Savant Page", layout="wide", page_icon="⚾",)
 
 # Hide Streamlit Cloud toolbar
 st.markdown(

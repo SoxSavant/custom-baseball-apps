@@ -11,7 +11,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(page_title="Pitcher Year-over-Year", layout="wide", page_icon="⚾",)
+st.set_page_config(page_title="Pitching Year-over-Year", layout="wide", page_icon="⚾",)
 
 st.markdown(
     """

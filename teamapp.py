@@ -56,7 +56,7 @@ GRID_CUSTOM_CSS = {
 
 
 
-st.set_page_config(page_title="Custom Team Hitter Savant Page", layout="wide", page_icon="⚾",)
+st.set_page_config(page_title="Custom Team Hitting Savant Page", layout="wide", page_icon="⚾",)
 
 # Hide Streamlit Cloud toolbar + profile badge on deployed app
 st.markdown(
@@ -75,7 +75,7 @@ st.markdown(
 )
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Team Hitter Savant Page")
+    st.title("Custom Team Hitting Savant Page")
 with meta_col:
     st.markdown(
         """

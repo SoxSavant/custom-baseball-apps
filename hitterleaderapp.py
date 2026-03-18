@@ -13,7 +13,7 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
-st.set_page_config(page_title="Custom Hitter Leaderboard", layout="wide", page_icon="⚾",)
+st.set_page_config(page_title="Custom Hitting Leaderboard", layout="wide", page_icon="⚾",)
 
 st.markdown(
     """
