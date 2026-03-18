@@ -559,7 +559,7 @@ for key, default in [
     ("sc_min_pa",     300),
     ("sc_position",   "all"),
     ("sc_team",       "all"),
-
+    ("rf_show_min_pa",  False),
     ("sc_stat_0",     "HR"),   ("sc_op_0",  ">="), ("sc_val_0",  25.0),
     ("sc_stat_1",     "SB"),   ("sc_op_1",  ">="), ("sc_val_1",  30.0),
     ("sc_stat_2",     "K%"),   ("sc_op_2",  "<="), ("sc_val_2",  20.0),
@@ -638,6 +638,7 @@ with col1:
                  format_func=lambda x: TEAM_OPTIONS[x], key="sc_team")
 
     st.checkbox("Show player PA", key="sc_show_pa")
+    st.checkbox("Show min PA",         key="rf_show_min_pa")
     st.checkbox("Only display top 10", key="sc_top10")
 
 # ----------------------------
@@ -767,6 +768,11 @@ pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" el
 team_suffix = f"({team_val}) " if team_val != "all" else ""
 title = f"{filter_str} in {year_val} {team_suffix}{pos_suffix}"
 
+min_pa_subtitle = ""
+if st.session_state.get("rf_show_min_pa", False):
+    display_min_pa = min_pa_val
+    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min_pa} PA</div>'
+
 overflow_note = ""
 display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
 if total_qualified > display_limit:
@@ -780,6 +786,7 @@ else:
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
+    {min_pa_subtitle}
     {overflow_note}
     <div class="players-grid">{body}</div>
     <div class="footer">
@@ -817,6 +824,13 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     margin-bottom: 1.2rem;
     text-align: center;
     line-height: 1.2;
+}}
+.leaderboard-subtitle {{
+    text-align: center;
+    color: #888;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    margin-top: -0.5rem;
 }}
 .overflow-note {{
     text-align: center;
