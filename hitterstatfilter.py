@@ -559,11 +559,10 @@ for key, default in [
     ("sc_min_pa",     300),
     ("sc_position",   "all"),
     ("sc_team",       "all"),
-
-    ("sc_stat_0",     "HR"),   ("sc_op_0",  ">="), ("sc_val_0",  25.0),
-    ("sc_stat_1",     "SB"),   ("sc_op_1",  ">="), ("sc_val_1",  30.0),
     ("sc_show_pa",    False),
     ("sc_top10", False),
+    ("sc_val_0", 30),
+    ("sc_val_1",30),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -592,14 +591,14 @@ with col1:
         op_key   = f"sc_op_{i}"
         val_key  = f"sc_val_{i}"
 
-        current_stat = st.session_state.get(stat_key)
-        stat_index = COMBO_STATS.index(current_stat) if current_stat in COMBO_STATS else 0
+        default_stat = "HR" if i == 0 else "SB" if i == 1 else COMBO_STATS[0]
+        default_index = COMBO_STATS.index(default_stat)
 
         new_stat = st.selectbox(
             f"Stat {i+1}",
             COMBO_STATS,
-            index=stat_index,
             key=stat_key,
+            index = default_index,
             format_func=lambda x: label_map.get(x, x),
             label_visibility="collapsed",
             on_change=update_stat_default,
@@ -607,14 +606,10 @@ with col1:
         )
 
         default_op = "<=" if new_stat in LOWER_BETTER else ">="
-        current_op = st.session_state.get(op_key, default_op)
-        op_index = 0 if current_op == ">=" else 1
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            op = st.selectbox("Op", [">=", "<="],
-                              index=op_index,
-                              key=op_key, label_visibility="collapsed")
+            op = st.selectbox("Op", [">=", "<="], key=op_key, index = 0, label_visibility="collapsed")
         with val_col:
             default_val = STAT_DEFAULTS.get(new_stat, 0.0)
             current_val = st.session_state.get(val_key, default_val)

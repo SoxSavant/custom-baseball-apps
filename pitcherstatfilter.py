@@ -411,11 +411,11 @@ for key, default in [
     ("pc_year",    2025),
     ("pc_min_ip",  100),
     ("pc_team",    "all"),
-    ("pc_stat_0",  "ERA"),   ("pc_op_0", "<="), ("pc_val_0",  3.00),
-    ("pc_stat_1",  "FIP"),    ("pc_op_1", "<="), ("pc_val_1", 3.00),
     ("pc_show_ip", False),
     ("pc_show_min_ip", True),
     ("pc_top10",   False),
+    ("pc_val_0", 3.00),
+    ("pc_val_1", 3.00),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -443,23 +443,23 @@ with col1:
         op_key   = f"pc_op_{i}"
         val_key  = f"pc_val_{i}"
 
-        current_stat = st.session_state.get(stat_key)
-        stat_index = COMBO_STATS.index(current_stat) if current_stat in COMBO_STATS else 0
+        default_stat = "ERA" if i == 0 else "FIP" if i == 1 else COMBO_STATS[0]
+        default_index = COMBO_STATS.index(default_stat)
 
         new_stat = st.selectbox(
             f"Stat {i+1}",
             COMBO_STATS,
-            index = stat_index,
             key=stat_key,
+            index = default_index,
             format_func=lambda x: label_map.get(x, x),
             label_visibility="collapsed",
             on_change=update_stat_default,
             args=(i,),
         )
-
+        default_index = 1 if i == 0 or i == 1 else 0
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            st.selectbox("Op", [">=", "<="], key=op_key, label_visibility="collapsed")
+            st.selectbox("Op", [">=", "<="], index = default_index, key=op_key, label_visibility="collapsed")
         with val_col:
             # Three tiers: rate stats (ERA/FIP/WHIP etc) need 2-3dp, % stats need 1dp, counting are integers
             RATE_STATS_3DP = {"WHIP", "BABIP"}
