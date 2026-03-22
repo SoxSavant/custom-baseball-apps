@@ -178,7 +178,7 @@ def format_threshold(stat: str, val: float, op: str) -> str:
     if op == ">=":
         return f"{numeric}+ {label}"
     else:
-        return f"≤{numeric} {label}"
+        return f"≤ {numeric} {label}"
 
 
 # ----------------------------
