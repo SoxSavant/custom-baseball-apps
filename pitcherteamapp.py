@@ -1,5 +1,32 @@
-import os
+import requests
 import time
+
+SESSION = requests.Session()
+SESSION.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.fangraphs.com/",
+    "Connection": "keep-alive"
+})
+
+
+
+def safe_get(url, **kwargs):
+    for _ in range(3):
+        try:
+            r = SESSION.get(url, timeout=15, **kwargs)
+            if r.status_code == 200:
+                return r
+        except:
+            pass
+        time.sleep(2)
+    return None
+
+requests.get = SESSION.get
+requests.post = SESSION.post
+
+import os
 import unicodedata
 import streamlit as st
 import pandas as pd
@@ -12,7 +39,6 @@ from pathlib import Path
 from io import BytesIO, StringIO
 from pybaseball import pitching_stats, bwar_pitch
 from datetime import date
-import requests
 
 
 st.set_page_config(page_title="Custom Team Pitching Savant Page", layout="wide", page_icon="⚾",)

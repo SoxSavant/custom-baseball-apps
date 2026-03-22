@@ -15,6 +15,31 @@ from pybaseball.statcast_fielding import statcast_outs_above_average
 import requests
 from bs4 import BeautifulSoup
 
+SESSION = requests.Session()
+SESSION.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.fangraphs.com/",
+    "Connection": "keep-alive"
+})
+
+requests.get = SESSION.get
+requests.post = SESSION.post
+
+def safe_get(url, **kwargs):
+    for _ in range(3):
+        try:
+            r = SESSION.get(url, timeout=15, **kwargs)
+            if r.status_code == 200:
+                return r
+        except:
+            pass
+        time.sleep(2)
+    return None
+
+requests.get = safe_get
+
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾",)
 
 st.markdown(

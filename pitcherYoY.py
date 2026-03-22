@@ -1,9 +1,36 @@
+import requests
+import time
+
+SESSION = requests.Session()
+SESSION.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://www.fangraphs.com/",
+    "Connection": "keep-alive"
+})
+
+
+
+def safe_get(url, **kwargs):
+    for _ in range(3):
+        try:
+            r = SESSION.get(url, timeout=15, **kwargs)
+            if r.status_code == 200:
+                return r
+        except:
+            pass
+        time.sleep(2)
+    return None
+
+requests.get = SESSION.get
+requests.post = SESSION.post
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import unicodedata
 import html
-import requests
 import re
 import io
 from pathlib import Path
