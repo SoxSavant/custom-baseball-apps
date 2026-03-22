@@ -559,7 +559,7 @@ for key, default in [
     ("sc_min_pa",     300),
     ("sc_position",   "all"),
     ("sc_team",       "all"),
-    ("sc_show_pa",    False),
+    ("sc_show_min_pa",    True),
     ("sc_top10", False),
     ("sc_val_0", 30),
     ("sc_val_1",30),
@@ -634,7 +634,7 @@ with col1:
     st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
                  format_func=lambda x: TEAM_OPTIONS[x], key="sc_team")
 
-    st.checkbox("Show player PA", key="sc_show_pa")
+    st.checkbox("Show min PA", key="sc_show_min_pa")
     st.checkbox("Only display top 10", key="sc_top10")
 
 # ----------------------------
@@ -732,9 +732,7 @@ for card_pos, (_, row) in enumerate(df.iterrows()):
             lbl = label_map.get(stat, stat)
             stat_lines.append(f'<span class="stat-label">{lbl}:</span> <span class="stat-value">{display}</span>')
 
-    pa_val = row.get("PA", np.nan)
-    pa_display = f'<div class="player-pa">{int(pa_val)} PA</div>' if st.session_state.get("sc_show_pa") and pd.notna(pa_val) else ""
-
+    
     src_row = row
     try:
         ov = st.session_state.get(f"sc_mlbam_override_{card_pos}", "")
@@ -752,7 +750,6 @@ for card_pos, (_, row) in enumerate(df.iterrows()):
       <div class="player-name">{html.escape(str(name))}</div>
       <div class="player-team">{html.escape(str(team))}</div>
       {'<div class="player-stat-line">' + " | ".join(stat_lines) + "</div>" if stat_lines else ""}
-      {pa_display}
     </div>''')
 
 # ----------------------------
@@ -774,9 +771,14 @@ if not cards:
 else:
     body = "".join(cards)
 
+min_pa_subtitle = ""
+if st.session_state.get("sc_show_min_pa", True):
+    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA </div>'
+
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
+    {min_pa_subtitle}
     {overflow_note}
     <div class="players-grid">{body}</div>
     <div class="footer">
@@ -814,6 +816,13 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     margin-bottom: 1.2rem;
     text-align: center;
     line-height: 1.2;
+}}
+.leaderboard-subtitle {{
+    text-align: center;
+    color: #888;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    margin-top: -0.5rem;
 }}
 .overflow-note {{
     text-align: center;
