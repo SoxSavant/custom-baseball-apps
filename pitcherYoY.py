@@ -362,7 +362,7 @@ def load_single_year(year: int, min_ip: int = 0) -> pd.DataFrame:
 #  HEADSHOT HELPERS
 # ----------------------------
 
-@st.cache_data(show_spinner=False, tttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None

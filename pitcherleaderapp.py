@@ -230,7 +230,7 @@ def compute_team_display(teams: list[str]) -> str:
 #  External Data Loaders
 # ----------------------------
 
-@st.cache_data(ttl=600, max_entries=2)
+@st.cache_data(ttl=3600, max_entries=2)
 def pitching_stats(start_year: int, end_year: int, qual=0, split_seasons=False):
     try:
         return pybaseball.pitching_stats(start_year, end_year, qual=qual, split_seasons=split_seasons)
@@ -261,7 +261,7 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None

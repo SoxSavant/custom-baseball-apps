@@ -1322,7 +1322,7 @@ def resolve_player_fg_id(name: str, pool_df: pd.DataFrame | None = None) -> int 
 
 
 
-@st.cache_data(show_spinner=False, tttl=3600)
+@st.cache_data(show_spinner=False, ttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     """Best-effort MLBAM lookup using pybaseball's playerid_lookup. Optionally returns bbref id."""
     if not full_name or not full_name.strip():
