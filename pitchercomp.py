@@ -427,7 +427,7 @@ def fg_pitching_leaderboard(year: int, split_seasons: bool = False) -> pd.DataFr
 
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_year(y: int) -> pd.DataFrame:
     """Cached single-year fetch."""
     try:
@@ -831,7 +831,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
     return result
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_pitching(start_year: int, end_year: int) -> pd.DataFrame:
     """Load aggregated pitching stats for a single year or a span of years."""
     start = min(start_year, end_year)
@@ -1002,7 +1002,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     return combined.reset_index(drop=True)
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar_span(
     start_year: int,
     end_year: int,
@@ -1093,7 +1093,7 @@ def normalize_display_team(team_value: str) -> str:
     return compute_team_display([team_value]) if team_value else "N/A"
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_player_pitching_profile(fg_id: int, start_year: int, end_year: int) -> pd.Series | None:
     """
     Load the player's pitching profile for either a single season or a multi-year span.
@@ -1121,7 +1121,7 @@ def load_player_pitching_profile(fg_id: int, start_year: int, end_year: int) -> 
                 frames.append(split_df)
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-    @st.cache_data(show_spinner=False, ttl=900)
+    @st.cache_data(show_spinner=False, ttl=3600)
     def fallback_rows(pid: int, yr_start: int, yr_end: int) -> pd.DataFrame:
         """Best-effort fallback using broader load_pitching dataset."""
         df = load_pitching(yr_start, yr_end)
@@ -1322,7 +1322,7 @@ def resolve_player_fg_id(name: str, pool_df: pd.DataFrame | None = None) -> int 
 
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, tttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     """Best-effort MLBAM lookup using pybaseball's playerid_lookup. Optionally returns bbref id."""
     if not full_name or not full_name.strip():

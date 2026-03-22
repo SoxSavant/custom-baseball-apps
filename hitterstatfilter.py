@@ -212,7 +212,7 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 #  DATA LOADING
 # ----------------------------
 
-@st.cache_data(ttl=600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10)
 def batting_stats_cached(year: int, qual: int = 0):
     try:
         df = pybaseball.batting_stats(year, year, qual=qual, split_seasons=False)
@@ -262,7 +262,7 @@ def get_primary_fielding(year: int, batting_df=None) -> pd.DataFrame:
     return fielding[cols]
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=10)
 def load_savant_frv_year(year: int) -> pd.DataFrame:
     url = (
         "https://baseballsavant.mlb.com/leaderboard/fielding-run-value?"
@@ -286,7 +286,7 @@ def load_savant_frv_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=10)
 def load_savant_oaa_year(year: int) -> pd.DataFrame:
     try:
         df = statcast_outs_above_average(year, "all")
@@ -314,7 +314,7 @@ def load_savant_oaa_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "OAA"]]
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=5)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=5)
 def load_fangraphs_fielding(player_names: list, year: int) -> pd.DataFrame:
     if not player_names:
         return pd.DataFrame()
@@ -333,7 +333,7 @@ def load_fangraphs_fielding(player_names: list, year: int) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=600, show_spinner=False, max_entries=5)
+@st.cache_data(ttl=3600, show_spinner=False, max_entries=5)
 def load_fielding_for_players(player_names: list, year: int) -> pd.DataFrame:
     if not player_names:
         return pd.DataFrame()
@@ -364,7 +364,7 @@ def load_fielding_for_players(player_names: list, year: int) -> pd.DataFrame:
     return pd.DataFrame()
 
 
-@st.cache_data(ttl=600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10)
 def load_year(year: int, min_pa: int = 0, position: str = "all") -> pd.DataFrame:
     df = batting_stats_cached(year, qual=min_pa)
     if df is None or df.empty:
@@ -438,7 +438,7 @@ def load_year(year: int, min_pa: int = 0, position: str = "all") -> pd.DataFrame
 #  HEADSHOT FUNCTIONS
 # ----------------------------
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False,tttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None

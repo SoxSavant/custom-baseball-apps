@@ -134,7 +134,7 @@ ALLTIME_CSV = Path(__file__).with_name("yoy_deltas.csv")
 ALLTIME_MIN_PA = 600
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl= 3600)
 def load_alltime_csv() -> pd.DataFrame:
     if not ALLTIME_CSV.exists():
         return pd.DataFrame()
@@ -287,7 +287,7 @@ def transform_stat_value(stat: str, raw_val):
     return raw_val
 
 
-@st.cache_data(ttl=600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10)
 def batting_stats_cached(year: int, qual=0):
     try:
         df = pybaseball.batting_stats(year, year, qual=qual, split_seasons=False)
@@ -420,7 +420,7 @@ def load_single_year(year: int, min_pa: int = 0, position: str = "all") -> pd.Da
     return df
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=10)
 def load_savant_frv_year(year: int) -> pd.DataFrame:
     url = (
         "https://baseballsavant.mlb.com/leaderboard/fielding-run-value?"
@@ -444,7 +444,7 @@ def load_savant_frv_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "FRV", "ARM", "RANGE"]]
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=10)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=10)
 def load_savant_oaa_year(year: int) -> pd.DataFrame:
     try:
         df = statcast_outs_above_average(year, "all")
@@ -472,7 +472,7 @@ def load_savant_oaa_year(year: int) -> pd.DataFrame:
     return df[["NameKey", "Name", "OAA"]]
 
 
-@st.cache_data(show_spinner=False, ttl=600, max_entries=5)
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=5)
 def load_fangraphs_fielding(player_names: list, start_year: int, end_year: int) -> pd.DataFrame:
     if not player_names:
         return pd.DataFrame()
@@ -524,7 +524,7 @@ def load_fielding_for_year(player_names: list, year: int) -> pd.DataFrame:
     return pd.DataFrame()
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, tttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None

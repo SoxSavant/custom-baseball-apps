@@ -278,7 +278,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     return combined.reset_index(drop=True)
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar_for_year(year: int) -> pd.DataFrame:
     data = load_bwar_dataset(local_bwar_signature())
     if data is None or data.empty:
@@ -306,7 +306,7 @@ def add_whiff_from_contact(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner=True, ttl=900)
+@st.cache_data(show_spinner=True, ttl=3600)
 def load_pitching(y: int) -> pd.DataFrame:
     try:
         base = pitching_stats(y, y, qual=0)

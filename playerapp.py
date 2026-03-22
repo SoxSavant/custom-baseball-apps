@@ -354,7 +354,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     return combined.reset_index(drop=True)
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar_for_year(year: int) -> pd.DataFrame:
     data = load_bwar_dataset(local_bwar_signature())
     if data is None or data.empty:
@@ -369,7 +369,7 @@ def load_bwar_for_year(year: int) -> pd.DataFrame:
     return agg
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar_span(
     start_year: int,
     end_year: int,
@@ -435,7 +435,7 @@ def load_bwar_span(
 
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
     try:
         df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
@@ -465,7 +465,7 @@ def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> 
 
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_player_fielding_profile_span(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
     try:
         df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
@@ -492,7 +492,7 @@ def load_player_fielding_profile_span(fg_id: int, start_year: int, end_year: int
     return result
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_statcast_fielding_span(
     start_year: int,
     end_year: int,
@@ -553,7 +553,7 @@ def load_statcast_fielding_span(
     return agg
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_fielding_year(year: int) -> pd.DataFrame:
     try:
         df = fielding_stats(year, year, qual=0, split_seasons=False)
@@ -584,7 +584,7 @@ def load_fielding_year(year: int) -> pd.DataFrame:
 
 
 # ...existing code...
-@st.cache_data(show_spinner=True, ttl=900)
+@st.cache_data(show_spinner=True, ttl=3600)
 def load_batting(y: int) -> pd.DataFrame:
     base = batting_stats(y, y, qual=0)
     if base is None or base.empty:

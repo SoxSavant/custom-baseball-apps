@@ -305,7 +305,7 @@ def transform_stat_value(stat: str, raw_val):
 #  DATA LOADING
 # ----------------------------
 
-@st.cache_data(ttl=600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10)
 def pitching_stats_cached(year: int, qual=0):
     try:
         df = pybaseball.pitching_stats(year, year, qual=qual, split_seasons=False)
@@ -362,7 +362,7 @@ def load_single_year(year: int, min_ip: int = 0) -> pd.DataFrame:
 #  HEADSHOT HELPERS
 # ----------------------------
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, tttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None

@@ -1,19 +1,5 @@
-import os
-import time
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import html
-import io
-import unicodedata
-import re
-from datetime import date
-from pathlib import Path
-from pybaseball import batting_stats, fielding_stats, playerid_lookup, bwar_bat
-from pybaseball.statcast_fielding import statcast_outs_above_average
 import requests
-from bs4 import BeautifulSoup
+import time
 
 SESSION = requests.Session()
 SESSION.headers.update({
@@ -24,8 +10,7 @@ SESSION.headers.update({
     "Connection": "keep-alive"
 })
 
-requests.get = SESSION.get
-requests.post = SESSION.post
+
 
 def safe_get(url, **kwargs):
     for _ in range(3):
@@ -38,7 +23,26 @@ def safe_get(url, **kwargs):
         time.sleep(2)
     return None
 
-requests.get = safe_get
+requests.get = SESSION.get
+requests.post = SESSION.post
+
+
+import os
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import html
+import io
+import unicodedata
+import re
+from datetime import date
+from pathlib import Path
+from pybaseball import batting_stats, fielding_stats, playerid_lookup, bwar_bat
+from pybaseball.statcast_fielding import statcast_outs_above_average
+
+from bs4 import BeautifulSoup
+
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾",)
 
@@ -409,7 +413,7 @@ def local_bwar_signature() -> float:
         return 0.0
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_year(y: int) -> pd.DataFrame:
     return batting_stats(y, y, qual=0, split_seasons=False)
 
@@ -602,7 +606,7 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
     return result
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
     start = min(start_year, end_year)
     end = max(start_year, end_year)
@@ -822,7 +826,7 @@ def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
     return combined.reset_index(drop=True)
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar_span(
     start_year: int,
     end_year: int,
@@ -907,7 +911,7 @@ def load_bwar_span(
     return agg
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_statcast_fielding_span(
     start_year: int,
     end_year: int,
@@ -967,7 +971,7 @@ def normalize_display_team(team_value: str) -> str:
     return compute_team_display([team_value]) if team_value else "N/A"
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> pd.Series | None:
     if start_year == end_year:
         try:
@@ -1017,7 +1021,7 @@ def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> p
     return pd.Series(aggregated)
 
 
-@st.cache_data(show_spinner=False, ttl=900)
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_player_fielding_profile(fg_id: int, start_year: int, end_year: int) -> dict[str, float]:
     try:
         df = fielding_stats(start_year, end_year, qual=0, split_seasons=False, players=str(fg_id))
@@ -1155,7 +1159,7 @@ def resolve_player_fg_id(name: str, pool_df: pd.DataFrame | None = None) -> int 
     return lookup_fg_id_by_name(name)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, tttl = 3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None

@@ -238,7 +238,7 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 #  DATA LOADING
 # ----------------------------
 
-@st.cache_data(ttl=600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10)
 def pitching_stats_cached(year: int, qual: int = 0):
     try:
         df = pybaseball.pitching_stats(year, year, qual=qual, split_seasons=False)
@@ -247,7 +247,7 @@ def pitching_stats_cached(year: int, qual: int = 0):
         return pd.DataFrame()
 
 
-@st.cache_data(ttl=600, max_entries=10)
+@st.cache_data(ttl=3600, max_entries=10)
 def load_year(year: int, min_ip: int = 0) -> pd.DataFrame:
     df = pitching_stats_cached(year, qual=min_ip)
     if df is None or df.empty:
@@ -291,7 +291,7 @@ def load_year(year: int, min_ip: int = 0) -> pd.DataFrame:
 #  HEADSHOT FUNCTIONS
 # ----------------------------
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, tttl=3600)
 def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
     if not full_name or not full_name.strip():
         return (None, None) if return_bbref else None
