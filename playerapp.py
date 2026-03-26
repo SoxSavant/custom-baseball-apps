@@ -44,6 +44,8 @@ from pybaseball.statcast_fielding import statcast_outs_above_average
 
 plt.rcdefaults()
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
+
 st.set_page_config(page_title="Custom Hitter Savant Page", layout="wide", page_icon="⚾",)
 
 st.markdown(

@@ -38,6 +38,8 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
+
 st.set_page_config(page_title="Custom Hitting Leaderboard", layout="wide", page_icon="⚾",)
 
 st.markdown(

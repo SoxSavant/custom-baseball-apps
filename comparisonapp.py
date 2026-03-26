@@ -23,7 +23,7 @@ def safe_get(url, **kwargs):
         time.sleep(2)
     return None
 
-requests.get = SESSION.get
+requests.get = safe_get
 requests.post = SESSION.post
 
 
@@ -43,6 +43,7 @@ from pybaseball.statcast_fielding import statcast_outs_above_average
 
 from bs4 import BeautifulSoup
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾",)
 

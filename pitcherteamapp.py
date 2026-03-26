@@ -40,6 +40,7 @@ from io import BytesIO, StringIO
 from pybaseball import pitching_stats, bwar_pitch
 from datetime import date
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
 
 st.set_page_config(page_title="Custom Team Pitching Savant Page", layout="wide", page_icon="⚾",)
 

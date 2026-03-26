@@ -42,6 +42,8 @@ from pybaseball import pitching_stats, playerid_lookup, bwar_pitch
 
 plt.rcdefaults()
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
+
 st.set_page_config(page_title="Custom Pitcher Savant Page", layout="wide", page_icon="⚾",)
 
 st.markdown(

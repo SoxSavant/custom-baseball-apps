@@ -41,6 +41,8 @@ from pybaseball import pitching_stats, playerid_lookup, bwar_pitch
 from bs4 import BeautifulSoup
 from io import BytesIO
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
+
 st.set_page_config(page_title="Custom Pitcher Comparison", layout="wide", page_icon="⚾",)
 
 st.markdown(

@@ -40,6 +40,8 @@ from datetime import date
 import streamlit.components.v1 as components
 import pybaseball
 
+st.error("⚠️ Data source temporarily down. Working on a fix.")
+
 st.set_page_config(page_title="Hitting Year-over-Year", layout="wide", page_icon="⚾",)
 
 POSITION_FILTER_MAP = {
