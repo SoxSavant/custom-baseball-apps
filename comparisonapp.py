@@ -1,31 +1,3 @@
-import requests
-import time
-
-SESSION = requests.Session()
-SESSION.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.fangraphs.com/",
-    "Connection": "keep-alive"
-})
-
-
-def safe_get(url, **kwargs):
-    for _ in range(3):
-        try:
-            r = SESSION.get(url, timeout=15, **kwargs)
-            if r.status_code == 200:
-                return r
-        except Exception:
-            pass
-        time.sleep(2)
-    return None
-
-requests.get = safe_get
-requests.post = SESSION.post
-
-
 import os
 import streamlit as st
 import pandas as pd
@@ -34,8 +6,7 @@ import html
 import unicodedata
 import re
 from pathlib import Path
-from pybaseball import playerid_lookup, bwar_bat
-
+from functools import lru_cache
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾")
 
@@ -53,11 +24,6 @@ st.markdown(
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
         .viewerBadge_link__qRi_k {display: none;}
-        div.ag-header-cell[col-id="ag-RowSelector"],
-        div.ag-pinned-left-cols-container [col-id="ag-RowSelector"],
-        div.ag-center-cols-container [col-id="ag-RowSelector"] {
-            display: none !important;
-        }
         .compare-card {
             background: #ffffff;
             border: 1px solid #d0d0d0;
@@ -184,7 +150,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-
 # ─────────────────────────────────────────────
 #  Constants
 # ─────────────────────────────────────────────
@@ -200,10 +165,7 @@ STAT_PRESETS = {
         "bWAR", "WAR", "G", "PA", "HR", "wRC+", "xwOBA",
         "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
     ],
-    "Stathead": [
-        "bWAR", "WAR", "G", "PA", "H", "HR", "RBI",
-        "SB", "AVG", "OBP", "SLG", "OPS", "wRC+",
-    ],
+   
     "Statcast": [
         "WAR", "Off", "BsR", "Def", "OAA", "FRV",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
@@ -217,20 +179,17 @@ STAT_PRESETS = {
     "Fielding": [
         "DRS", "FRV", "OAA",
     ],
-    "Miscellaneous": [
-        "K-BB%", "O-Swing%", "Contact%", "DRS",
-        "WPA", "Clutch", "Pull%", "GB%", "FB%", "LD%",
-    ],
-    "Blank – Create your own": [
-        "Age",
-    ],
+    
     "Every Stat": [
-        "bWAR", "WAR", "G", "PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI",
+        "bWAR", "WAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R",  "wOBA",
         "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
         "wRC+", "Off", "BsR", "Def", "OAA", "FRV",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
         "O-Swing%", "Contact%", "K%", "BB%", "BB", "IBB", "SO",
         "K-BB%", "DRS", "WPA", "Clutch", "Pull%", "GB%", "FB%", "LD%",
+    ],
+    "Blank – Create your own": [
+        "WAR",
     ],
     "Player A leads": [],
     "Player B leads": [],
@@ -245,7 +204,7 @@ STAT_ALLOWLIST = [
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
-    "Pull%", "FRV", "OAA", "DRS", "Age",
+    "FRV", "OAA", "DRS", "Age",
 ]
 
 STAT_DISPLAY_NAMES = {
@@ -257,7 +216,7 @@ STAT_DISPLAY_NAMES = {
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "WAR", "Off", "Def", "BsR", "GDP", "wRAA", "wRC",
+    "WAR", "Off", "Def", "BsR", "GDP", "wRC",
     "DRS", "OAA", "FRV",
 }
 RATE_STATS = {
@@ -271,15 +230,7 @@ STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}
 HEADSHOT_BASES = [
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
     "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
-    "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}headshot/67/current",
 ]
-HEADSHOT_BREF_BASES = [
-    "https://content-static.baseball-reference.com/req/202406/images/headshots/{folder}/{bref_id}.jpg",
-    "https://content-static.baseball-reference.com/req/202310/images/headshots/{folder}/{bref_id}.jpg",
-    "https://www.baseball-reference.com/req/202108020/images/headshots/{folder}/{bref_id}.jpg",
-]
-HEADSHOT_CHECK_TIMEOUT = 1.0
-HEADSHOT_USER_AGENT = "headshot-fetcher/1.0"
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
     "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
@@ -301,62 +252,111 @@ label_map = {
 }
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "Contact%", "SO"}
 
+# Teams that should be treated as the same franchise
+TEAM_ALIASES = {
+    "ATH": "OAK",
+    "ATH/OAK": "OAK",
+    "OAK/ATH": "OAK",
+}
+
 
 # ─────────────────────────────────────────────
-#  Data loading
+#  Team display helper
 # ─────────────────────────────────────────────
 
-def local_bwar_signature() -> float:
-    try:
-        return LOCAL_BWAR_FILE.stat().st_mtime
-    except FileNotFoundError:
-        return 0.0
+def normalize_team(team: str) -> str:
+    """Normalize team abbreviations (OAK/ATH treated as same)."""
+    t = str(team).strip()
+    return TEAM_ALIASES.get(t, t)
 
+
+def get_team_display(team_value: str) -> str:
+    """
+    Simple rule:
+      - '- - -' means player was on 2+ teams → '2+ Teams'
+      - Otherwise show the (normalized) team abbreviation
+    """
+    t = str(team_value).strip()
+    if t == "- - -":
+        return "2+ Teams"
+    return normalize_team(t)
+
+
+def get_team_display_multiseason(teams: list[str]) -> str:
+    """
+    For multi-year spans: if there are multiple distinct teams → '2+ Teams',
+    otherwise show the single team.
+    OAK and ATH count as the same team.
+    """
+    normalized = {normalize_team(t) for t in teams if str(t).strip() and str(t).strip() != "- - -"}
+    if "2+ Teams" in {get_team_display(t) for t in teams}:
+        return "2+ Teams"
+    if len(normalized) > 1:
+        return "2+ Teams"
+    return normalized.pop() if normalized else "N/A"
+
+
+# ─────────────────────────────────────────────
+#  Data loading — simple CSV reads
+# ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def load_year(y: int) -> pd.DataFrame:
-    """Load batting CSV for a year and left-join fielding metrics."""
+def load_final_year(year: int) -> pd.DataFrame:
+    """Load the pre-merged final CSV for a given year."""
+    path = f"data/final/hitting_final_{year}.csv"
     try:
-        df = pd.read_csv(f"data/batting_{y}.csv")
-        df["Season"] = y
+        df = pd.read_csv(path)
+        df["Season"] = year
+        return df
     except Exception:
         return pd.DataFrame()
 
-    try:
-        fielding = pd.read_csv(f"data/fielding_{y}.csv")
-        keep = ["PlayerId"] + [c for c in fielding.columns if c in FIELDING_METRICS]
-        if len(keep) > 1:
-            # Sum across positions for players who played multiple
-            fielding_agg = (
-                fielding[keep]
-                .groupby("PlayerId", as_index=False)
-                .sum(numeric_only=True)
-            )
-            df = df.merge(fielding_agg, on="PlayerId", how="left")
-    except Exception:
-        pass  # fielding file missing or malformed — skip silently
 
-    return df
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar() -> pd.DataFrame:
+    """Load bWAR + Age from the local warhitters file."""
+    if not LOCAL_BWAR_FILE.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(LOCAL_BWAR_FILE)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+
+    # Filter out pitchers with no PA
+    if "pitcher" in df.columns:
+        pitcher_mask = df["pitcher"].astype(str).str.strip().str.upper().isin({"Y", "1", "TRUE"})
+        pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
+        df = df[~(pitcher_mask & (pa_col.isna() | (pa_col <= 0)))]
+
+    name_col = "name_common" if "name_common" in df.columns else "Name"
+    df["Name"] = df[name_col].astype(str).str.strip()
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+
+    keep = ["Name", "year_ID", "bWAR"]
+    if "Age" in df.columns:
+        df["Age"] = pd.to_numeric(df.get("Age"), errors="coerce")
+        keep.append("Age")
+
+    return df[keep].dropna(subset=["Name", "year_ID", "bWAR"])
 
 
 # ─────────────────────────────────────────────
 #  Name utilities
 # ─────────────────────────────────────────────
 
-def normalize_statcast_name(raw: str) -> str:
+def normalize_name(raw: str) -> str:
     if not raw or not isinstance(raw, str):
         return ""
     cleaned = raw.replace("\xa0", " ").strip()
-    if "," in cleaned:
-        last, first = cleaned.split(",", 1)
-        full = f"{first.strip()} {last.strip()}"
-    else:
-        full = cleaned
     try:
-        full = unicodedata.normalize("NFKD", full).encode("ascii", "ignore").decode()
+        cleaned = unicodedata.normalize("NFKD", cleaned).encode("ascii", "ignore").decode()
     except Exception:
         pass
-    return " ".join(full.split())
+    return " ".join(cleaned.split()).lower()
 
 
 def display_stat_name(stat) -> str:
@@ -366,53 +366,37 @@ def display_stat_name(stat) -> str:
 
 
 # ─────────────────────────────────────────────
-#  Team helpers
-# ─────────────────────────────────────────────
-
-def compute_team_display(teams: list[str]) -> str:
-    if not teams:
-        return "N/A"
-    if len(teams) == 1:
-        return teams[0]
-    return f"{len(teams)} Teams"
-
-
-def normalize_display_team(team_value: str) -> str:
-    return compute_team_display([team_value]) if team_value else "N/A"
-
-
-# ─────────────────────────────────────────────
 #  Aggregation
 # ─────────────────────────────────────────────
 
-def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_year: int = 2015) -> dict:
-    result: dict[str, object] = {}
-    if name is None and "Name" in grp.columns:
+def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
+    result: dict = {}
+
+    if "Name" in grp.columns:
         val = grp["Name"].dropna()
         if not val.empty:
-            name = str(val.iloc[0])
-    if name:
-        result["Name"] = name
-    if "IDfg" in grp.columns:
-        ids = grp["IDfg"].dropna()
+            result["Name"] = str(val.iloc[0])
+
+    if "PlayerId" in grp.columns:
+        ids = grp["PlayerId"].dropna()
         if not ids.empty:
-            result["IDfg"] = ids.iloc[0]
+            result["PlayerId"] = ids.iloc[0]
+
+    if "MLBAMID" in grp.columns:
+        ids = grp["MLBAMID"].dropna()
+        if not ids.empty:
+            result["MLBAMID"] = ids.iloc[0]
+
+    # Team display
     if "Team" in grp.columns:
-        # Get the most common team if they played for multiple, or just the first
-        team_val = grp["Team"].dropna()
-        if not team_val.empty:
-            result["Team"] = str(team_val.iloc[-1]) # Uses the most recent team in the group
-            result["TeamDisplay"] = str(team_val.iloc[-1])
-        else:
-            result["Team"] = "N/A"
-            result["TeamDisplay"] = "N/A"
+        teams = grp["Team"].dropna().astype(str).tolist()
+        result["Team"] = get_team_display_multiseason(teams)
     else:
         result["Team"] = "N/A"
-        result["TeamDisplay"] = "N/A"
 
     numeric_cols = [
         col for col in grp.columns
-        if pd.api.types.is_numeric_dtype(grp[col]) and col not in {"IDfg"}
+        if pd.api.types.is_numeric_dtype(grp[col]) and col not in {"PlayerId", "MLBAMID", "Season"}
     ]
 
     pa_weight = (
@@ -512,658 +496,117 @@ def aggregate_player_group(grp: pd.DataFrame, name: str | None = None, start_yea
     return result
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_batting(start_year: int, end_year: int) -> pd.DataFrame:
-    start = min(start_year, end_year)
-    end = max(start_year, end_year)
-    frames = []
-    failed_years = []
-
-    for year in range(start, end + 1):
-        try:
-            yearly = load_year(year)
-        except Exception:
-            yearly = None
-        if yearly is not None and not yearly.empty:
-            yearly = yearly.copy()
-            if "Season" not in yearly.columns:
-                yearly["Season"] = year
-            frames.append(yearly)
-        else:
-            failed_years.append(year)
-
-    if frames:
-        combined = pd.concat(frames, ignore_index=True)
-        age_span_map: dict[str, str | float] = {}
-        if "Name" in combined.columns and "Age" in combined.columns:
-            for name, grp in combined.groupby("Name"):
-                series = pd.to_numeric(grp["Age"], errors="coerce")
-                if series.isna().all():
-                    continue
-                age_min = series.min(skipna=True)
-                age_max = series.max(skipna=True)
-                if pd.isna(age_min) or pd.isna(age_max):
-                    continue
-                if abs(age_min - age_max) < 0.01:
-                    age_span_map[name] = float(age_min)
-                else:
-                    age_span_map[name] = f"{int(round(age_min))}-{int(round(age_max))}"
-
-        grouped_rows = []
-        for name, grp in combined.groupby("Name"):
-            row = aggregate_player_group(grp, name, start_year=start)
-            if age_span_map and name in age_span_map:
-                row["Age"] = age_span_map[name]
-            grouped_rows.append(row)
-
-        if failed_years:
-            st.warning(f"Missing data for years: {', '.join(map(str, failed_years))}")
-
-        return pd.DataFrame(grouped_rows)
-
-    st.error(f"Could not load batting data for {start}-{end}.")
-    return pd.DataFrame()
-
-
 # ─────────────────────────────────────────────
-#  bWAR
+#  Player profile builder — no pybaseball
 # ─────────────────────────────────────────────
-
-def load_local_bwar_data() -> pd.DataFrame:
-    if not LOCAL_BWAR_FILE.exists():
-        return pd.DataFrame()
-    try:
-        df = pd.read_csv(LOCAL_BWAR_FILE)
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    pitcher_col = df.get("pitcher")
-    pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
-    if pitcher_col is not None:
-        pitcher_mask = pitcher_col.astype(str).str.strip().str.upper().isin({"Y", "1", "TRUE"})
-        no_pa_mask = pa_col.isna() | (pa_col <= 0)
-        df = df[~(pitcher_mask & no_pa_mask)]
-    df["Name"] = df.get("name_common", df.get("Name", "")).astype(str).str.strip()
-    df["NameKey"] = df["Name"].apply(normalize_statcast_name)
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["WAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    player_series = df["player_ID"] if "player_ID" in df.columns else pd.Series("", index=df.index)
-    df["player_ID"] = player_series.astype(str).str.strip().str.lower()
-    mlb_series = df["mlb_ID"] if "mlb_ID" in df.columns else pd.Series(np.nan, index=df.index)
-    df["mlb_ID"] = pd.to_numeric(mlb_series, errors="coerce")
-    df = df.dropna(subset=["NameKey", "year_ID", "WAR"])
-    return df[["NameKey", "Name", "year_ID", "WAR", "player_ID", "mlb_ID"]]
-
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar_dataset(local_sig: float) -> pd.DataFrame:
-    _ = local_sig
-    frames: list[pd.DataFrame] = []
-    try:
-        data = bwar_bat(return_all=True)
-    except Exception:
-        data = None
-    if data is not None and not data.empty:
-        data = data.copy()
-        data["year_ID"] = pd.to_numeric(data.get("year_ID"), errors="coerce")
-        data["WAR"] = pd.to_numeric(data.get("WAR"), errors="coerce")
-        if "pitcher" in data.columns:
-            pitcher_mask = pd.to_numeric(data["pitcher"], errors="coerce").fillna(0) != 0
-            pa_series = pd.to_numeric(data.get("PA"), errors="coerce") if "PA" in data.columns else pd.Series(np.nan, index=data.index)
-            no_pa_mask = pa_series.isna() | (pa_series <= 0)
-            data = data[~(pitcher_mask & no_pa_mask)]
-        data["Name"] = data["name_common"].astype(str).str.strip()
-        data["NameKey"] = data["Name"].apply(normalize_statcast_name)
-        player_series = data["player_ID"] if "player_ID" in data.columns else pd.Series("", index=data.index)
-        data["player_ID"] = player_series.astype(str).str.strip().str.lower()
-        mlb_series = data["mlb_ID"] if "mlb_ID" in data.columns else pd.Series(np.nan, index=data.index)
-        data["mlb_ID"] = pd.to_numeric(mlb_series, errors="coerce")
-        frames.append(data[["NameKey", "Name", "year_ID", "WAR", "player_ID", "mlb_ID"]])
-    local = load_local_bwar_data()
-    if local is not None and not local.empty:
-        frames.append(local)
-    if not frames:
-        return pd.DataFrame()
-    combined = pd.concat(frames, ignore_index=True)
-    combined = combined.dropna(subset=["NameKey", "year_ID", "WAR"])
-    combined = combined.sort_values(["NameKey", "year_ID"])
-    combined = combined.drop_duplicates(subset=["NameKey", "year_ID"], keep="last")
-    return combined.reset_index(drop=True)
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar_span(
-    start_year: int,
-    end_year: int,
-    target_names: tuple[str, ...] | None = None,
-    target_bbref: str | None = None,
-    target_mlbam: int | None = None,
-) -> pd.DataFrame:
-    data = load_bwar_dataset(local_bwar_signature())
-    if data is None or data.empty:
-        return pd.DataFrame()
-    pool = data[data["year_ID"].between(start_year, end_year)]
-    if pool.empty:
-        return pd.DataFrame()
-
-    def clean_key(val: str) -> str:
-        try:
-            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
-        except Exception:
-            pass
-        return "".join(ch for ch in str(val) if ch.isalnum()).lower()
-
-    def match_by_names() -> pd.DataFrame:
-        if not target_names:
-            return pd.DataFrame()
-        keys = {normalize_statcast_name(name) for name in target_names if name}
-        return pool[pool["NameKey"].isin(keys)] if keys else pd.DataFrame()
-
-    def match_by_clean_name() -> pd.DataFrame:
-        if not target_names:
-            return pd.DataFrame()
-        targets = {clean_key(name) for name in target_names if name}
-        if not targets:
-            return pd.DataFrame()
-        pool_local = pool.copy()
-        pool_local["__clean"] = pool_local["Name"].astype(str).apply(clean_key)
-        return pool_local[pool_local["__clean"].isin(targets)]
-
-    def match_by_bbref() -> pd.DataFrame:
-        if not target_bbref:
-            return pd.DataFrame()
-        slug = str(target_bbref).strip().lower()
-        if not slug or "player_ID" not in pool.columns:
-            return pd.DataFrame()
-        return pool[pool["player_ID"].astype(str).str.lower() == slug]
-
-    def match_by_mlbam() -> pd.DataFrame:
-        if target_mlbam is None or "mlb_ID" not in pool.columns:
-            return pd.DataFrame()
-        try:
-            return pool[pool["mlb_ID"] == int(target_mlbam)]
-        except Exception:
-            return pd.DataFrame()
-
-    df = match_by_names()
-    if df.empty:
-        df = match_by_bbref()
-    if df.empty:
-        df = match_by_mlbam()
-    if df.empty:
-        df = match_by_clean_name()
-    if df.empty:
-        return pd.DataFrame()
-
-    agg = df.groupby("NameKey", as_index=False).agg({
-        "Name": "first",
-        "WAR": lambda s: s.sum(min_count=1),
-    })
-    return agg.rename(columns={"WAR": "bWAR"})
-
-
-# ─────────────────────────────────────────────
-#  Player profile builder
-# ─────────────────────────────────────────────
-
-def load_player_batting_profile(fg_id: int, start_year: int, end_year: int) -> pd.Series | None:
+def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
+    """
+    Load rows for a PlayerId across the year range from final CSVs,
+    aggregate, then join bWAR + Age from warhitters file.
+    """
     frames = []
     for year in range(start_year, end_year + 1):
-        df = load_year(year)
+        df = load_final_year(year)
         if df is None or df.empty:
             continue
-        id_col = "PlayerId"
-        if id_col is None:
-            continue
-        match = df[df[id_col] == fg_id]
+        match = df[df["PlayerId"] == player_id]
         if not match.empty:
             frames.append(match)
+
     if not frames:
         return None
+
     combined = pd.concat(frames, ignore_index=True)
-    aggregated = aggregate_player_group(combined, start_year=start_year)
-    if isinstance(aggregated, dict):
-        aggregated = pd.DataFrame([aggregated])
-    return aggregated.iloc[0] if not aggregated.empty else None
-
-
-def build_player_profile(
-    fg_id: int,
-    start_year: int,
-    end_year: int,
-    mlbam_override: int | None = None,
-) -> pd.Series | None:
-    batting = load_player_batting_profile(fg_id, start_year, end_year)
-    if batting is None:
+    agg = aggregate_player_group(combined, start_year=start_year)
+    if not agg:
         return None
 
-    # Fielding metrics (DRS, OAA, FRV) are already merged into load_year()
-    # via the fielding CSV join, so they flow through aggregation automatically.
+    # Merge bWAR and Age from warhitters file by name + year range
+    player_name = agg.get("Name", "")
+    bwar_df = load_bwar()
+    if not bwar_df.empty and player_name:
+        name_key = normalize_name(player_name)
+        bwar_df["_nkey"] = bwar_df["Name"].apply(normalize_name)
+        subset = bwar_df[
+            (bwar_df["_nkey"] == name_key) &
+            (bwar_df["year_ID"] >= start_year) &
+            (bwar_df["year_ID"] <= end_year)
+        ]
+        if not subset.empty:
+            agg["bWAR"] = subset["bWAR"].sum(min_count=1)
+            # Age: show span if multi-year
+            if "Age" in subset.columns:
+                ages = subset["Age"].dropna()
+                if not ages.empty:
+                    age_min = int(ages.min())
+                    age_max = int(ages.max())
+                    agg["Age"] = float(age_min) if age_min == age_max else f"{age_min}-{age_max}"
 
-    name_value = str(batting.get("Name", "")).strip()
-    mlbam_id = mlbam_override
-    bbref_id = None
-    if name_value:
-        lookup_mlbam, lookup_bbref = lookup_mlbam_id(name_value, return_bbref=True)
-        if mlbam_id is None:
-            mlbam_id = lookup_mlbam
-        bbref_id = lookup_bbref
-    batting["mlbam_override"] = mlbam_id if mlbam_id is not None else np.nan
+    return pd.Series(agg)
 
-    name_key = normalize_statcast_name(name_value)
-    name_targets = (name_key,) if name_key else None
-    bwar = load_bwar_span(
-        start_year,
-        end_year,
-        target_names=name_targets,
-        target_bbref=bbref_id,
-        target_mlbam=mlbam_id,
-    )
-    if bwar is not None and not bwar.empty:
-        match_bwar = bwar
-        if name_key:
-            match = bwar[bwar["NameKey"] == name_key]
-            if not match.empty:
-                match_bwar = match
-        batting["bWAR"] = pd.to_numeric(match_bwar["bWAR"].iloc[0], errors="coerce")
-
-    for metric in FIELDING_METRICS:
-        if metric not in batting.index:
-            batting[metric] = np.nan
-        else:
-            batting[metric] = pd.to_numeric(batting[metric], errors="coerce")
-
-    return batting
-
-
-# ─────────────────────────────────────────────
-#  Player ID lookups
-# ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def lookup_fg_id_by_name(full_name: str) -> int | None:
-    if not full_name or not isinstance(full_name, str):
-        return None
-    tokens = full_name.strip().split()
-    suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
-    while tokens and tokens[-1].lower() in suffixes:
-        tokens.pop()
-    if len(tokens) < 2:
-        return None
-    last = tokens[-1]
-    first = " ".join(tokens[:-1])
+def search_players(query: str, year: int) -> pd.DataFrame:
+    """Search players by name in a given year's final CSV."""
+    df = load_final_year(year)
+    if df is None or df.empty or "Name" not in df.columns:
+        return pd.DataFrame()
+    mask = df["Name"].str.contains(query, case=False, na=False)
+    return df[mask][["Name", "PlayerId"]].drop_duplicates()
 
-    def normalize_token(val: str) -> str:
-        val = val.replace(".", "").strip()
-        try:
-            return unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
-        except Exception:
-            return val
 
-    variants = [
-        (last, first),
-        (normalize_token(last), normalize_token(first)),
-        (normalize_token(last).lower(), normalize_token(first).lower()),
-        (last.lower(), first.lower()),
-    ]
-    seen: set[tuple[str, str]] = set()
-    for last_variant, first_variant in variants:
-        key = (last_variant, first_variant)
-        if not last_variant or not first_variant or key in seen:
-            continue
-        seen.add(key)
-        try:
-            lookup = playerid_lookup(last_variant, first_variant)
-        except Exception:
-            continue
-        if lookup is None or lookup.empty or "key_fangraphs" not in lookup.columns:
-            continue
-        val = lookup["key_fangraphs"].dropna()
-        if val.empty:
-            continue
-        try:
-            fg_id = int(val.iloc[0])
-        except Exception:
-            continue
-        if fg_id > 0:
-            return fg_id
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_player_id_by_name(name: str, year: int) -> int | None:
+    """Look up PlayerId for an exact name match in a given year."""
+    df = load_final_year(year)
+    if df is None or df.empty or "Name" not in df.columns:
+        return None
+    # Try exact match first
+    match = df[df["Name"].str.strip() == name.strip()]
+    if match.empty:
+        # Try case-insensitive
+        match = df[df["Name"].str.lower().str.strip() == name.lower().strip()]
+    if match.empty:
+        return None
+    ids = match["PlayerId"].dropna()
+    return int(ids.iloc[0]) if not ids.empty else None
+
+
+def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
+    """Try each year in range to find the PlayerId for a name."""
+    for year in range(end_year, start_year - 1, -1):
+        pid = get_player_id_by_name(name, year)
+        if pid is not None:
+            return pid
     return None
 
 
-def resolve_player_fg_id(name: str, pool_df: pd.DataFrame | None = None) -> int | None:
-    if pool_df is not None and not pool_df.empty and "IDfg" in pool_df.columns:
-        ids = pool_df.loc[pool_df["Name"] == name, "IDfg"].dropna().astype(int)
-        if not ids.empty:
-            return int(ids.iloc[0])
-    return lookup_fg_id_by_name(name)
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def lookup_mlbam_id(full_name: str, return_bbref: bool = False):
-    if not full_name or not full_name.strip():
-        return (None, None) if return_bbref else None
-    suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv", "v"}
-
-    def normalize_token(tok: str) -> str:
-        if not tok:
-            return ""
-        tok = tok.replace(".", "").strip()
-        try:
-            return unicodedata.normalize("NFKD", tok).encode("ascii", "ignore").decode()
-        except Exception:
-            return tok
-
-    def clean_full(val: str) -> str:
-        try:
-            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
-        except Exception:
-            pass
-        return "".join(ch for ch in val if ch.isalnum()).lower()
-
-    def strip_suffix(tokens: list[str]) -> list[str]:
-        toks = tokens.copy()
-        while toks and toks[-1].lower() in suffixes:
-            toks.pop()
-        return toks
-
-    parts = full_name.split()
-    base_tokens = strip_suffix(parts)
-    if len(base_tokens) < 2:
-        return (None, None) if return_bbref else None
-
-    first_raw = base_tokens[0]
-    last_raw = " ".join(base_tokens[1:])
-    target_clean = clean_full(first_raw + last_raw)
-
-    def initial_forms(token: str) -> list[str]:
-        forms = []
-        if not token:
-            return forms
-        stripped = token.replace(".", "")
-        if stripped and stripped.isupper() and 1 <= len(stripped) <= 4:
-            dotted = ".".join(list(stripped)) + "."
-            spaced = " ".join(list(stripped))
-            forms.extend([dotted, spaced, stripped, stripped + "."])
-        return forms
-
-    first_forms = initial_forms(first_raw)
-    variants = [
-        (last_raw, first_raw),
-        (normalize_token(last_raw), normalize_token(first_raw)),
-        (normalize_token(last_raw).lower(), normalize_token(first_raw).lower()),
-        (last_raw.replace(".", ""), first_raw.replace(".", "")),
-    ]
-    for form in first_forms:
-        variants.append((last_raw, form))
-        variants.append((normalize_token(last_raw), normalize_token(form)))
-
-    first_hit_mlbam = None
-    first_hit_bbref = None
-    best_match_mlbam = None
-    best_match_bbref = None
-
-    def consider_row(row):
-        nonlocal first_hit_mlbam, first_hit_bbref, best_match_mlbam, best_match_bbref
-        combo = clean_full(str(row.get("name_first", "")) + str(row.get("name_last", "")))
-        mlbam_val = row.get("key_mlbam")
-        bbref_val = row.get("key_bbref")
-        if combo == target_clean:
-            if pd.notna(mlbam_val):
-                try:
-                    best_match_mlbam = int(mlbam_val)
-                except Exception:
-                    pass
-            if pd.notna(bbref_val):
-                try:
-                    best_match_bbref = str(bbref_val)
-                except Exception:
-                    pass
-        if first_hit_mlbam is None and pd.notna(mlbam_val):
-            try:
-                first_hit_mlbam = int(mlbam_val)
-            except Exception:
-                pass
-        if first_hit_bbref is None and pd.notna(bbref_val):
-            try:
-                first_hit_bbref = str(bbref_val)
-            except Exception:
-                pass
-
-    for last, first in variants:
-        try:
-            lookup_df = playerid_lookup(last, first)
-        except Exception:
-            continue
-        if lookup_df is None or lookup_df.empty:
-            continue
-        for _, row in lookup_df.iterrows():
-            consider_row(row)
-
-    try:
-        lookup_df = playerid_lookup(last_raw, None)
-    except Exception:
-        lookup_df = None
-    if lookup_df is not None and not lookup_df.empty:
-        for _, row in lookup_df.iterrows():
-            consider_row(row)
-
-    mlbam_result = best_match_mlbam if best_match_mlbam is not None else first_hit_mlbam
-    bbref_result = best_match_bbref if best_match_bbref is not None else first_hit_bbref
-    return (mlbam_result, bbref_result) if return_bbref else mlbam_result
-
-
 # ─────────────────────────────────────────────
-#  Headshots
+#  Headshots — MLBAM only (no pybaseball reverse lookup)
 # ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=21600)
-def build_mlb_headshot(mlbam: int | str | None) -> str | None:
+def build_mlb_headshot(mlbam: int | str | None) -> str:
     if mlbam is None:
-        return None
+        return HEADSHOT_PLACEHOLDER
     mlbam_val = str(mlbam).strip()
-    if not mlbam_val:
-        return None
-    headers = {"User-Agent": HEADSHOT_USER_AGENT}
-    fallback_url = None
-    for base in HEADSHOT_BASES:
-        try:
-            url = base.format(mlbam=mlbam_val)
-            if fallback_url is None:
-                fallback_url = url
-        except Exception:
-            continue
-        try:
-            resp = requests.head(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, allow_redirects=True)
-            status = resp.status_code
-            if status == 200:
-                return url
-            if status in (403, 404, 405):
-                resp_get = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT, stream=True)
-                if resp_get.status_code == 200:
-                    return url
-        except Exception:
-            continue
-    return fallback_url
+    if not mlbam_val or mlbam_val in {"nan", "0"}:
+        return HEADSHOT_PLACEHOLDER
+    # Return first URL format — browser will handle 404 gracefully
+    return HEADSHOT_BASES[0].format(mlbam=mlbam_val)
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
-def fetch_bbref_headshot(bref_id: str | None) -> str | None:
-    if not bref_id:
-        return None
-    slug = str(bref_id).strip().lower()
-    if not slug:
-        return None
-    first_letter = slug[0]
-    url = f"https://www.baseball-reference.com/players/{first_letter}/{slug}.shtml"
-    headers = {"User-Agent": HEADSHOT_USER_AGENT}
-    try:
-        resp = requests.get(url, headers=headers, timeout=HEADSHOT_CHECK_TIMEOUT)
-    except Exception:
-        return None
-    if resp.status_code != 200 or not resp.text:
-        return None
-    html_text = resp.text
-    urls = []
-    for pattern in [
-        r'https?://[^"\']*headshots[^"\']*\.(?:jpg|png)',
-        r'//[^"\']*headshots[^"\']*\.(?:jpg|png)',
-    ]:
-        urls.extend(re.findall(pattern, html_text, flags=re.IGNORECASE))
-    for raw in urls:
-        if not raw:
-            continue
-        return raw if raw.startswith("http") else f"https:{raw}"
-    return None
-
-
-def get_headshot_url(name: str, df: pd.DataFrame) -> str:
-    id_cols = ["mlbam_override", "mlbamid", "mlbam_id", "mlbam", "MLBID", "MLBAMID", "key_mlbam"]
-    fg_cols = ["playerid", "IDfg", "fg_id", "FGID"]
-    bref_cols = ["key_bbref", "bbref_id", "BBREFID", "bref_id", "BREFID"]
-
-    def build_bref_headshot(bref_id: str | None) -> str | None:
-        if not bref_id:
-            return None
-        raw_slug = str(bref_id).strip()
-        if not raw_slug:
-            return None
-        slug_variants = {raw_slug.lower(), raw_slug.upper()}
-        for slug in slug_variants:
-            folder_variants = {slug[0].lower(), slug[0].upper()} if slug else set()
-            for folder in folder_variants:
-                for base in HEADSHOT_BREF_BASES:
-                    try:
-                        return base.format(folder=folder, bref_id=slug)
-                    except Exception:
-                        continue
-        return None
-
-    def resolve_bref_headshot(bref_id: str | None) -> str | None:
-        direct = build_bref_headshot(bref_id)
-        return direct if direct else fetch_bbref_headshot(bref_id)
-
-    for col in id_cols:
-        if col in df.columns:
-            vals = df.loc[df["Name"] == name, col].dropna()
-            if not vals.empty:
-                try:
-                    headshot = build_mlb_headshot(int(vals.iloc[0]))
-                    if headshot:
-                        return headshot
-                except Exception:
-                    pass
-
-    for col in fg_cols:
-        if col in df.columns:
-            vals = df.loc[df["Name"] == name, col].dropna()
-            if not vals.empty:
-                try:
-                    fg_id = int(vals.iloc[0])
-                except Exception:
-                    fg_id = None
-                if fg_id:
-                    try:
-                        from pybaseball import playerid_reverse_lookup
-                        rev = playerid_reverse_lookup([fg_id], key_type="fangraphs")
-                        if rev is not None and not rev.empty:
-                            mlbam = rev.iloc[0].get("key_mlbam")
-                            if pd.notna(mlbam):
-                                headshot = build_mlb_headshot(int(mlbam))
-                                if headshot:
-                                    return headshot
-                            bbref = rev.iloc[0].get("key_bbref")
-                            if pd.notna(bbref):
-                                bref_url = resolve_bref_headshot(str(bbref))
-                                if bref_url:
-                                    return bref_url
-                    except Exception:
-                        pass
-
-    def clean_name(val: str) -> str:
-        if not val:
-            return ""
-        try:
-            val = unicodedata.normalize("NFKD", val).encode("ascii", "ignore").decode()
-        except Exception:
-            pass
-        return "".join(ch for ch in val if ch.isalnum() or ch.isspace()).strip().lower()
-
-    def heuristic_bbref_slug(full_name: str) -> list[str]:
-        cleaned = clean_name(full_name)
-        if not cleaned:
-            return []
-        parts = cleaned.split()
-        if len(parts) < 2:
-            return []
-        first = parts[0]
-        last = parts[-1]
-        if not first or not last:
-            return []
-        base_slug = f"{last[:5]}{first[:2]}"
-        if len(base_slug) < 6:
-            return []
-        return [f"{base_slug}{i:02d}" for i in range(1, 16)]
-
-    target_clean = clean_name(name)
-    candidate_cols = ["mlbam_override", "mlbamid", "MLBID", "mlbam_id", "mlbam", "key_mlbam", "MLBAMID", "playerid"]
-
-    for col in candidate_cols:
-        if col in df.columns:
-            vals = df.loc[df["Name"] == name, col].dropna()
-            if not vals.empty:
-                try:
-                    headshot = build_mlb_headshot(int(vals.iloc[0]))
-                    if headshot:
-                        return headshot
-                except Exception:
-                    pass
-
-    for col in bref_cols:
-        if col in df.columns:
-            vals = df.loc[df["Name"] == name, col].dropna()
-            if not vals.empty:
-                bref_url = resolve_bref_headshot(str(vals.iloc[0]))
-                if bref_url:
-                    return bref_url
-
-    if "Name" in df.columns:
-        df_clean = df.copy()
-        df_clean["__clean_name"] = df_clean["Name"].astype(str).apply(clean_name)
-        matches = df_clean[df_clean["__clean_name"] == target_clean]
-        if not matches.empty:
-            for col in candidate_cols:
-                if col in matches.columns:
-                    vals = matches[col].dropna()
-                    if not vals.empty:
-                        try:
-                            headshot = build_mlb_headshot(int(vals.iloc[0]))
-                            if headshot:
-                                return headshot
-                        except Exception:
-                            pass
-            for col in bref_cols:
-                if col in matches.columns:
-                    vals = matches[col].dropna()
-                    if not vals.empty:
-                        bref_url = resolve_bref_headshot(str(vals.iloc[0]))
-                        if bref_url:
-                            return bref_url
-
-    mlbam_fallback, bbref_fallback = lookup_mlbam_id(name, return_bbref=True)
-    if mlbam_fallback:
-        headshot = build_mlb_headshot(mlbam_fallback)
-        if headshot:
-            return headshot
-    if bbref_fallback:
-        bref_url = resolve_bref_headshot(bbref_fallback)
-        if bref_url:
-            return bref_url
-    for slug in heuristic_bbref_slug(name):
-        bref_url = resolve_bref_headshot(slug)
-        if bref_url:
-            return bref_url
+def get_headshot(player_row: pd.Series) -> str:
+    """Get headshot URL from MLBAMID in the player row."""
+    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
+        val = player_row.get(col)
+        if val is not None and pd.notna(val):
+            try:
+                return build_mlb_headshot(int(val))
+            except Exception:
+                pass
     return HEADSHOT_PLACEHOLDER
 
 
@@ -1241,7 +684,7 @@ with left_col:
     stat_builder_container = st.container()
 
 current_year = 2025
-years_desc = list(range(current_year, 1870, -1))
+years_desc = list(range(current_year, 2014, -1))  # data starts 2015
 MAX_PLAYERS = 5
 default_names = ["Shohei Ohtani", "Aaron Judge", "", "", ""]
 
@@ -1256,8 +699,6 @@ for idx in range(MAX_PLAYERS):
         (f"comp_player_{idx}", default_names[idx] if idx < len(default_names) else ""),
         (f"comp_player_{idx}_id", ""),
         (f"comp_player_{idx}_mode", "Name"),
-        (f"comp_player_{idx}_mlbam", ""),
-        (f"comp_player_{idx}_mlbam_enabled", False),
         (f"comp_single_year_{idx}", True),
         (f"comp_year_{idx}_single", years_desc[0]),
         (f"comp_year_{idx}_start", years_desc[0]),
@@ -1265,18 +706,6 @@ for idx in range(MAX_PLAYERS):
     ]:
         if key not in st.session_state:
             st.session_state[key] = default
-
-
-def parse_mlbam_override(raw: str, enabled: bool) -> int | None:
-    if not enabled:
-        return None
-    raw_val = str(raw).strip()
-    if not raw_val:
-        return None
-    try:
-        return int(raw_val)
-    except Exception:
-        return None
 
 
 with controls_container:
@@ -1295,11 +724,6 @@ with controls_container:
                 year_end = st.selectbox(f"Season End (Player {label})", years_desc, index=0, key=f"comp_year_{idx}_end")
         year_ranges.append((min(year_start, year_end), max(year_start, year_end)))
 
-    for idx in range(player_count):
-        name_key = f"comp_player_{idx}"
-        if not st.session_state.get(name_key) and idx < len(default_names) and default_names[idx]:
-            st.session_state[name_key] = default_names[idx]
-
     input_cols = st.columns(player_count)
     player_inputs = []
     for idx in range(player_count):
@@ -1317,10 +741,6 @@ with controls_container:
             "name_input": name_input.strip(),
             "id_input": str(id_input).strip(),
             "years": year_ranges[idx],
-            "mlbam_override": parse_mlbam_override(
-                st.session_state.get(f"comp_player_{idx}_mlbam", ""),
-                st.session_state.get(f"comp_player_{idx}_mlbam_enabled", False),
-            ),
         })
 
 # ─────────────────────────────────────────────
@@ -1330,57 +750,47 @@ with controls_container:
 players_data = []
 for idx, cfg in enumerate(player_inputs):
     label = chr(ord("A") + idx)
-    years = cfg["years"]
+    start_year, end_year = cfg["years"]
+
     if cfg["mode"] == "Name":
         if not cfg["name_input"]:
             st.warning(f"Enter a name for Player {label} or switch to FanGraphs ID input.")
             st.stop()
-        fg_id = resolve_player_fg_id(cfg["name_input"])
+        player_id = resolve_player_id(cfg["name_input"], start_year, end_year)
+        if not player_id:
+            st.error(f"Could not find '{cfg['name_input']}' in the dataset. Check spelling or use FanGraphs ID.")
+            st.stop()
     else:
         if not cfg["id_input"]:
-            st.warning(f"Enter a FanGraphs ID for Player {label} or switch to name input.")
+            st.warning(f"Enter a FanGraphs ID for Player {label}.")
             st.stop()
         try:
-            fg_id = int(cfg["id_input"])
+            player_id = int(cfg["id_input"])
         except Exception:
-            fg_id = None
-
-    if not fg_id or fg_id <= 0:
-        if cfg["mode"] == "Name":
-            st.error(f"Could not find data for {cfg['name_input'] or f'Player {label}'}. Check the spelling or use the ID input.")
-        else:
             st.error(f"Player {label} FanGraphs ID must be a positive integer.")
-        st.stop()
+            st.stop()
 
-    player_row = build_player_profile(fg_id, *years, mlbam_override=cfg["mlbam_override"])
+    player_row = build_player_profile(player_id, start_year, end_year)
     if player_row is None:
-        st.error(f"Could not load data for Player {label}.")
+        st.error(f"Could not load data for Player {label} (ID: {player_id}).")
         st.stop()
 
     display_name = str(player_row.get("Name", "")).strip()
     if not display_name:
-        display_name = cfg["name_input"] if cfg["mode"] == "Name" else f"FG#{fg_id}"
+        display_name = cfg["name_input"] if cfg["mode"] == "Name" else f"FG#{player_id}"
+
+    team_display = str(player_row.get("Team", "N/A"))
+    year_label = f"{start_year}" if start_year == end_year else f"{start_year}-{end_year}"
 
     df = pd.DataFrame([player_row])
-    for metric in FIELDING_METRICS:
-        if metric in df.columns:
-            df[metric] = pd.to_numeric(df[metric], errors="coerce")
-    if cfg["mlbam_override"] is not None:
-        df["mlbam_override"] = cfg["mlbam_override"]
-
-    team_display = player_row.get("TeamDisplay", normalize_display_team(player_row.get("Team", "")))
-    year_label = f"{years[0]}" if years[0] == years[1] else f"{years[0]}-{years[1]}"
 
     players_data.append({
-        "fg_id": fg_id,
+        "player_id": player_id,
         "display_name": display_name,
-        "input_name": cfg["name_input"],
-        "mode": cfg["mode"],
         "team": team_display,
         "year_label": year_label,
         "df": df,
         "row": player_row,
-        "mlbam_override": cfg["mlbam_override"],
         "label_char": label,
     })
 
@@ -1401,7 +811,7 @@ dfs = [p["df"] for p in players_data]
 #  Stat options
 # ─────────────────────────────────────────────
 
-stat_exclusions = {"Season"}
+stat_exclusions = {"Season", "PlayerId", "MLBAMID"}
 numeric_sets = []
 for df in dfs:
     numeric_sets.append({col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])})
@@ -1788,7 +1198,7 @@ table_df = pd.DataFrame(comparison_rows, columns=["Stat"] + col_order)
 # ─────────────────────────────────────────────
 
 for pdata in players_data:
-    pdata["headshot"] = get_headshot_url(pdata["display_name"], pdata["df"])
+    pdata["headshot"] = get_headshot(pdata["row"])
 
 # ─────────────────────────────────────────────
 #  Render comparison card
@@ -1917,17 +1327,5 @@ with right_col:
 
         st.markdown("\n".join(rows), unsafe_allow_html=True)
 
-        with st.expander("Optional MLB ID overrides (use if bWAR/headshot is missing)", expanded=False):
-            override_cols = st.columns(player_count)
-            for idx, pdata in enumerate(players_data):
-                with override_cols[idx]:
-                    st.checkbox("Use MLB ID override", key=f"comp_player_{idx}_mlbam_enabled")
-                    st.text_input(
-                        f"Player {pdata['label_char']} MLB ID",
-                        key=f"comp_player_{idx}_mlbam",
-                        placeholder="e.g. 608070",
-                        disabled=not st.session_state.get(f"comp_player_{idx}_mlbam_enabled", False),
-                    )
-
         st.caption("Screenshot to save")
-        st.caption("Find a player's Fangraphs/MLB ID in their Fangraphs/MLB profile URL")
+        st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
