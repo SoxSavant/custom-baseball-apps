@@ -651,7 +651,7 @@ with left_col:
 current_year = 2025
 years_desc = list(range(current_year, 2014, -1))
 MAX_PLAYERS = 5
-default_names = ["Tarik Skubal", "Garrett Crochet", "", "", ""]
+default_names = ["Tarik Skubal", "Paul Skenes", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
