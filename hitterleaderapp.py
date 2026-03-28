@@ -86,7 +86,7 @@ RATE_STATS = {
 POSITION_OPTIONS = {
     "all": "All Positions",
     "C": "C", "1B": "1B", "2B": "2B", "3B": "3B", "SS": "SS",
-    "LF": "LF", "CF": "CF", "RF": "RF", "OF": "OF", "DH": "DH",
+    "LF": "LF", "CF": "CF", "RF": "RF", "OF": "OF",
 }
 
 TEAM_OPTIONS = {
@@ -181,10 +181,10 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
         result["Team"] = "N/A"
 
     # DefPos: most common across seasons
-    if "DefPos" in grp.columns:
-        pos_vals = grp["DefPos"].dropna().astype(str)
+    if "Pos" in grp.columns:
+        pos_vals = grp["Pos"].dropna().astype(str)
         if not pos_vals.empty:
-            result["DefPos"] = pos_vals.mode().iloc[0]
+            result["Pos"] = pos_vals.mode().iloc[0]
 
     pa_weight = pd.to_numeric(grp["PA"], errors="coerce").fillna(0) if "PA" in grp.columns else pd.Series(np.zeros(len(grp)), index=grp.index)
     pa_total = pa_weight.sum()
@@ -415,12 +415,12 @@ if min_pa_val > 0 and "PA" in df.columns:
     df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
 # Position filter
-if position_val != "all" and "DefPos" in df.columns:
+if position_val != "all" and "Pos" in df.columns:
     pos_group = {
         "OF": ["LF", "CF", "RF", "OF"],
     }
     allowed_pos = pos_group.get(position_val, [position_val])
-    df = df[df["DefPos"].astype(str).str.upper().isin([p.upper() for p in allowed_pos])]
+    df = df[df["Pos"].astype(str).str.upper().isin([p.upper() for p in allowed_pos])]
 
 # Team filter (single/split season only)
 if team_val != "all" and "Team" in df.columns:

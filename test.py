@@ -36,7 +36,18 @@ for year in range(2015, 2026):
     fielding.columns = fielding.columns.str.strip()
     fielding.columns = fielding.columns.str.replace('\ufeff', '')
 
-    fielding_agg = fielding.groupby("PlayerId", as_index=False).sum(numeric_only=True)
+   
+    fielding["Inn"] = pd.to_numeric(fielding["Inn"], errors="coerce")
+
+
+    idx = fielding.groupby("PlayerId")["Inn"].idxmax()
+    primary_pos = fielding.loc[idx, ["PlayerId", "Pos"]]
+
+
+    numeric_agg = fielding.groupby("PlayerId", as_index=False).sum(numeric_only=True)
+
+
+    fielding_agg = numeric_agg.merge(primary_pos, on="PlayerId", how="left")
 
     duplicate_fielding_cols = [
         c for c in fielding_agg.columns
