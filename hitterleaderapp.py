@@ -397,7 +397,7 @@ for key, default in [
     ("hl_mode", MODE_SINGLE),
     ("hl_show_player_pa", False),
     ("hl_sort_worst", False),
-    ("hl_show_min_pa", False),
+    ("hl_show_min_pa", True),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -533,8 +533,12 @@ mode_label = " Single Season" if mode == MODE_SPLIT else ""
 title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label} {title_label} Leaders{pos_suffix}".strip())
 if sort_worst:
     title += " (Worst)"
-if st.session_state.get("hl_show_min_pa"):
-    title += f" (min {min_pa_val} PA)"
+
+min_pa_subtitle = (
+    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+    if st.session_state.get("hl_show_min_pa") else ""
+)
+
 
 # ─────────────────────────────────────────────
 #  Render HTML
@@ -543,6 +547,7 @@ if st.session_state.get("hl_show_min_pa"):
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
+    {min_pa_subtitle}
     <div class="players-grid">{''.join(cards)}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
@@ -558,6 +563,7 @@ full_html = f"""
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
 <meta charset="utf-8" />
 <style>
+html, body {{ background: transparent; font-family: "Source Sans Pro", sans-serif; margin:0; padding:0; }}
 .leaderboard-card {{
     background: #ffffff;
     border: 1px solid #d0d0d0;
@@ -574,6 +580,13 @@ full_html = f"""
     font-size: 2.4rem;
     margin-bottom: 2rem;
     text-align: center;
+}}
+.leaderboard-subtitle{{
+    text-align: center;
+    color: #888;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    margin-top: -1rem;
 }}
 .players-grid {{
     display: grid;
