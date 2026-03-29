@@ -55,16 +55,14 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "WAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB",
+    "fWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB",
     "K/9", "BB/9", "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-",
-    "Barrel%", "HardHit%", "EV", "O-Swing%", "Whiff%", "GB%", "FB%", "CG", "ShO",
+    "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%", "GB%", "FB%", "CG", "ShO",
 ]
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "O-Swing%": "Chase%",
 }
 
 lower_better = {
@@ -75,11 +73,11 @@ lower_better = {
 
 SUM_STATS = {
     "G", "GS", "W", "L", "SV", "SO", "BB", "HR", "ER", "HBP",
-    "WAR", "CG", "ShO", "TBF",
+    "fWAR", "CG", "ShO", "TBF",
 }
 RATE_STATS = {
     "FIP", "xFIP", "xERA", "WHIP", "K/9", "BB/9", "HR/9", "K%", "BB%",
-    "K-BB%", "Barrel%", "HardHit%", "EV", "O-Swing%", "Whiff%", "GB%", "FB%",
+    "K-BB%", "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%", "GB%", "FB%",
     "HR/FB", "BABIP", "SIERA", "ERA-", "FIP-",
 }
 
@@ -297,7 +295,7 @@ def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
     upper_stat = stat.upper()
-    if upper_stat in {"WAR", "FWAR", "EV"}:
+    if upper_stat in {"WAR", "fWAR", "EV"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
     if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "K/9", "BB/9", "HR/9"}:
@@ -329,12 +327,12 @@ for key, default in [
     ("pl_year",           current_year-1),
     ("pl_start_year",     current_year - 2),
     ("pl_end_year",       current_year-1),
-    ("pl_stat",           "WAR"),
+    ("pl_stat",           "fWAR"),
     ("pl_min_ip",         162),
     ("pl_team",           "all"),
     ("pl_mode",           MODE_SINGLE),
     ("pl_sort_worst",     False),
-    ("pl_show_min_ip",    False),
+    ("pl_show_min_ip",    True),
     ("pl_show_player_ip", False),
 ]:
     if key not in st.session_state:
@@ -465,8 +463,11 @@ mode_label  = " Single Season" if mode == MODE_SPLIT else ""
 title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label} {title_label} Leaders".strip())
 if show_worst:
     title += " (Worst)"
-if st.session_state.get("pl_show_min_ip"):
-    title += f" (min {min_ip_val} IP)"
+
+min_pa_subtitle = (
+    f'<div class="leaderboard-subtitle">Min {min_ip_val} PA</div>'
+    if st.session_state.get("pl_show_min_ip") else ""
+)
 
 # ─────────────────────────────────────────────
 #  Render HTML
@@ -475,6 +476,7 @@ if st.session_state.get("pl_show_min_ip"):
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
+    {min_pa_subtitle}
     <div class="players-grid">{"".join(cards)}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
@@ -489,6 +491,7 @@ full_html = f"""
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
 <meta charset="utf-8" />
 <style>
+html, body {{ background: transparent; font-family: "Source Sans Pro", sans-serif; margin:0; padding:0; }}
 .leaderboard-card {{
     background: #ffffff;
     border: 1px solid #d0d0d0;
@@ -505,6 +508,13 @@ full_html = f"""
     font-size: 2.4rem;
     margin-bottom: 2rem;
     text-align: center;
+}}
+.leaderboard-subtitle{{
+    text-align: center;
+    color: #888;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    margin-top: -1rem;
 }}
 .players-grid {{
     display: grid;

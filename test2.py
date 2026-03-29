@@ -9,6 +9,8 @@ for year in range(2015, 2026):
         pd.read_csv(f"data/pitching_standard_{year}.csv"),
         pd.read_csv(f"data/pitching_statcast_{year}.csv"),
         pd.read_csv(f"data/pitching_winprob_{year}.csv"),
+        pd.read_csv(f"data/discipline_pitching_{year}.csv"),
+
     ]
 
     base_cols = {"Name", "Team", "MLBAMID", "NameASCII"}
@@ -33,4 +35,6 @@ for year in range(2015, 2026):
 
     final = pitching_merged
     final["Year"] = year
+    final["Contact%"] = 1 - final["Contact%"]
+    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR"}, inplace=True)
     final.to_csv(f"data/final/pitching_final_{year}.csv", index=False)

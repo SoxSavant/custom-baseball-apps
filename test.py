@@ -58,4 +58,6 @@ for year in range(2015, 2026):
 
     final = hitting_merged.merge(fielding_agg, on="PlayerId", how="left")
     final["Year"] = year
+    final["Contact%"] = 1 - final["Contact%"]
+    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR"}, inplace=True)
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)

@@ -55,7 +55,7 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",  "O-Swing%", "Contact%",
+    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "WPA", "Clutch",
@@ -66,23 +66,20 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "O-Swing%": "Chase%",
-    "Contact%": "Whiff%",
 }
 
-lower_better = {"K%", "O-Swing%", "SO", "Contact%"}
+lower_better = {"K%", "Chase%", "SO", "Whiff%"}
 
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "WAR", "Off", "Def", "BsR", "DRS", "OAA", "FRV",
+    "fWAR", "Off", "Def", "BsR", "DRS", "OAA", "FRV",
 }
 RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP", "ISO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Barrel%", "HardHit%",
-    "EV", "WPA", "Clutch", "wRC+", "Contact%"
+    "K%", "BB%", "K-BB%", "Chase%", "Barrel%", "HardHit%",
+    "EV", "WPA", "Clutch", "wRC+", "Whiff%"
 }
 
 POSITION_OPTIONS = {
@@ -136,7 +133,7 @@ def load_bwar() -> pd.DataFrame:
     name_col = "name_common" if "name_common" in df.columns else "Name"
     df["Name"] = df[name_col].astype(str).str.strip()
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("fWAR"), errors="coerce")
 
     keep = ["Name", "year_ID", "bWAR"]
     if "Age" in df.columns:
@@ -361,7 +358,7 @@ def format_stat(stat: str, val) -> str:
     upper_stat = stat.upper()
     if upper_stat in {"FRV", "OAA", "DRS"}:
         return f"{int(round(float(val)))}"
-    if upper_stat in {"WAR", "BWAR", "OFF", "DEF", "BSR", "EV"}:
+    if upper_stat in {"fWAR", "BWAR", "OFF", "DEF", "BSR", "EV"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
     if upper_stat in {"WPA", "CLUTCH"}:
@@ -390,7 +387,7 @@ for key, default in [
     ("hl_year", current_year-1),
     ("hl_start_year", current_year - 2),
     ("hl_end_year", current_year-1),
-    ("hl_stat", "WAR"),
+    ("hl_stat", "fWAR"),
     ("hl_min_pa", 502),
     ("hl_position", "all"),
     ("hl_team", "all"),
@@ -474,8 +471,7 @@ if "Team" in df.columns:
 else:
     df["TeamDisplay"] = "N/A"
 
-if "Contact%" in df.columns:
-    df["Contact%"] = 100 - df["Contact%"]*100 
+
 
 # Sort & top 10
 if stat not in df.columns:

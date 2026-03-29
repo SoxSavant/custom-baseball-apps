@@ -162,20 +162,20 @@ TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
 
 STAT_PRESETS = {
     "Default": [
-        "WAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
+        "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
         "K%", "BB%", "Whiff%", "O-Swing%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "WAR", "xERA", "EV", "O-Swing%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Standard": [
         "WAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
     ],
     
     "Every Stat": [
-        "WAR", "bWAR",
+        "fWAR", "bWAR",
         "W-L",
-        "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9", "Age",
+        "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
         "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
         "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%", "Whiff%", "WPA",
@@ -190,15 +190,17 @@ STAT_PRESETS = {
 
 STAT_ALLOWLIST = [
     "WAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9", "Age",
-    "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
-    "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-    "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%", "Whiff%", "WPA",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%",  "K-BB%", "IP", "G", 
+    "GS", "Barrel%", "HardHit%", "EV",
+      "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV",  "AVG", "WHIP", "ERA-", "FIP-",  "SIERA", 
+    "Chase%", "Whiff%", "WPA", "Clutch", "E-F", "vFA (pi)",
+    "SO", "BB", "HBP", "HR", 
+      "QS", "CG", "ShO",
+
 ]
 
 STAT_DISPLAY_NAMES = {
-    "WAR": "fWAR",
-    "O-Swing%": "Chase%",
 }
 
 SUM_STATS = {
@@ -207,21 +209,19 @@ SUM_STATS = {
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
-    "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
+    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
     "ERA-", "FIP-", "Stuff+", "Location+", "Pitching+",
 }
 
 label_map = {
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "O-Swing%": "Chase%",
     "HardHit%": "Hard Hit%",
 }
 lower_better = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
     "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "FB%", "LD%",
-    "O-Swing%", "Pull%",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "FB%",
+     "E-F"
 }
 
 
@@ -602,7 +602,7 @@ def format_stat(stat: str, val) -> str:
             v *= 100
         return f"{v:.1f}%"
 
-    if upper_stat in {"FIP", "XFIP", "ERA", "XERA", "SIERA", "GB/FB", "HR/9", "K/9", "BB/9"}:
+    if upper_stat in {"FIP", "XFIP", "ERA", "XERA", "SIERA", "GB/FB", "HR/9", "K/9", "BB/9", "E-F"}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":

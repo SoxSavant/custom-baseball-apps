@@ -69,45 +69,43 @@ TEAMS = {
 
 STAT_PRESETS = {
     "Statcast": [
-        "WAR", "bWAR", "Off", "BsR", "Def",
+        "fWAR", "bWAR", "Off", "BsR", "Def",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Whiff%", "K%", "BB%",
+        "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Fielding": ["DRS", "FRV", "OAA"],
     "Standard": [
-        "bWAR", "WAR", "PA", "AVG", "OBP", "SLG", "OPS",
+        "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R", "K%", "BB%",
     ],
     "Miscellaneous": [
-        "K-BB%", "O-Swing%", "WPA", "Clutch",
-        "Pull%", "GB%", "FB%", "LD%",
+        "K-BB%", "Chase%", "WPA", "Clutch",
+        "Pull%", "GB%",
     ],
     "Every Stat": [
-        "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",
+        "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",
         "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
         "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-        "K%", "BB%", "K-BB%", "O-Swing%", "WPA", "Clutch",
-        "Whiff%", "Pull%", "GB%", "FB%", "LD%",
+        "K%", "BB%", "K-BB%", "Chase%", "WPA", "Clutch",
+        "Whiff%",
         "DRS", "FRV", "OAA",
     ],
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",
+    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "GB%", "FB%", "LD%",
+    "K%", "BB%", "K-BB%", "chase%", "WPA", "Clutch",
+    "Whiff%",
     "DRS", "FRV", "OAA",
 ]
 
-STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
+STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%"}
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "O-Swing%": "Chase%",
 }
 lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "SO"}
 
@@ -234,11 +232,7 @@ df["PA"] = pd.to_numeric(df.get("PA"), errors="coerce")
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-# Whiff% from Contact% if needed
-if "Whiff%" not in df.columns and "Contact%" in df.columns:
-    contact = pd.to_numeric(df["Contact%"], errors="coerce")
-    contact = contact.where(contact > 1, contact * 100)
-    df["Whiff%"] = 100 - contact
+
 
 # Attach bWAR
 bwar_df = load_bwar()

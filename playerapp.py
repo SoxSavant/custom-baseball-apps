@@ -47,30 +47,30 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
 
-STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
+STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%"}
 
 STAT_PRESETS = {
      "Statcast": [
-        "WAR", "Off", "BsR", "Def", "wOBA",
+        "fWAR", "Off", "BsR", "Def", "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Contact%", "K%", "BB%",
+        "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Fielding": ["DRS", "FRV", "OAA", "FRM"],
     "Standard": [
-        "bWAR", "WAR", "PA", "AVG", "OBP", "SLG", "OPS",
+        "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R", "K%", "BB%",
     ],
 
     "Every Stat": [
-        "bWAR", "WAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
+        "bWAR", "fWAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
         "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
         "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Contact%", "K%", "BB%", "BB", "IBB", "SO",
+        "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
         "DRS", "WPA", "Clutch",
     ],
     "Blank – Create your own": [
-        "WAR",
+        "fWAR",
     ],
 }
 
@@ -79,18 +79,15 @@ STAT_ALLOWLIST = [
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
+    "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM",
 ]
 
-lower_better = {"K%", "O-Swing%", "Contact%", "SO"}
+lower_better = {"K%", "Chase%", "Whiff%", "SO"}
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "Contact%": "Whiff%",
-    "O-Swing%": "Chase%",
 }
 
 
@@ -192,8 +189,6 @@ df["PA"] = pd.to_numeric(df.get("PA"), errors="coerce")
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-if "Contact%" in df.columns:
-    df["Contact%"] = 100 - df["Contact%"]*100 
 
 # Attach bWAR for this year
 bwar_df = load_bwar()

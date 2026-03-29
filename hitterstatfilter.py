@@ -53,37 +53,35 @@ HEADSHOT_PLACEHOLDER = (
 MAX_DISPLAY = 30
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",  "O-Swing%", "Contact%",
+    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM"
 ]
 
-lower_better = {"K%", "O-Swing%", "SO", "Contact%"}
+lower_better = {"K%", "O-Swing%", "SO", "Chase%"}
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "O-Swing%": "Chase%",
-    "Contact%": "Whiff%",
+    
 }
 
 STAT_DEFAULTS = {
     "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
-    "WAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
+    "fWAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
     "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
     "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
     "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450,
     "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 250, "G": 140,
     "Age": 30, "Clutch": 1.0, "FRV": 10, "OAA": 10, "DRS": 10,
-    "O-Swing%": 25.0, "Contact%": 20.0,
+    "Chase%": 25.0, "Whiff%": 20.0,
 }
 
 PCT_STATS = {
-    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%",
+    "K%", "BB%", "K-BB%", "Chase%", "Whiff%",
     "Barrel%", "HardHit%",
 }
 
@@ -186,7 +184,7 @@ def format_stat(stat: str, val) -> str:
     upper = stat.upper()
     if upper in {"FRV", "OAA", "DRS"}:
         return f"{int(round(float(val)))}"
-    if upper in {"WAR", "OFF", "DEF", "BSR", "EV"}:
+    if upper in {"fWAR", "OFF", "DEF", "BSR", "EV"}:
         v = float(val)
         return f"{v:.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(v))}.0"
     if upper == "WPA":
@@ -195,7 +193,7 @@ def format_stat(stat: str, val) -> str:
         return f"{float(val):.3f}".lstrip("0") or ".000"
     if upper == "WRC+":
         return f"{int(round(float(val)))}"
-    if "%" in stat or any(x in stat for x in ["Barrel", "Hard", "K%", "Swing", "Contact"]):
+    if "%" in stat or any(x in stat for x in ["Barrel", "Hard", "K%", "Swing", "Whiff"]):
         v = float(val)
         if v <= 1:
             v *= 100
@@ -301,9 +299,6 @@ if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(normalize_team) == target]
 
-
-if "Contact%" in df.columns:
-    df["Contact%"] = 100 - df["Contact%"]*100 
 
 # Team display
 if "Team" in df.columns:

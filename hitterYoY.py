@@ -58,33 +58,20 @@ ALLTIME_CSV = Path(__file__).with_name("yoy_deltas.csv")
 ALLTIME_MIN_PA = 600
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",  "O-Swing%", "Contact%",
+    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM"
 ]
 
-ALLTIME_STAT_ALLOWLIST = [
-    "WAR", "Off", "Def", "BsR",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG",
-    "OPS", "SLG", "OBP", "AVG", "ISO", "BABIP",
-    "G", "AB", "R", "RBI", "HR", "SB", "BB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Whiff%",
-    "Barrel%", "HardHit%", "EV",
-    "GB%", "FB%", "LD%", "Pull%",
-    "WPA", "Clutch",
-]
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "O-Swing%": "Chase%",
-    "Contact%": "Whiff%",
 }
 
-lower_better = {"K%", "O-Swing%", "SO", "Contact%"}
+lower_better = {"K%", "Chase%", "SO", "Whiff%"}
 
 POSITION_OPTIONS = {
     "all": "All Positions",
@@ -192,12 +179,6 @@ def load_risers_data(
     df_s = load_final_year(start_year)
     df_e = load_final_year(end_year)
 
-    if "Contact%" in df_s.columns:
-        df_s["Contact%"] = (100 - df_s["Contact%"]*100 )/100
-    
-    if "Contact%" in df_e.columns:
-        df_e["Contact%"] = (100 - df_e["Contact%"]*100)/100 
-
     if df_s is None or df_s.empty or df_e is None or df_e.empty:
         return pd.DataFrame()
 
@@ -284,7 +265,7 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
         v = float(val)
         formatted = f"{abs(v):.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(abs(v)))}.0"
         if show_sign and v > 0:
@@ -308,7 +289,7 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
 
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Contact" in stat or "%" in stat
+        or "Swing" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
         if v <= 1:
@@ -332,7 +313,7 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
 for key, default in [
     ("rf_start_year",     2024),
     ("rf_end_year",       2025),
-    ("rf_stat",           "WAR"),
+    ("rf_stat",           "fWAR"),
     ("rf_min_pa",         300),
     ("rf_position",       "all"),
     ("rf_team",           "all"),
@@ -352,7 +333,7 @@ for key, default in [
 
 active_allowlist =  STAT_ALLOWLIST
 if st.session_state.get("rf_stat") not in active_allowlist:
-    st.session_state["rf_stat"] = "WAR"
+    st.session_state["rf_stat"] = "fWAR"
 
 stat = st.selectbox(
     "Stat", active_allowlist, key="rf_stat",

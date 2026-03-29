@@ -162,17 +162,17 @@ STATCAST_HITTING_START_YEAR = 2015
 
 STAT_PRESETS = {
     "Default": [
-        "bWAR", "WAR", "G", "PA", "HR", "wRC+", "xwOBA",
+        "bWAR", "fWAR", "G", "PA", "HR", "wRC+", "xwOBA",
         "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
     ],
    
     "Statcast": [
-        "WAR", "Off", "BsR", "Def", "wOBA",
+        "fWAR", "Off", "BsR", "Def", "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Contact%", "K%", "BB%",
+        "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Standard": [
-        "WAR", "PA", "AVG", "OBP", "SLG", "OPS",
+        "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
         "K%", "BB%", "DRS",
     ],
@@ -181,15 +181,15 @@ STAT_PRESETS = {
     ],
     
     "Every Stat": [
-        "bWAR", "WAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
+        "bWAR", "fWAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
         "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
         "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Contact%", "K%", "BB%", "BB", "IBB", "SO",
+        "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
         "K-BB%", "DRS", "WPA", "Clutch",
     ],
     "Blank – Create your own": [
-        "WAR",
+        "fWAR",
     ],
     "Player A leads": [],
     "Player B leads": [],
@@ -199,29 +199,28 @@ STAT_PRESETS = {
 }
 
 STAT_ALLOWLIST = [
-    "WAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
+    "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM",
 ]
 
 STAT_DISPLAY_NAMES = {
-    "WAR": "fWAR",
-    "Contact%": "Whiff%",
-    "O-Swing%": "Chase%",
+    "HardHit%": "Hard Hit%",
+    "EV": "Avg Exit Velo",
 }
 
 SUM_STATS = {
-    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
+    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "WAR", "Off", "Def", "BsR", "GDP", "wRC",
+    "WAR", "Off", "Def", "BsR",
     "DRS", "OAA", "FRV",
 }
 RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Whiff%",
     "Barrel%", "HardHit%", 
      "EV", "MaxEV", "BB/K", "ISO",
 }
@@ -245,12 +244,9 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
-    "Contact%": "Whiff%",
-    "O-Swing%": "Chase%",
 }
-lower_better = {"K%", "O-Swing%", "Contact%", "SO"}
+lower_better = {"K%", "Chase%", "Whiff%","SO"}
 
 # Teams that should be treated as the same franchise
 TEAM_ALIASES = {
@@ -648,20 +644,6 @@ def format_stat(stat: str, val) -> str:
     return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
-def transform_stat_value(stat: str, raw_val):
-    if stat == "Contact%":
-        if pd.isna(raw_val):
-            return np.nan
-        try:
-            contact = float(raw_val)
-        except Exception:
-            return np.nan
-        if contact <= 1:
-            contact *= 100
-        return 100 - contact
-    return raw_val
-
-
 # ─────────────────────────────────────────────
 #  Layout
 # ─────────────────────────────────────────────
@@ -930,7 +912,7 @@ def stat_preset_callback(preset_key: str, stat_key: str, available_stats: list[s
             vals = []
             for p in players:
                 raw_v = p["row"].get(stat, np.nan)
-                trans_v = transform_stat_value(stat, raw_v)
+                trans_v = raw_v
                 try:
                     num = float(trans_v) if pd.notna(trans_v) else np.nan
                 except Exception:
@@ -1164,7 +1146,7 @@ for stat in stats_order:
     has_non_numeric = False
     for pdata in players_data:
         raw_val = pdata["row"].get(stat, np.nan)
-        val = transform_stat_value(stat, raw_val)
+        val = raw_val
         values.append(val)
         if pd.isna(val):
             numeric_vals.append(np.nan)
