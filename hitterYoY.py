@@ -58,12 +58,11 @@ ALLTIME_CSV = Path(__file__).with_name("yoy_deltas.csv")
 ALLTIME_MIN_PA = 600
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV",
+    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",  "O-Swing%", "Contact%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "GB%", "FB%", "LD%",
-    "FRV", "OAA", "DRS",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "K%", "BB%", "WPA", "Clutch",
+    "FRV", "OAA", "DRS", "FRM"
 ]
 
 ALLTIME_STAT_ALLOWLIST = [
@@ -79,11 +78,13 @@ ALLTIME_STAT_ALLOWLIST = [
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "WAR":      "fWAR",
-    "EV":       "Avg Exit Velo",
+    "WAR": "fWAR",
+    "EV": "Avg Exit Velo",
     "O-Swing%": "Chase%",
+    "Contact%": "Whiff%",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "SO", "GB%"}
+
+lower_better = {"K%", "O-Swing%", "SO", "Contact%"}
 
 POSITION_OPTIONS = {
     "all": "All Positions",
@@ -159,19 +160,6 @@ def load_final_year(year: int) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_alltime_csv() -> pd.DataFrame:
-    if not ALLTIME_CSV.exists():
-        return pd.DataFrame()
-    df = pd.read_csv(ALLTIME_CSV)
-    # Convert Contact% columns to Whiff% if present
-    for col in [c for c in df.columns if "Contact%" in c]:
-        vals = pd.to_numeric(df[col], errors="coerce")
-        if pd.notna(vals.median()) and vals.median() <= 1:
-            vals = vals * 100
-        df[col] = 100 - vals
-    return df
-
 def apply_dh_override(df):
     if "Pos" not in df.columns or "PA" not in df.columns or "Inn" not in df.columns:
         return df
@@ -204,6 +192,12 @@ def load_risers_data(
     df_s = load_final_year(start_year)
     df_e = load_final_year(end_year)
 
+    if "Contact%" in df_s.columns:
+        df_s["Contact%"] = (100 - df_s["Contact%"]*100 )/100
+    
+    if "Contact%" in df_e.columns:
+        df_e["Contact%"] = (100 - df_e["Contact%"]*100)/100 
+
     if df_s is None or df_s.empty or df_e is None or df_e.empty:
         return pd.DataFrame()
 
@@ -214,6 +208,8 @@ def load_risers_data(
     # position filter
     df_s = filter_by_position(df_s, position)
     df_e = filter_by_position(df_e, position)
+
+
 
 
     # Team filter on end year
@@ -312,7 +308,7 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
 
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
+        or "Swing" in stat or "Contact" in stat or "%" in stat
     ):
         v = float(val)
         if v <= 1:
@@ -352,9 +348,9 @@ for key, default in [
 #  Controls
 # ─────────────────────────────────────────────
 
-alltime_mode = st.checkbox("🕰️ All-Time Mode (600 PA, 1955–present)", key="rf_alltime_mode")
 
-active_allowlist = ALLTIME_STAT_ALLOWLIST if alltime_mode else STAT_ALLOWLIST
+
+active_allowlist =  STAT_ALLOWLIST
 if st.session_state.get("rf_stat") not in active_allowlist:
     st.session_state["rf_stat"] = "WAR"
 
@@ -366,31 +362,24 @@ stat = st.selectbox(
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    if alltime_mode:
-        st.info(f"Showing all-time best/worst single-season changes (min {ALLTIME_MIN_PA} PA each year)")
-        min_pa_val   = ALLTIME_MIN_PA
-        position_val = "all"
-        team_val     = "all"
-        start_year   = None
-        end_year     = None
-    else:
-        st.number_input("Start Year", min_value=2015, max_value=current_year, key="rf_start_year")
-        st.number_input("End Year",   min_value=2015, max_value=current_year, key="rf_end_year")
-        start_year = st.session_state["rf_start_year"]
-        end_year   = st.session_state["rf_end_year"]
-        if end_year <= start_year:
-            st.warning("End Year must be greater than Start Year.")
+  
+    st.number_input("Start Year", min_value=2015, max_value=current_year, key="rf_start_year")
+    st.number_input("End Year",   min_value=2015, max_value=current_year, key="rf_end_year")
+    start_year = st.session_state["rf_start_year"]
+    end_year   = st.session_state["rf_end_year"]
+    if end_year <= start_year:
+        st.warning("End Year must be greater than Start Year.")
 
-        st.number_input("Min PA (each year)", min_value=0, max_value=20000, key="rf_min_pa")
-        st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
-                     format_func=lambda x: POSITION_OPTIONS[x], key="rf_position")
-        st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
+    st.number_input("Min PA (each year)", min_value=0, max_value=20000, key="rf_min_pa")
+    st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
+                    format_func=lambda x: POSITION_OPTIONS[x], key="rf_position")
+    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
                      format_func=lambda x: TEAM_OPTIONS[x], key="rf_team",
                      help="Filters by team in the end year only")
 
-        min_pa_val   = int(st.session_state.get("rf_min_pa", 0))
-        position_val = st.session_state.get("rf_position", "all")
-        team_val     = st.session_state.get("rf_team", "all")
+    min_pa_val   = int(st.session_state.get("rf_min_pa", 0))
+    position_val = st.session_state.get("rf_position", "all")
+    team_val     = st.session_state.get("rf_team", "all")
 
     st.checkbox("Show Fallers",   key="rf_show_fallers")
     st.checkbox("Show min PA",    key="rf_show_min_pa")
@@ -402,35 +391,14 @@ show_fallers = st.session_state.get("rf_show_fallers", False)
 #  Load data
 # ─────────────────────────────────────────────
 
-if alltime_mode:
-    alltime_df_full = load_alltime_csv()
-    if alltime_df_full.empty:
-        st.error("yoy_deltas.csv not found. Run precompute_yoy.py first.")
-        st.stop()
 
-    delta_col = f"{stat}_delta"
-    start_col = f"{stat}_start"
-    end_col   = f"{stat}_end"
-
-    df = alltime_df_full[
-        (pd.to_numeric(alltime_df_full["PA_start"], errors="coerce") >= ALLTIME_MIN_PA) &
-        (pd.to_numeric(alltime_df_full["PA_end"],   errors="coerce") >= ALLTIME_MIN_PA)
-    ].copy()
-
-    df = df.rename(columns={
-        "TeamDisplay_end": "Team",
-        delta_col:         stat,
-        start_col:         f"{stat}_start",
-        end_col:           f"{stat}_end",
-    })
-    df["PA_start"] = pd.to_numeric(df["PA_start"], errors="coerce")
-    df["PA_end"]   = pd.to_numeric(df["PA_end"],   errors="coerce")
-
-elif end_year > start_year:
+if end_year > start_year:
     with st.spinner("Loading data..."):
         df = load_risers_data(start_year, end_year, min_pa_val, position_val, team_val)
 else:
     df = pd.DataFrame()
+
+
 
 # Sort & filter direction
 if not df.empty and stat in df.columns:
@@ -446,6 +414,10 @@ if not df.empty and stat in df.columns:
 elif not df.empty:
     st.error(f"Stat '{stat}' not found in dataset.")
     df = pd.DataFrame()
+
+print(df)
+
+
 
 
 # ─────────────────────────────────────────────
@@ -468,12 +440,7 @@ for _, row in df.iterrows():
     pa_start = row.get("PA_start", np.nan)
     pa_end   = row.get("PA_end",   np.nan)
     player_pa_html = ""
-    if alltime_mode:
-        yr_s = row.get("start_year", "")
-        yr_e = row.get("end_year", "")
-        if pd.notna(yr_s) and pd.notna(yr_e):
-            player_pa_html = f'<div class="player-pa">{int(yr_s)} → {int(yr_e)}</div>'
-    elif st.session_state.get("rf_show_player_pa"):
+    if st.session_state.get("rf_show_player_pa"):
         parts = []
         if pd.notna(pa_start): parts.append(str(int(pa_start)))
         if pd.notna(pa_end):   parts.append(str(int(pa_end)))
@@ -505,18 +472,16 @@ for _, row in df.iterrows():
 # ─────────────────────────────────────────────
 
 title_stat_label = label_map.get(stat, stat)
-pos_suffix  = f" ({POSITION_OPTIONS.get(position_val, '')})" if not alltime_mode and position_val != "all" else ""
-team_prefix = f"{TEAM_OPTIONS.get(team_val, '')} " if not alltime_mode and team_val != "all" else ""
+pos_suffix  = f" ({POSITION_OPTIONS.get(position_val, '')})" if  position_val != "all" else ""
+team_prefix = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
 riser_label = "Fallers" if show_fallers else "Risers"
 
-if alltime_mode:
-    title = f"All-Time {title_stat_label} {riser_label}{pos_suffix}"
-else:
-    title = f"Top {team_prefix}{title_stat_label} {riser_label}{pos_suffix}: {int(start_year)} → {int(end_year)}"
+
+title = f"Top {team_prefix}{title_stat_label} {riser_label}{pos_suffix}: {int(start_year)} → {int(end_year)}"
 
 min_pa_subtitle = ""
 if st.session_state.get("rf_show_min_pa"):
-    display_min = ALLTIME_MIN_PA if alltime_mode else min_pa_val
+    display_min =  min_pa_val
     min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min} PA each year</div>'
 
 # ─────────────────────────────────────────────
