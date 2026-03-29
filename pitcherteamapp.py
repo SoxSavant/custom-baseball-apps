@@ -66,21 +66,21 @@ TEAMS = {
 
 STAT_PRESETS = {
     "Statcast": [
-        "WAR", "bWAR", "xERA", "EV", "O-Swing%", "Whiff%",
+        "fWAR", "bWAR", "xERA", "EV", "Chase%", "Whiff%",
         "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Standard": [
-        "bWAR", "WAR", "GS", "IP", "ERA", "FIP", "WHIP",
+        "bWAR", "fWAR", "GS", "IP", "ERA", "FIP", "WHIP",
         "K/9", "BB/9", "HR/9", "K%", "BB%",
     ],
     "Miscellaneous": [
         "K-BB%", "WPA", "Clutch", "GB%", "HR/FB",
     ],
     "Every Stat": [
-        "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+        "fWAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
         "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
         "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-        "GB%", "SIERA", "O-Swing%", "Whiff%", "WPA", "Clutch",
+        "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
     ],
 }
 
@@ -88,16 +88,16 @@ STAT_ALLOWLIST = [
     "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
     "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-    "GB%", "SIERA", "O-Swing%", "Whiff%", "WPA", "Clutch",
+    "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
 ]
 
-STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%", "O-Swing%": "Chase%"}
+STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%",}
 
-label_map = {**STAT_DISPLAY_NAMES, "EV": "Avg Exit Velo"}
+label_map = { "EV": "Avg Exit Velo"}
 
 LOWER_BETTER = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "WHIP", "BB%", "BB/9", "HR/9",
-    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB", "LD%", "FB%",
+    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB",
 }
 
 
@@ -216,11 +216,7 @@ df["IP"] = pd.to_numeric(df.get("IP", 0), errors="coerce")
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-# Whiff% from Contact% if needed
-if "Whiff%" not in df.columns and "Contact%" in df.columns:
-    contact = pd.to_numeric(df["Contact%"], errors="coerce")
-    contact = contact.where(contact > 1, contact * 100)
-    df["Whiff%"] = 100 - contact
+
 
 # Attach bWAR
 bwar_df = load_bwar()

@@ -48,45 +48,43 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
 
 STAT_DISPLAY_NAMES = {
-    "WAR": "fWAR",
     "HardHit%": "Hard Hit%",
-    "O-Swing%": "Chase%",
+
 }
 
 STAT_PRESETS = {
     "Default": [
-        "WAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
-        "K%", "BB%", "Whiff%", "O-Swing%", "HardHit%", "GB%",
+        "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
+        "K%", "BB%", "Whiff%", "Cjase%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "WAR", "xERA", "EV", "O-Swing%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Standard": [
         "WAR", "bWAR", "ERA", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
     ],
     "Every Stat": [
-        "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+        "fWAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
         "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
         "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-        "GB%", "SIERA", "O-Swing%", "Whiff%", "WPA", "Clutch",
+        "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
     ],
-    "Blank – Create your own": ["WAR"],
+    "Blank – Create your own": ["fWAR"],
 }
 
 STAT_ALLOWLIST = [
-    "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
+    "fWAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
     "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-    "GB%", "SIERA", "O-Swing%", "Whiff%", "WPA", "Clutch",
+    "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
 ]
 
 lower_better = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "WHIP", "BB%", "BB/9", "HR/9",
-    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB", "LD%", "FB%",
+    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB",
 }
 
 label_map = {
-    **STAT_DISPLAY_NAMES,
     "EV": "Avg Exit Velo",
 }
 
@@ -182,11 +180,6 @@ for col in ["IP", "G", "GS"]:
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-# Whiff% from Contact% if not present
-if "Whiff%" not in df.columns and "Contact%" in df.columns:
-    contact = pd.to_numeric(df["Contact%"], errors="coerce")
-    contact = contact.where(contact > 1, contact * 100)
-    df["Whiff%"] = 100 - contact
 
 # Attach bWAR for this year
 bwar_df = load_bwar()
