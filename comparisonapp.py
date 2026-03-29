@@ -167,7 +167,7 @@ STAT_PRESETS = {
     ],
    
     "Statcast": [
-        "WAR", "Off", "BsR", "Def", "OAA", "FRV",
+        "WAR", "Off", "BsR", "Def", "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
         "O-Swing%", "Contact%", "K%", "BB%",
     ],
@@ -177,16 +177,16 @@ STAT_PRESETS = {
         "K%", "BB%", "DRS",
     ],
     "Fielding": [
-        "DRS", "FRV", "OAA",
+        "DRS", "FRV", "OAA", "FRM"
     ],
     
     "Every Stat": [
-        "bWAR", "WAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R",  "wOBA",
+        "bWAR", "WAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
         "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
-        "wRC+", "Off", "BsR", "Def", "OAA", "FRV",
+        "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
         "O-Swing%", "Contact%", "K%", "BB%", "BB", "IBB", "SO",
-        "K-BB%", "DRS", "WPA", "Clutch", "Pull%", "GB%", "FB%", "LD%",
+        "K-BB%", "DRS", "WPA", "Clutch",
     ],
     "Blank – Create your own": [
         "WAR",
@@ -203,8 +203,8 @@ STAT_ALLOWLIST = [
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
-    "FRV", "OAA", "DRS", "Age",
+    "K%", "BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
+    "FRV", "OAA", "DRS", "FRM",
 ]
 
 STAT_DISPLAY_NAMES = {
@@ -221,9 +221,9 @@ SUM_STATS = {
 }
 RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%", "Whiff%",
-    "Barrel%", "HardHit%", "Pull%", "GB%", "FB%", "LD%",
-    "LA", "EV", "MaxEV", "CSW%", "BB/K", "ISO",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Contact%",
+    "Barrel%", "HardHit%", 
+     "EV", "MaxEV", "BB/K", "ISO",
 }
 STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}
 
@@ -250,7 +250,7 @@ label_map = {
     "Contact%": "Whiff%",
     "O-Swing%": "Chase%",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "Contact%", "SO"}
+lower_better = {"K%", "O-Swing%", "Contact%", "SO"}
 
 # Teams that should be treated as the same franchise
 TEAM_ALIASES = {

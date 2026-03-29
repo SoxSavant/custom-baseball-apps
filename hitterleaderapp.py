@@ -55,22 +55,24 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "Barrel%", "HardHit%", "EV",
+    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",  "O-Swing%", "Contact%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "WPA", "Clutch",
-    "Pull%", "GB%", "FB%", "LD%",
-    "FRV", "OAA", "DRS",
+    "K%", "BB%", "WPA", "Clutch",
+    "FRV", "OAA", "DRS", "FRM"
 ]
+
+LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 
 label_map = {
     "HardHit%": "Hard Hit%",
     "WAR": "fWAR",
     "EV": "Avg Exit Velo",
     "O-Swing%": "Chase%",
+    "Contact%": "Whiff%",
 }
 
-lower_better = {"K%", "O-Swing%", "SO", "GB%"}
+lower_better = {"K%", "O-Swing%", "SO", "Contact%"}
 
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
@@ -80,7 +82,7 @@ SUM_STATS = {
 RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP", "ISO",
     "K%", "BB%", "K-BB%", "O-Swing%", "Barrel%", "HardHit%",
-    "Pull%", "GB%", "FB%", "LD%", "EV", "WPA", "Clutch", "wRC+",
+    "EV", "WPA", "Clutch", "wRC+", "Contact%"
 }
 
 POSITION_OPTIONS = {
@@ -111,6 +113,37 @@ current_year = date.today().year
 # ─────────────────────────────────────────────
 #  Team helpers
 # ─────────────────────────────────────────────
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar() -> pd.DataFrame:
+    """Load bWAR + Age from the local warhitters file."""
+    if not LOCAL_BWAR_FILE.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(LOCAL_BWAR_FILE)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+
+    # Filter out pitchers with no PA
+    if "pitcher" in df.columns:
+        pitcher_mask = df["pitcher"].astype(str).str.strip().str.upper().isin({"Y", "1", "TRUE"})
+        pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
+        df = df[~(pitcher_mask & (pa_col.isna() | (pa_col <= 0)))]
+
+    name_col = "name_common" if "name_common" in df.columns else "Name"
+    df["Name"] = df[name_col].astype(str).str.strip()
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+
+    keep = ["Name", "year_ID", "bWAR"]
+    if "Age" in df.columns:
+        df["Age"] = pd.to_numeric(df.get("Age"), errors="coerce")
+        keep.append("Age")
+
+    return df[keep].dropna(subset=["Name", "year_ID", "bWAR"])
 
 def normalize_team(team: str) -> str:
     t = str(team).strip()
@@ -440,6 +473,9 @@ if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
 else:
     df["TeamDisplay"] = "N/A"
+
+if "Contact%" in df.columns:
+    df["Contact%"] = 100 - df["Contact%"]*100 
 
 # Sort & top 10
 if stat not in df.columns:

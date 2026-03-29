@@ -9,6 +9,7 @@ for year in range(2015, 2026):
         pd.read_csv(f"data/advanced_{year}.csv"),
         pd.read_csv(f"data/statcast_{year}.csv"),
         pd.read_csv(f"data/winprob_{year}.csv"),
+        pd.read_csv(f"data/discipline_{year}.csv"),
     ]
 
     base_cols = {"Name", "Team", "MLBAMID", "NameASCII"}
