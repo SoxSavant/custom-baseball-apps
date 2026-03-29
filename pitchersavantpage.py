@@ -159,7 +159,7 @@ with controls_container:
     year = st.selectbox("Select Year", list(range(2025, 2014, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     if player_mode == "Name":
-        player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Tarik Skubal"), key="player_select")
+        player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Paul Skenes"), key="player_select")
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 

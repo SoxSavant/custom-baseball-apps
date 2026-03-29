@@ -50,42 +50,46 @@ TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
 STAT_DISPLAY_NAMES = {"WAR": "fWAR", "HardHit%": "Hard Hit%"}
 
 STAT_PRESETS = {
-    "Statcast": [
-        "WAR", "bWAR", "Off", "BsR", "Def",
+     "Statcast": [
+        "WAR", "Off", "BsR", "Def", "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Whiff%", "K%", "BB%",
+        "O-Swing%", "Contact%", "K%", "BB%",
     ],
-    "Fielding": ["DRS", "FRV", "OAA", "ARM"],
+    "Fielding": ["DRS", "FRV", "OAA", "FRM"],
     "Standard": [
         "bWAR", "WAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R", "K%", "BB%",
     ],
 
     "Every Stat": [
-        "WAR", "bWAR", "Off", "BsR", "Def",
-        "wOBA", "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "O-Swing%", "Whiff%", "K%", "BB%",
-        "wRC+", "OPS", "SLG", "OBP", "AVG", "ISO", "BABIP",
-        "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-        "WPA", "Clutch", "Pull%", "GB%", "FB%", "LD%",
-        "DRS", "FRV", "OAA",
+        "bWAR", "WAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
+        "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
+        "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
+        "O-Swing%", "Contact%", "K%", "BB%", "BB", "IBB", "SO",
+        "DRS", "WPA", "Clutch",
+    ],
+    "Blank – Create your own": [
+        "WAR",
     ],
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "WAR", "bWAR", "Barrel%", "HardHit%", "EV",
+    "WAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "O-Swing%", "WPA", "Clutch",
-    "Whiff%", "Pull%", "Cent%", "Oppo%", "GB%", "FB%", "LD%",
-    "DRS", "FRV", "OAA",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
+    "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "K%", "BB%", "O-Swing%", "Contact%", "WPA", "Clutch",
+    "FRV", "OAA", "DRS", "FRM",
 ]
 
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "SO"}
+lower_better = {"K%", "O-Swing%", "Contact%", "SO"}
 
 label_map = {
-    **STAT_DISPLAY_NAMES,
+    "HardHit%": "Hard Hit%",
+    "WAR": "fWAR",
     "EV": "Avg Exit Velo",
+    "Contact%": "Whiff%",
     "O-Swing%": "Chase%",
 }
 
@@ -167,7 +171,7 @@ with controls_container:
     year = st.selectbox("Select Year", list(range(2025, 2014, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     if player_mode == "Name":
-        player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Mookie Betts"), key="player_select")
+        player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Roman Anthony"), key="player_select")
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 
@@ -188,14 +192,8 @@ df["PA"] = pd.to_numeric(df.get("PA"), errors="coerce")
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-# Whiff% from Contact% if needed
-if "Whiff%" not in df.columns:
-    if "Contact%" in df.columns:
-        contact = pd.to_numeric(df["Contact%"], errors="coerce")
-        contact = contact.where(contact > 1, contact * 100)
-        df["Whiff%"] = 100 - contact
-    else:
-        df["Whiff%"] = np.nan
+if "Contact%" in df.columns:
+    df["Contact%"] = 100 - df["Contact%"]*100 
 
 # Attach bWAR for this year
 bwar_df = load_bwar()
