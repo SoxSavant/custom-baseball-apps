@@ -85,19 +85,25 @@ STAT_PRESETS = {
 }
 
 STAT_ALLOWLIST = [
-    "WAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
-    "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
-    "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-    "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
+    "fWAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "Chase%", "Whiff%", "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
 
-STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%",}
 
-label_map = { "EV": "Avg Exit Velo"}
+label_map = {
+    "EV": "Avg Exit Velo",
+    "HardHit%": "Hard Hit%",
+    "vFA (pi)": "vFA",
+}
 
-LOWER_BETTER = {
-    "ERA", "xERA", "FIP", "xFIP", "SIERA", "WHIP", "BB%", "BB/9", "HR/9",
-    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB",
+lower_better = {
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
+    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
 }
 
 
@@ -452,7 +458,7 @@ with stat_builder_container:
                 on_click=move_stat_row, args=(1, idx, preset_base_config))
         with stat_col:
             sn = row.get("Stat", "")
-            st.write(STAT_DISPLAY_NAMES.get(sn, sn))
+            st.write(sn)
         with show_col:
             ck = f"stat_show_{idx}"
             st.checkbox("", value=bool(row.get("Show", True)), key=ck,
@@ -517,11 +523,11 @@ for stat in stats_order:
     if league_vals.empty:
         continue
 
-    team_leader_row = team_vals.sort_values(stat, ascending=stat in LOWER_BETTER).iloc[0]
+    team_leader_row = team_vals.sort_values(stat, ascending=stat in lower_better).iloc[0]
     leader_val = float(team_leader_row[stat])
 
     pct = (league_vals <= leader_val).mean() * 100.0
-    if stat in LOWER_BETTER:
+    if stat in lower_better:
         pct = 100 - pct
     pct = float(np.clip(pct, 0, 100))
 

@@ -55,20 +55,24 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "fWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB",
-    "K/9", "BB/9", "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-",
-    "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%", "GB%", "FB%", "CG", "ShO",
+    "fWAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "Chase%", "Whiff%", "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
 
 label_map = {
+    "EV": "Avg Exit Velo",
     "HardHit%": "Hard Hit%",
-    "EV":       "Avg Exit Velo",
-  
+    "vFA (pi)": "vFA",
 }
 
 lower_better = {
-    "HardHit%", "Barrel%", "EV", "ERA", "xERA", "FIP", "xFIP", "BB",
-    "BB/9", "HR/9", "BABIP", "BB%", "WHIP", "ERA-", "FIP-", "FB%", "L",
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
+    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
 }
 
 TEAM_OPTIONS = {

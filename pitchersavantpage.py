@@ -73,19 +73,24 @@ STAT_PRESETS = {
 }
 
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
-    "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
-    "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-    "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
+    "fWAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "Chase%", "Whiff%", "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
-
-lower_better = {
-    "ERA", "xERA", "FIP", "xFIP", "SIERA", "WHIP", "BB%", "BB/9", "HR/9",
-    "HardHit%", "Barrel%", "EV", "AVG", "BABIP", "ERA-", "FIP-", "HR/FB",
-}
 
 label_map = {
     "EV": "Avg Exit Velo",
+    "HardHit%": "Hard Hit%",
+    "vFA (pi)": "vFA",
+}
+
+lower_better = {
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
+    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
 }
 
 

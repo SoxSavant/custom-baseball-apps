@@ -143,44 +143,39 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
-
 LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
-
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
     "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
-    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
+    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjAaJyBmaWxsPScjZWVmJy8+"
     "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
     "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
     "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
     "YycvPgo8L3N2Zz4="
 )
-
-# OAK/ATH same franchise
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
 
 STAT_PRESETS = {
     "Default": [
         "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
-        "K%", "BB%", "Whiff%", "O-Swing%", "HardHit%", "GB%",
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
         "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Standard": [
-        "WAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
+        "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
     ],
-    
     "Every Stat": [
-        "fWAR", "bWAR",
-        "W-L",
+        "fWAR", "bWAR", "W-L",
         "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
-        "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-        "GB/FB", "GB%", "FB%", "SIERA", "O-Swing%", "Whiff%", "WPA",
+        "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-",
+        "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
+        "Chase%", "Whiff%", "WPA",
     ],
-    "Blank – Create your own": ["WAR"],
+    "Blank – Create your own": ["fWAR"],
     "Player A leads": [],
     "Player B leads": [],
     "Player C leads": [],
@@ -189,39 +184,34 @@ STAT_PRESETS = {
 }
 
 STAT_ALLOWLIST = [
-    "WAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%",  "K-BB%", "IP", "G", 
-    "GS", "Barrel%", "HardHit%", "EV",
-      "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
-    "SV",  "AVG", "WHIP", "ERA-", "FIP-",  "SIERA", 
-    "Chase%", "Whiff%", "WPA", "Clutch", "E-F", "vFA (pi)",
-    "SO", "BB", "HBP", "HR", 
-      "QS", "CG", "ShO",
-
+    "fWAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "Chase%", "Whiff%", "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
 
-STAT_DISPLAY_NAMES = {
-}
-
 SUM_STATS = {
-    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "WAR",
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR",
 }
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
-    "ERA-", "FIP-", "Stuff+", "Location+", "Pitching+",
+    "ERA-", "FIP-",
 }
 
 label_map = {
     "EV": "Avg Exit Velo",
     "HardHit%": "Hard Hit%",
+    "vFA (pi)": "vFA",
 }
+
 lower_better = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
     "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "FB%",
-     "E-F"
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
 }
 
 
@@ -257,19 +247,10 @@ def get_team_display_multiseason(teams: list[str]) -> str:
 def ip_to_outs(value) -> float:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return np.nan
-    if isinstance(value, str):
-        match = re.search(r"[-+]?[0-9]+(?:\.[0-9]+)?", value)
-        if not match:
-            return np.nan
-        try:
-            v = float(match.group(0))
-        except Exception:
-            return np.nan
-    else:
-        try:
-            v = float(value)
-        except Exception:
-            return np.nan
+    try:
+        v = float(value)
+    except Exception:
+        return np.nan
     innings = int(np.floor(v))
     fractional = v - innings
     if abs(fractional - 0.1) < 0.05:
@@ -284,9 +265,8 @@ def ip_to_outs(value) -> float:
 def outs_to_ip(outs: float) -> float:
     if pd.isna(outs):
         return np.nan
-    total_outs = float(outs)
-    innings = int(total_outs // 3)
-    remainder = int(round(total_outs % 3))
+    innings = int(float(outs) // 3)
+    remainder = int(round(float(outs) % 3))
     return innings + remainder / 10
 
 
@@ -320,8 +300,7 @@ def load_bwar() -> pd.DataFrame:
     df["Name"] = df[name_col].astype(str).str.strip()
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    keep = ["Name", "year_ID", "bWAR"]
-    return df[keep].dropna(subset=["Name", "year_ID", "bWAR"])
+    return df[["Name", "year_ID", "bWAR"]].dropna(subset=["Name", "year_ID", "bWAR"])
 
 
 # ─────────────────────────────────────────────
@@ -337,12 +316,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-
-def display_stat_name(stat) -> str:
-    if stat is None:
-        return ""
-    return STAT_DISPLAY_NAMES.get(str(stat), str(stat))
 
 
 # ─────────────────────────────────────────────
@@ -367,14 +340,12 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         if not ids.empty:
             result["MLBAMID"] = ids.iloc[0]
 
-    # Team display
     if "Team" in grp.columns:
         teams = grp["Team"].dropna().astype(str).tolist()
         result["Team"] = get_team_display_multiseason(teams)
     else:
         result["Team"] = "N/A"
 
-    # IP needs special handling
     ip_outs_total = np.nan
     if "IP" in grp.columns:
         outs_series = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs)
@@ -383,7 +354,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
             ip_outs_total = valid.sum()
             result["IP"] = outs_to_ip(ip_outs_total)
 
-    # Weight by IP outs for rate stats
     if "IP" in grp.columns:
         weight = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).fillna(0)
     elif "TBF" in grp.columns:
@@ -392,7 +362,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         weight = pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
     weight_total = weight.sum()
 
-    # Totals needed for derived stats
     total_bb = np.nan
     total_so = np.nan
     total_er = np.nan
@@ -412,33 +381,13 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         series = pd.to_numeric(grp[col], errors="coerce")
         if series.isna().all():
             continue
-
-        if col == "Age":
-            age_min = series.min(skipna=True)
-            age_max = series.max(skipna=True)
-            if pd.isna(age_min) or pd.isna(age_max):
-                continue
-            if abs(age_min - age_max) < 0.01:
-                result[col] = float(age_min)
-            else:
-                result[col] = f"{int(round(age_min))}-{int(round(age_max))}"
-            continue
-
-        # Track raw totals for derived stats
-        if col == "BB":
-            total_bb = series.sum(skipna=True)
-        if col == "SO":
-            total_so = series.sum(skipna=True)
-        if col == "ER":
-            total_er = series.sum(skipna=True)
-        if col == "HR":
-            total_hr = series.sum(skipna=True)
-        if col == "GB":
-            total_gb = series.sum(skipna=True)
-        if col == "FB":
-            total_fb = series.sum(skipna=True)
-        if col == "LD":
-            total_ld = series.sum(skipna=True)
+        if col == "BB":   total_bb = series.sum(skipna=True)
+        if col == "SO":   total_so = series.sum(skipna=True)
+        if col == "ER":   total_er = series.sum(skipna=True)
+        if col == "HR":   total_hr = series.sum(skipna=True)
+        if col == "GB":   total_gb = series.sum(skipna=True)
+        if col == "FB":   total_fb = series.sum(skipna=True)
+        if col == "LD":   total_ld = series.sum(skipna=True)
 
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
@@ -447,7 +396,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         else:
             result[col] = series.mean(skipna=True)
 
-    # Derived stats from totals
     ip_innings = ip_outs_total / 3.0 if not pd.isna(ip_outs_total) else np.nan
 
     if not pd.isna(total_er) and not pd.isna(ip_innings) and ip_innings > 0:
@@ -461,7 +409,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
     if not pd.isna(total_so) and not pd.isna(ip_innings) and ip_innings > 0:
         result["K/9"] = (total_so / ip_innings) * 9
 
-    # GB/FB/LD%
     gb = total_gb if not pd.isna(total_gb) else 0
     fb = total_fb if not pd.isna(total_fb) else 0
     ld = total_ld if not pd.isna(total_ld) else 0
@@ -474,13 +421,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
             result["GB/FB"] = gb / fb
     if not pd.isna(total_hr) and fb > 0:
         result["HR/FB"] = (total_hr / fb) * 100
-
-    # Whiff% from Contact% if not directly available
-    if "Whiff%" not in result and "Contact%" in result:
-        contact = result["Contact%"]
-        if pd.notna(contact):
-            c = float(contact) * 100 if float(contact) <= 1 else float(contact)
-            result["Whiff%"] = 100 - c
 
     return result
 
@@ -508,7 +448,6 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
     if not agg:
         return None
 
-    # Join bWAR + Age from warpitchers file
     player_name = agg.get("Name", "")
     bwar_df = load_bwar()
     if not bwar_df.empty and player_name:
@@ -521,12 +460,6 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
         ]
         if not subset.empty:
             agg["bWAR"] = subset["bWAR"].sum(min_count=1)
-            if "Age" in subset.columns:
-                ages = subset["Age"].dropna()
-                if not ages.empty:
-                    age_min = int(ages.min())
-                    age_max = int(ages.max())
-                    agg["Age"] = float(age_min) if age_min == age_max else f"{age_min}-{age_max}"
 
     return pd.Series(agg)
 
@@ -577,20 +510,14 @@ def format_stat(stat: str, val) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat == "AGE":
-        if isinstance(val, str):
-            return val
-        v = float(val)
-        return f"{int(round(v))}" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-
-    if upper_stat in {"WAR", "BWAR", "EV"}:
+    if upper_stat in {"FWAR", "BWAR", "EV"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"ERA-", "FIP-", "STUFF+", "LOCATION+", "PITCHING+"}:
+    if upper_stat in {"ERA-", "FIP-"}:
         return f"{int(round(float(val)))}"
 
     if upper_stat == "HR/FB":
@@ -599,7 +526,7 @@ def format_stat(stat: str, val) -> str:
             v *= 100
         return f"{v:.1f}%"
 
-    if upper_stat in {"FIP", "XFIP", "ERA", "XERA", "SIERA", "GB/FB", "HR/9", "K/9", "BB/9", "E-F"}:
+    if upper_stat in {"FIP", "XFIP", "ERA", "XERA", "SIERA", "GB/FB", "HR/9", "K/9", "BB/9"}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":
@@ -613,8 +540,8 @@ def format_stat(stat: str, val) -> str:
         return f"{float(val):.3f}".lstrip("0")
 
     if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
+        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
+        or "Chase" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
         if v <= 1:
@@ -633,10 +560,8 @@ player_mode_options = ["2 players", "3 players", "4 players", "5 players"]
 player_mode = st.radio("", player_mode_options, index=0, horizontal=True)
 player_count = int(player_mode.split()[0])
 column_weights_map = {
-    "2 players": [1, 1],
-    "3 players": [1, 1.5],
-    "4 players": [1, 2],
-    "5 players": [1, 2.5],
+    "2 players": [1, 1], "3 players": [1, 1.5],
+    "4 players": [1, 2], "5 players": [1, 2.5],
 }
 column_weights = column_weights_map.get(player_mode, [1, 1])
 
@@ -781,8 +706,6 @@ if not numeric_sets:
 
 numeric_stats = list((numeric_sets[0] if len(numeric_sets) == 1 else set.intersection(*numeric_sets)) - stat_exclusions)
 
-if all("Age" in df.columns for df in dfs) and "Age" not in numeric_stats:
-    numeric_stats.append("Age")
 if any("bWAR" in df.columns for df in dfs) and "bWAR" not in numeric_stats:
     numeric_stats.append("bWAR")
 
@@ -791,7 +714,6 @@ other_stats = [stat for stat in numeric_stats if stat not in preferred_stats]
 stat_options = preferred_stats + other_stats
 allowed_add_stats = preferred_stats if preferred_stats else stat_options.copy()
 
-# W-L derived stat
 has_record = all("W" in df.columns and "L" in df.columns for df in dfs)
 if has_record:
     if "W-L" not in stat_options:
@@ -883,7 +805,7 @@ def stat_preset_callback(preset_key, stat_key, available_stats):
         if len(players_data) < 2:
             return leads
         for stat in available_stats:
-            if stat == "W-L" or stat == "Age" or stat not in STAT_ALLOWLIST:
+            if stat == "W-L" or stat not in STAT_ALLOWLIST:
                 continue
             if any(stat not in p["df"].columns for p in players_data):
                 continue
@@ -1012,13 +934,11 @@ with stat_builder_container:
     add_col, remove_col = st.columns(2)
     with add_col:
         st.selectbox("Add stat", add_options, label_visibility="hidden",
-            format_func=display_stat_name, key=add_select_key,
-            on_change=add_stat_callback,
+            key=add_select_key, on_change=add_stat_callback,
             args=(stat_state_key, add_select_key, add_reset_key, sentinel_add))
     with remove_col:
         st.selectbox("Remove stat", remove_options, label_visibility="hidden",
-            format_func=display_stat_name, key=remove_select_key,
-            on_change=remove_stat_callback,
+            key=remove_select_key, on_change=remove_stat_callback,
             args=(stat_state_key, remove_select_key, remove_reset_key, sentinel_remove))
 
     current_stat_config = normalize_stat_rows(
@@ -1040,8 +960,7 @@ with stat_builder_container:
             st.button("▼", key=f"stat_down_{idx}", disabled=idx == len(current_stat_config) - 1,
                 on_click=move_stat_row, args=(1, idx, preset_base_config))
         with stat_col:
-            sn = row.get("Stat", "")
-            st.write(STAT_DISPLAY_NAMES.get(sn, sn))
+            st.write(row.get("Stat", ""))
         with show_col:
             ck = f"stat_show_{idx}"
             st.checkbox("", value=bool(row.get("Show", True)), key=ck,
@@ -1066,12 +985,10 @@ winner_map: dict[str, set[str]] = {}
 col_order = [p["col_label"] for p in players_data]
 
 for stat in stats_order:
-    # W-L derived
     if stat == "W-L":
         if any("W" not in p["df"].columns or "L" not in p["df"].columns for p in players_data):
             continue
-        values = []
-        ratios = []
+        values, ratios = [], []
         for pdata in players_data:
             w = pd.to_numeric(pdata["row"].get("W", np.nan), errors="coerce")
             l = pd.to_numeric(pdata["row"].get("L", np.nan), errors="coerce")
@@ -1097,8 +1014,7 @@ for stat in stats_order:
         continue
 
     raw_label = label_map.get(stat, stat)
-    values = []
-    numeric_vals = []
+    values, numeric_vals = [], []
     has_non_numeric = False
 
     for pdata in players_data:
@@ -1115,7 +1031,7 @@ for stat in stats_order:
 
     winners: set[str] = set()
     cands = [v for v in numeric_vals if not pd.isna(v)]
-    if cands and not has_non_numeric and stat.upper() != "AGE":
+    if cands and not has_non_numeric:
         best = min(cands) if stat in lower_better else max(cands)
         winners = {col_order[i] for i, v in enumerate(numeric_vals) if not pd.isna(v) and abs(v - best) < 1e-9}
 

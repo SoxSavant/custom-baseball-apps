@@ -55,36 +55,34 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "WAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%",  "K-BB%", "IP", "G", 
-    "GS", "Barrel%", "HardHit%", "EV",
-      "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
-    "SV",  "AVG", "WHIP", "ERA-", "FIP-",  "SIERA", 
-    "Chase%", "Whiff%", "WPA", "Clutch", "E-F", "vFA (pi)",
-    "SO", "BB", "HBP", "HR", 
-      "QS", "CG", "ShO",
-
+    "fWAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "Chase%", "Whiff%", "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
 
+SUM_STATS = {
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR",
+}
+RATE_STATS = {
+    "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
+    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
+    "ERA-", "FIP-",
+}
+
 label_map = {
-    "HardHit%": "Hard Hit%",
     "EV": "Avg Exit Velo",
+    "HardHit%": "Hard Hit%",
+    "vFA (pi)": "vFA",
 }
 
 lower_better = {
-    "HardHit%", "Barrel%", "EV", "ERA", "xERA", "FIP", "xFIP",
-    "BB/9", "HR/9", "BABIP", "BB%", "WHIP", "ERA-", "FIP-",
-    "FB%", "SIERA", "L",
-}
-
-SUM_STATS = {
-    "G", "GS", "W", "L", "SV", "SO", "BB", "HR", "ER", "HBP",
-    "fWAR", "CG", "ShO", "TBF",
-}
-RATE_STATS = {
-    "FIP", "xFIP", "xERA", "WHIP", "K/9", "BB/9", "HR/9", "K%", "BB%",
-    "K-BB%", "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%", "GB%", "FB%",
-    "HR/FB", "BABIP", "SIERA", "ERA-", "FIP-",
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
+    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
 }
 
 TEAM_OPTIONS = {
@@ -104,6 +102,25 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
+
+LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar() -> pd.DataFrame:
+    if not LOCAL_BWAR_FILE.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(LOCAL_BWAR_FILE)
+    except Exception:
+        return pd.DataFrame()
+    if df is None or df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    name_col = "name_common" if "name_common" in df.columns else "Name"
+    df["Name"] = df[name_col].astype(str).str.strip()
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    return df[["Name", "year_ID", "bWAR"]].dropna(subset=["Name", "year_ID", "bWAR"])
 
 
 # ─────────────────────────────────────────────

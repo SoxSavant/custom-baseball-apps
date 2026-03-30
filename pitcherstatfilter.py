@@ -52,29 +52,35 @@ HEADSHOT_PLACEHOLDER = (
 MAX_DISPLAY = 30
 
 # Same stat list, label_map, lower_better as pitcher leaderboard
-COMBO_STATS = [
-    "fWAR", "ERA", "xERA", "FIP", "xFIP", "WHIP", "ERA-", "FIP-", "SIERA",
-    "IP", "G", "GS", "W", "L", "SV", "SO", "BB",
-    "K/9", "BB/9", "HR/9", "K%", "BB%", "K-BB%",
-    "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%",
-    "GB%",  "HR/FB",
-    "BABIP", "WPA", "Clutch", "CG", "ShO",
+STAT_ALLOWLIST = [
+    "fWAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "Chase%", "Whiff%", "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
 
+SUM_STATS = {
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR",
+}
+RATE_STATS = {
+    "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
+    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
+    "ERA-", "FIP-",
+}
+
 label_map = {
-    "HardHit%": "Hard Hit%",
     "EV": "Avg Exit Velo",
+    "HardHit%": "Hard Hit%",
+    "vFA (pi)": "vFA",
 }
 
 lower_better = {
-    "HardHit%", "Barrel%", "EV", "ERA", "xERA", "FIP", "xFIP",
-    "BB/9", "HR/9", "BABIP", "BB%", "WHIP", "ERA-", "FIP-",
-    "FB%", "SIERA", "L",
-}
-
-PCT_STATS = {
-    "K%", "BB%", "K-BB%", "Chase%", "Whiff%",
-    "Barrel%", "HardHit%", "GB%", "FB%", "LD%", "HR/FB",
+    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
+    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
 }
 
 STAT_DEFAULTS = {
@@ -226,11 +232,11 @@ with col1:
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
-        default_stat = "ERA" if i == 0 else "FIP" if i == 1 else COMBO_STATS[0]
-        default_index = COMBO_STATS.index(default_stat) if default_stat in COMBO_STATS else 0
+        default_stat = "ERA" if i == 0 else "FIP" if i == 1 else STAT_ALLOWLIST[0]
+        default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
 
         new_stat = st.selectbox(
-            f"Stat {i+1}", COMBO_STATS,
+            f"Stat {i+1}", STAT_ALLOWLIST,
             key=f"pc_stat_{i}",
             index=default_index,
             format_func=lambda x: label_map.get(x, x),
@@ -310,7 +316,7 @@ if not df.empty:
         col_vals = pd.to_numeric(df[stat], errors="coerce")
         compare_val = val
         # Handle pct stats stored as decimals
-        if stat in PCT_STATS:
+        if stat in RATE_STATS:
             median_col = col_vals.median()
             if pd.notna(median_col) and median_col <= 1:
                 if val > 1:
