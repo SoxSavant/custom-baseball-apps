@@ -193,12 +193,12 @@ STAT_ALLOWLIST = [
 ]
 
 SUM_STATS = {
-    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR",
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR"
 }
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
-    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
+    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
     "ERA-", "FIP-",
 }
 
@@ -290,18 +290,29 @@ def load_bwar() -> pd.DataFrame:
     if not LOCAL_BWAR_FILE.exists():
         return pd.DataFrame()
     try:
+        # 1. Read the raw data
         df = pd.read_csv(LOCAL_BWAR_FILE)
     except Exception:
         return pd.DataFrame()
+    
     if df is None or df.empty:
         return pd.DataFrame()
+
     df = df.copy()
-    name_col = "name_common" if "name_common" in df.columns else "Name"
-    df["Name"] = df[name_col].astype(str).str.strip()
+    
+    # 2. Standardize IDs and Years
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    return df[["Name", "year_ID", "bWAR"]].dropna(subset=["Name", "year_ID", "bWAR"])
+    
+    # 3. Clean up missing values before aggregating
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
 
+    # 4. THE FIX: Group by ID and Year, then SUM the WAR
+    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
+    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
+
+    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 # ─────────────────────────────────────────────
 #  Name utilities
@@ -365,10 +376,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
     total_bb = np.nan
     total_so = np.nan
     total_er = np.nan
-    total_hr = np.nan
-    total_gb = np.nan
-    total_fb = np.nan
-    total_ld = np.nan
     tbf_total = pd.to_numeric(grp["TBF"], errors="coerce").sum(skipna=True) if "TBF" in grp.columns else np.nan
 
     numeric_cols = [
@@ -384,10 +391,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         if col == "BB":   total_bb = series.sum(skipna=True)
         if col == "SO":   total_so = series.sum(skipna=True)
         if col == "ER":   total_er = series.sum(skipna=True)
-        if col == "HR":   total_hr = series.sum(skipna=True)
-        if col == "GB":   total_gb = series.sum(skipna=True)
-        if col == "FB":   total_fb = series.sum(skipna=True)
-        if col == "LD":   total_ld = series.sum(skipna=True)
 
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
@@ -408,19 +411,6 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         result["BB/9"] = (total_bb / ip_innings) * 9
     if not pd.isna(total_so) and not pd.isna(ip_innings) and ip_innings > 0:
         result["K/9"] = (total_so / ip_innings) * 9
-
-    gb = total_gb if not pd.isna(total_gb) else 0
-    fb = total_fb if not pd.isna(total_fb) else 0
-    ld = total_ld if not pd.isna(total_ld) else 0
-    bip = gb + fb + ld
-    if bip > 0:
-        result["GB%"] = (gb / bip) * 100
-        result["FB%"] = (fb / bip) * 100
-        result["LD%"] = (ld / bip) * 100
-        if fb > 0:
-            result["GB/FB"] = gb / fb
-    if not pd.isna(total_hr) and fb > 0:
-        result["HR/FB"] = (total_hr / fb) * 100
 
     return result
 
@@ -448,13 +438,11 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
     if not agg:
         return None
 
-    player_name = agg.get("Name", "")
+    player_id = agg.get("MLBAMID")
     bwar_df = load_bwar()
-    if not bwar_df.empty and player_name:
-        name_key = normalize_name(player_name)
-        bwar_df["_nkey"] = bwar_df["Name"].apply(normalize_name)
+    if not bwar_df.empty and player_id:
         subset = bwar_df[
-            (bwar_df["_nkey"] == name_key) &
+            (bwar_df["MLBAMID"] == player_id) &
             (bwar_df["year_ID"] >= start_year) &
             (bwar_df["year_ID"] <= end_year)
         ]

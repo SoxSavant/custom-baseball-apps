@@ -55,7 +55,7 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "WPA", "Clutch",
@@ -113,34 +113,32 @@ current_year = date.today().year
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_bwar() -> pd.DataFrame:
-    """Load bWAR + Age from the local warhitters file."""
     if not LOCAL_BWAR_FILE.exists():
         return pd.DataFrame()
     try:
+        # 1. Read the raw data
         df = pd.read_csv(LOCAL_BWAR_FILE)
     except Exception:
         return pd.DataFrame()
+    
     if df is None or df.empty:
         return pd.DataFrame()
+
     df = df.copy()
-
-    # Filter out pitchers with no PA
-    if "pitcher" in df.columns:
-        pitcher_mask = df["pitcher"].astype(str).str.strip().str.upper().isin({"Y", "1", "TRUE"})
-        pa_col = pd.to_numeric(df.get("PA"), errors="coerce") if "PA" in df.columns else pd.Series(np.nan, index=df.index)
-        df = df[~(pitcher_mask & (pa_col.isna() | (pa_col <= 0)))]
-
-    name_col = "name_common" if "name_common" in df.columns else "Name"
-    df["Name"] = df[name_col].astype(str).str.strip()
+    
+    # 2. Standardize IDs and Years
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("fWAR"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    
+    # 3. Clean up missing values before aggregating
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
 
-    keep = ["Name", "year_ID", "bWAR"]
-    if "Age" in df.columns:
-        df["Age"] = pd.to_numeric(df.get("Age"), errors="coerce")
-        keep.append("Age")
+    # 4. THE FIX: Group by ID and Year, then SUM the WAR
+    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
+    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
 
-    return df[keep].dropna(subset=["Name", "year_ID", "bWAR"])
+    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 def normalize_team(team: str) -> str:
     t = str(team).strip()
@@ -298,13 +296,11 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
-    """
-    Single Season: load one year directly.
-    Split Seasons: load each year separately, keep as individual rows.
-    Multi-Year Span: load all years, aggregate by PlayerId.
-    """
     if mode == MODE_SINGLE:
-        return load_final_year(start_year)
+        # If single year, we still want bWAR for that specific year
+        df = load_final_year(start_year)
+        # See below for helper to add bWAR to dataframes
+        return add_bwar_to_df(df, start_year, start_year)
 
     frames = []
     for year in range(start_year, end_year + 1):
@@ -318,20 +314,52 @@ def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     combined = pd.concat(frames, ignore_index=True)
 
     if mode == MODE_SPLIT:
-        # One row per player per season — already the case since each CSV is one season
-        return combined
+        # Every row is a separate season, so we match bWAR 1:1 with the 'Season' column
+        return add_bwar_to_df(combined, start_year, end_year, use_season_col=True)
 
-    # MODE_MULTI: aggregate across years by PlayerId
+    # MODE_MULTI: aggregate by PlayerId
     if "PlayerId" not in combined.columns:
         return combined
 
     grouped_rows = []
-    for pid, grp in combined.groupby("PlayerId"):
-        row = aggregate_player_group(grp)
-        grouped_rows.append(row)
+    for _, grp in combined.groupby("PlayerId"):
+        grouped_rows.append(aggregate_player_group(grp))
 
-    return pd.DataFrame(grouped_rows)
+    final_df = pd.DataFrame(grouped_rows)
+    
+    # Add bWAR to the aggregated rows
+    return add_bwar_to_df(final_df, start_year, end_year)
 
+# ─────────────────────────────────────────────
+#  New Helper: add_bwar_to_df
+# ─────────────────────────────────────────────
+def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool = False) -> pd.DataFrame:
+    if df.empty or "MLBAMID" not in df.columns:
+        return df
+    
+    bwar_master = load_bwar()
+    if bwar_master.empty:
+        return df
+
+    def get_player_war(row):
+        p_id = row.get("MLBAMID")
+        if not p_id:
+            return np.nan
+        
+        # If 'Split' mode, only get WAR for that specific row's season
+        # Otherwise, use the full range provided by the app filters
+        s_yr = int(row["Season"]) if use_season_col and "Season" in row else start
+        e_yr = int(row["Season"]) if use_season_col and "Season" in row else end
+        
+        subset = bwar_master[
+            (bwar_master["MLBAMID"] == p_id) & 
+            (bwar_master["year_ID"] >= s_yr) & 
+            (bwar_master["year_ID"] <= e_yr)
+        ]
+        return subset["bWAR"].sum(min_count=1)
+
+    df["bWAR"] = df.apply(get_player_war, axis=1)
+    return df
 
 # ─────────────────────────────────────────────
 #  Headshot
@@ -414,14 +442,12 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="hl_mode")
 
     if mode == MODE_SINGLE:
-        st.number_input("Year", min_value=2015, max_value=current_year-1, key="hl_year")
+        st.selectbox("Year", options=list(range(2025, 2014, -1)), key="hl_year")
         start_year = st.session_state["hl_year"]
         end_year   = st.session_state["hl_year"]
     else:
-        st.number_input("Start Year", min_value=2015, max_value=current_year-1,
-                        value=st.session_state.get("hl_start_year", current_year - 1), key="hl_start_year")
-        st.number_input("End Year", min_value=2015, max_value=current_year-1,
-                        value=st.session_state.get("hl_end_year", current_year), key="hl_end_year")
+        st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="hl_start_year")
+        st.selectbox("End Year", options=list(range(2025, 2014, -1)), key="hl_end_year")
         start_year = st.session_state["hl_start_year"]
         end_year   = max(st.session_state["hl_end_year"], start_year)
 

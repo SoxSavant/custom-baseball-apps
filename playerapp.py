@@ -51,7 +51,7 @@ STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%"}
 
 STAT_PRESETS = {
      "Statcast": [
-        "fWAR", "Off", "BsR", "Def", "wOBA",
+        "fWAR", "bWAR", "Off", "BsR", "Def", "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
@@ -75,7 +75,7 @@ STAT_PRESETS = {
 }
 
 STAT_ALLOWLIST = [
-    "WAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
@@ -138,20 +138,29 @@ def load_bwar() -> pd.DataFrame:
     if not LOCAL_BWAR_FILE.exists():
         return pd.DataFrame()
     try:
+        # 1. Read the raw data
         df = pd.read_csv(LOCAL_BWAR_FILE)
     except Exception:
         return pd.DataFrame()
+    
     if df is None or df.empty:
         return pd.DataFrame()
+
     df = df.copy()
-    if "pitcher" in df.columns:
-        pitcher_mask = df["pitcher"].astype(str).str.strip().str.upper().isin({"Y", "1", "TRUE"})
-        df = df[~pitcher_mask]
-    name_col = "name_common" if "name_common" in df.columns else "Name"
-    df["Name"] = df[name_col].astype(str).str.strip()
+    
+    # 2. Standardize IDs and Years
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    return df[["Name", "year_ID", "bWAR"]].dropna(subset=["Name", "year_ID", "bWAR"])
+    
+    # 3. Clean up missing values before aggregating
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
+
+    # 4. THE FIX: Group by ID and Year, then SUM the WAR
+    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
+    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
+
+    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 
 # ─────────────────────────────────────────────
@@ -190,17 +199,17 @@ if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
 
-# Attach bWAR for this year
+
+
 bwar_df = load_bwar()
 if not bwar_df.empty:
-    year_bwar = bwar_df[bwar_df["year_ID"] == year][["Name", "bWAR"]].copy()
-    year_bwar["_nkey"] = year_bwar["Name"].apply(normalize_name)
-    df["_nkey"] = df["Name"].astype(str).apply(normalize_name)
-    df = df.merge(year_bwar[["_nkey", "bWAR"]], on="_nkey", how="left")
-    df.drop(columns=["_nkey"], inplace=True)
-
-if "bWAR" not in df.columns:
-    df["bWAR"] = np.nan
+    # 1. Filter the bWAR database for only the current year
+    # 2. Select only the columns we need for the merge
+    year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
+    
+    # 3. Merge directly on MLBAMID
+    # We use 'left' so we don't lose players who might be missing from the bWAR file
+    df = df.merge(year_bwar, on="MLBAMID", how="left")
 
 # League for percentile distribution (340+ PA, or 126 in 2020)
 PCT_PA = 126 if year == 2020 else 340

@@ -42,7 +42,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
-
+LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
@@ -94,6 +94,35 @@ current_year = date.today().year
 #  Helpers
 # ─────────────────────────────────────────────
 
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar() -> pd.DataFrame:
+    if not LOCAL_BWAR_FILE.exists():
+        return pd.DataFrame()
+    try:
+        # 1. Read the raw data
+        df = pd.read_csv(LOCAL_BWAR_FILE)
+    except Exception:
+        return pd.DataFrame()
+    
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+    
+    # 2. Standardize IDs and Years
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    
+    # 3. Clean up missing values before aggregating
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
+
+    # 4. THE FIX: Group by ID and Year, then SUM the WAR
+    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
+    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
+
+    return df[["MLBAMID", "year_ID", "bWAR"]]
+
 def normalize_team(team: str) -> str:
     t = str(team).strip()
     return TEAM_ALIASES.get(t, t)
@@ -127,6 +156,10 @@ def load_final_year(year: int) -> pd.DataFrame:
     try:
         df = pd.read_csv(path)
         df["Season"] = year
+        bwar_df = load_bwar()
+        if not bwar_df.empty:
+            year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
+            df = df.merge(year_bwar, on="MLBAMID", how="left")
         return df
     except Exception:
         return pd.DataFrame()
@@ -292,8 +325,8 @@ stat = st.selectbox(
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    st.number_input("Start Year", min_value=2015, max_value=current_year, key="pr_start_year")
-    st.number_input("End Year",   min_value=2015, max_value=current_year, key="pr_end_year")
+    st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="pr_start_year")
+    st.selectbox("End Year", options=list(range(2025, 2014, -1)), key="pr_end_year")
 
     start_year = st.session_state["pr_start_year"]
     end_year   = st.session_state["pr_end_year"]

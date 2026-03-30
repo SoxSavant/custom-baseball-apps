@@ -64,12 +64,12 @@ STAT_ALLOWLIST = [
 ]
 
 SUM_STATS = {
-    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR",
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR"
 }
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
-    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
+    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
     "ERA-", "FIP-",
 }
 
@@ -110,18 +110,29 @@ def load_bwar() -> pd.DataFrame:
     if not LOCAL_BWAR_FILE.exists():
         return pd.DataFrame()
     try:
+        # 1. Read the raw data
         df = pd.read_csv(LOCAL_BWAR_FILE)
     except Exception:
         return pd.DataFrame()
+    
     if df is None or df.empty:
         return pd.DataFrame()
+
     df = df.copy()
-    name_col = "name_common" if "name_common" in df.columns else "Name"
-    df["Name"] = df[name_col].astype(str).str.strip()
+    
+    # 2. Standardize IDs and Years
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    return df[["Name", "year_ID", "bWAR"]].dropna(subset=["Name", "year_ID", "bWAR"])
+    
+    # 3. Clean up missing values before aggregating
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
 
+    # 4. THE FIX: Group by ID and Year, then SUM the WAR
+    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
+    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
+
+    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 # ─────────────────────────────────────────────
 #  Team / IP helpers
@@ -268,7 +279,10 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SINGLE:
-        return load_final_year(start_year)
+        # If single year, we still want bWAR for that specific year
+        df = load_final_year(start_year)
+        # See below for helper to add bWAR to dataframes
+        return add_bwar_to_df(df, start_year, start_year)
 
     frames = []
     for year in range(start_year, end_year + 1):
@@ -282,7 +296,8 @@ def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     combined = pd.concat(frames, ignore_index=True)
 
     if mode == MODE_SPLIT:
-        return combined
+        # Every row is a separate season, so we match bWAR 1:1 with the 'Season' column
+        return add_bwar_to_df(combined, start_year, end_year, use_season_col=True)
 
     # MODE_MULTI: aggregate by PlayerId
     if "PlayerId" not in combined.columns:
@@ -292,9 +307,41 @@ def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     for _, grp in combined.groupby("PlayerId"):
         grouped_rows.append(aggregate_player_group(grp))
 
-    return pd.DataFrame(grouped_rows)
+    final_df = pd.DataFrame(grouped_rows)
+    
+    # Add bWAR to the aggregated rows
+    return add_bwar_to_df(final_df, start_year, end_year)
 
+# ─────────────────────────────────────────────
+#  New Helper: add_bwar_to_df
+# ─────────────────────────────────────────────
+def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool = False) -> pd.DataFrame:
+    if df.empty or "MLBAMID" not in df.columns:
+        return df
+    
+    bwar_master = load_bwar()
+    if bwar_master.empty:
+        return df
 
+    def get_player_war(row):
+        p_id = row.get("MLBAMID")
+        if not p_id:
+            return np.nan
+        
+        # If 'Split' mode, only get WAR for that specific row's season
+        # Otherwise, use the full range provided by the app filters
+        s_yr = int(row["Season"]) if use_season_col and "Season" in row else start
+        e_yr = int(row["Season"]) if use_season_col and "Season" in row else end
+        
+        subset = bwar_master[
+            (bwar_master["MLBAMID"] == p_id) & 
+            (bwar_master["year_ID"] >= s_yr) & 
+            (bwar_master["year_ID"] <= e_yr)
+        ]
+        return subset["bWAR"].sum(min_count=1)
+
+    df["bWAR"] = df.apply(get_player_war, axis=1)
+    return df
 # ─────────────────────────────────────────────
 #  Headshot
 # ─────────────────────────────────────────────
@@ -376,14 +423,15 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="pl_mode")
 
     if mode == MODE_SINGLE:
-        st.number_input("Year", min_value=2015, max_value=current_year, key="pl_year")
+        st.selectbox("Year", options=list(range(2025, 2014, -1)), key="pl_year")
         start_year = st.session_state["pl_year"]
         end_year   = st.session_state["pl_year"]
     else:
-        st.number_input("Start Year", min_value=2015, max_value=current_year,
-                        value=st.session_state.get("pl_start_year", current_year - 1), key="pl_start_year")
-        st.number_input("End Year", min_value=2015, max_value=current_year,
-                        value=st.session_state.get("pl_end_year", current_year), key="pl_end_year")
+        st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="pl_start_year", 
+                      )
+        st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="pl_end_year", 
+                     )
+    
         start_year = st.session_state["pl_start_year"]
         end_year   = max(st.session_state["pl_end_year"], start_year)
 
@@ -488,7 +536,7 @@ if show_worst:
     title += " (Worst)"
 
 min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_ip_val} PA</div>'
+    f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
     if st.session_state.get("pl_show_min_ip") else ""
 )
 

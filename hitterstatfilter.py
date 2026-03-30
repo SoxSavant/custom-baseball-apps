@@ -38,7 +38,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
-
+LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
@@ -53,7 +53,7 @@ HEADSHOT_PLACEHOLDER = (
 MAX_DISPLAY = 30
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
+    "fWAR", "bWAR", "Off", "Def", "BsR",  "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "WPA", "Clutch",
@@ -70,7 +70,7 @@ label_map = {
 
 STAT_DEFAULTS = {
     "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
-    "fWAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
+    "fWAR": 4.0, "bWAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
     "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
     "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
@@ -108,6 +108,36 @@ current_year = date.today().year
 # ─────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_bwar() -> pd.DataFrame:
+    if not LOCAL_BWAR_FILE.exists():
+        return pd.DataFrame()
+    try:
+        # 1. Read the raw data
+        df = pd.read_csv(LOCAL_BWAR_FILE)
+    except Exception:
+        return pd.DataFrame()
+    
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    df = df.copy()
+    
+    # 2. Standardize IDs and Years
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    
+    # 3. Clean up missing values before aggregating
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
+
+    # 4. THE FIX: Group by ID and Year, then SUM the WAR
+    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
+    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
+
+    return df[["MLBAMID", "year_ID", "bWAR"]]
+
 
 def normalize_team(team: str) -> str:
     t = str(team).strip()
@@ -169,6 +199,10 @@ def load_final_year(year: int) -> pd.DataFrame:
     try:
         df = pd.read_csv(path)
         df["Season"] = year
+        bwar_df = load_bwar()
+        if not bwar_df.empty:
+            year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
+            df = df.merge(year_bwar, on="MLBAMID", how="left")
         return df
     except Exception:
         return pd.DataFrame()
@@ -233,7 +267,7 @@ col1, col2 = st.columns([0.5, 2])
 
 with col1:
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="sc_num_stats")
-    st.number_input("Year", min_value=2015, max_value=current_year, key="sc_year")
+    st.selectbox("Year", options=list(range(2025, 2014, -1)), key="sc_year")
     st.number_input("Min PA", min_value=0, max_value=20000, key="sc_min_pa")
 
     for i in range(num_stats):
@@ -258,7 +292,7 @@ with col1:
             RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
             if new_stat in RATE_STATS_3DP:
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or new_stat == "EV":
+            elif "%" in new_stat or new_stat == "EV" or "WAR" in new_stat:
                 step, fmt = 0.1, "%.1f"
             else:
                 step, fmt = 1.0, "%.0f"
