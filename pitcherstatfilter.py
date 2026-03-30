@@ -57,8 +57,8 @@ COMBO_STATS = [
     "IP", "G", "GS", "W", "L", "SV", "SO", "BB",
     "K/9", "BB/9", "HR/9", "K%", "BB%", "K-BB%",
     "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%",
-    "GB%", "FB%", "LD%", "HR/FB",
-    "BABIP", "Age", "WPA", "Clutch", "CG", "ShO",
+    "GB%",  "HR/FB",
+    "BABIP", "WPA", "Clutch", "CG", "ShO",
 ]
 
 label_map = {
@@ -69,7 +69,7 @@ label_map = {
 lower_better = {
     "HardHit%", "Barrel%", "EV", "ERA", "xERA", "FIP", "xFIP",
     "BB/9", "HR/9", "BABIP", "BB%", "WHIP", "ERA-", "FIP-",
-    "FB%", "SIERA", "L", "Chase%",
+    "FB%", "SIERA", "L",
 }
 
 PCT_STATS = {
@@ -86,8 +86,8 @@ STAT_DEFAULTS = {
     "K%": 25.0, "BB%": 7.0, "K-BB%": 18.0,
     "Barrel%": 6.0, "HardHit%": 35.0, "EV": 88.0,
     "Chase%": 32.0, "Whiff%": 25.0,
-    "GB%": 50.0, "FB%": 35.0, "LD%": 20.0, "HR/FB": 10.0,
-    "BABIP": 0.280, "Age": 28.0, "WPA": 2.0, "Clutch": 1.0,
+    "GB%": 50.0, "HR/FB": 10.0,
+    "BABIP": 0.280, "WPA": 2.0, "Clutch": 1.0,
     "CG": 1.0, "ShO": 1.0,
 }
 
@@ -241,9 +241,7 @@ with col1:
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            default_op_idx = 1 if new_stat in lower_better else 0
-            st.selectbox("Op", [">=", "<="], index=default_op_idx,
-                         key=f"pc_op_{i}", label_visibility="collapsed")
+            st.selectbox("Op", ["<=", ">="], key=f"pc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
             RATE_3DP = {"WHIP", "BABIP"}
             RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB"}
@@ -297,7 +295,7 @@ else:
 active_filters = []
 for i in range(num_stats):
     stat = st.session_state.get(f"pc_stat_{i}")
-    op   = st.session_state.get(f"pc_op_{i}", ">=")
+    op   = st.session_state.get(f"pc_op_{i}", "<=")
     val  = float(st.session_state.get(f"pc_val_{i}", 0.0))
     if stat:
         active_filters.append((stat, op, val))

@@ -321,9 +321,6 @@ def load_bwar() -> pd.DataFrame:
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
     keep = ["Name", "year_ID", "bWAR"]
-    if "Age" in df.columns:
-        df["Age"] = pd.to_numeric(df.get("Age"), errors="coerce")
-        keep.append("Age")
     return df[keep].dropna(subset=["Name", "year_ID", "bWAR"])
 
 

@@ -55,7 +55,7 @@ STAT_DISPLAY_NAMES = {
 STAT_PRESETS = {
     "Default": [
         "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
-        "K%", "BB%", "Whiff%", "Cjase%", "HardHit%", "GB%",
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
         "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",

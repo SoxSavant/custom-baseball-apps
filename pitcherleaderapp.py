@@ -55,9 +55,15 @@ HEADSHOT_PLACEHOLDER = (
 )
 
 STAT_ALLOWLIST = [
-    "fWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "W", "L", "SV", "SO", "BB",
-    "K/9", "BB/9", "HR/9", "K%", "BB%", "K-BB%", "WHIP", "ERA-", "FIP-",
-    "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%", "GB%", "FB%", "CG", "ShO",
+    "WAR", "bWAR",
+    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%",  "K-BB%", "IP", "G", 
+    "GS", "Barrel%", "HardHit%", "EV",
+      "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV",  "AVG", "WHIP", "ERA-", "FIP-",  "SIERA", 
+    "Chase%", "Whiff%", "WPA", "Clutch", "E-F", "vFA (pi)",
+    "SO", "BB", "HBP", "HR", 
+      "QS", "CG", "ShO",
+
 ]
 
 label_map = {
