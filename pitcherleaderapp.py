@@ -585,14 +585,14 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     color: #888;
     font-size: 1.1rem;
     margin-bottom: 1rem;
-    margin-top: -1rem;
+    margin-top: -1.5rem;
 }}
 .players-grid {{
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     justify-content: start;
     justify-items: center;
-    row-gap: 2.5rem;
+    row-gap: 1rem;
     column-gap: 4rem;
 }}
 .player-card {{ text-align: center; }}
@@ -607,7 +607,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .player-name {{ font-weight: 800; margin-top: 0.35rem; font-size: 1.3rem; }}
 .player-team {{ color: #666; font-size: 0.85rem; }}
 .player-stat {{ font-weight: 900; font-size: 1.3rem; margin-top: 0.25rem; }}
-.player-ip {{ color: #666; font-size: 1rem; }}
+.player-ip {{ color: #666; font-size: .85rem; }}
 html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
 .footer {{ display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }}
 .footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}

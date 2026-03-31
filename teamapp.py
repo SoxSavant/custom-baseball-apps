@@ -582,8 +582,8 @@ with right_col:
              ha="center", va="center", fontsize=22, fontweight="bold")
     fig.text(0.5, subtitle_y, f"(min {min_pa} PA)",
              ha="center", va="center", fontsize=13, color="#555")
-    fig.text(0.2, 0.08, "By: Sox_Savant", ha="center", va="center", fontsize=11, color="#555")
-    fig.text(0.7, 0.08, "Data: FanGraphs", ha="center", va="center", fontsize=11, color="#555")
+    fig.text(0.2, 0.08, "By: Sox_Savant", ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.7, 0.08, "Data: FanGraphs", ha="center", va="center", fontsize=10, color="#555")
 
     y = np.arange(len(lead_df))
     TRACK_H   = 0.82

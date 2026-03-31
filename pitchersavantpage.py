@@ -618,8 +618,8 @@ with right_col:
     if player_team_display:
         title += f" | {player_team_display}"
     fig.text(0.5, 0.885, title, ha="center", va="center", fontsize=22, fontweight="bold")
-    fig.text(0.2, 0.08, "By: Sox_Savant", ha="center", va="center", fontsize=13, color="#555")
-    fig.text(0.75, 0.08, "Data: FanGraphs", ha="center", va="center", fontsize=13, color="#555")
+    fig.text(0.2, 0.08, "By: Sox_Savant", ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.75, 0.08, "Data: FanGraphs", ha="center", va="center", fontsize=10, color="#555")
 
     y = np.arange(len(lead_df))
     TRACK_H = 0.82

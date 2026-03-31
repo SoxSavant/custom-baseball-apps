@@ -608,14 +608,14 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     color: #888;
     font-size: 1.1rem;
     margin-bottom: 1rem;
-    margin-top: -1rem;
+    margin-top: -1.5rem;
 }}
 .players-grid {{
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     justify-content: start;
     justify-items: center;
-    row-gap: 2.5rem;
+    row-gap: 1rem;
     column-gap: 4rem;
 }}
 .player-card {{ text-align: center; }}
