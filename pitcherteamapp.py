@@ -191,6 +191,10 @@ current_year = date.today().year
 #  Controls
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_ip
+
+min_ip = get_dynamic_min_ip(current_year)
+
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
@@ -206,7 +210,23 @@ with left_col:
         index=team_options.index(preferred),
         key=team_select_key,
     )
-    min_ip = st.number_input("Minimum IP", 0, 250, 40)
+    # ── Minimum IP input (with dynamic default)
+    if "pitcher_team_min_ip" not in st.session_state:
+        st.session_state.pitcher_team_min_ip = min_ip 
+
+    if "pitcher_team_last_year" not in st.session_state:
+        st.session_state.pitcher_team_last_year = year
+
+    if year != st.session_state.pitcher_team_last_year:
+        st.session_state.pitcher_team_min_ip = get_dynamic_min_ip(year)
+        st.session_state.pitcher_team_last_year = year
+
+    min_ip = st.number_input(
+        "Minimum IP",
+        min_value=0,
+        max_value=250,
+        key="pitcher_team_min_ip"
+    )
 
 stat_builder_container = left_col.container()
 
@@ -599,12 +619,12 @@ with right_col:
 
         name = row["Leader"]
         bubble_x = LEFT_OFFSET + bar_width
-        needs_shift = pct < len(str(name)) * 3.2
+        needs_shift = pct < len(str(name)) * 3.7
         if needs_shift:
-            name_x = bubble_x + (VALUE_X - bubble_x) * 0.2 - 1
+            name_x = bubble_x + (VALUE_X - bubble_x) * 0.2 - 2
             name_ha = "left"
         else:
-            name_x = LEFT_OFFSET + bar_width / 2 + 1
+            name_x = LEFT_OFFSET + bar_width / 2 + 0
             name_ha = "center"
 
         ax.text(name_x, i, name, ha=name_ha, va="center", fontsize=13, fontweight="bold", color="#111")
