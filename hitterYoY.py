@@ -172,6 +172,7 @@ def load_final_year(year: int) -> pd.DataFrame:
     try:
         df = pd.read_csv(path)
         df["Season"] = year
+    
         bwar_df = load_bwar()
         if not bwar_df.empty:
             year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
@@ -428,6 +429,8 @@ if not df.empty and stat in df.columns:
 elif not df.empty:
     st.error(f"Stat '{stat}' not found in dataset.")
     df = pd.DataFrame()
+
+
 
 
 

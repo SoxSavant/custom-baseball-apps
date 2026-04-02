@@ -75,7 +75,7 @@ STAT_DEFAULTS = {
     "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
     "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450,
-    "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 250, "G": 140,
+    "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 300, "G": 140,
     "Age": 30, "Clutch": 1.0, "FRV": 10, "OAA": 10, "DRS": 10,
     "Chase%": 25.0, "Whiff%": 20.0,
 }
@@ -339,6 +339,20 @@ if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
 else:
     df["TeamDisplay"] = "N/A"
+
+
+if "TB" not in df.columns or df["TB"].isna().all():
+    doubles = pd.to_numeric(df.get("2B"), errors="coerce")
+    triples = pd.to_numeric(df.get("3B"), errors="coerce")
+    hr = pd.to_numeric(df.get("HR"), errors="coerce")
+    singles = pd.to_numeric(df.get("1B"), errors="coerce")
+    df["TB"] = singles + 2*doubles + 3*triples + 4*hr
+
+if "XBH" not in df.columns or df["XBH"].isna().all():
+    doubles = pd.to_numeric(df.get("2B"), errors="coerce")
+    triples = pd.to_numeric(df.get("3B"), errors="coerce")
+    hr = pd.to_numeric(df.get("HR"), errors="coerce")
+    df["XBH"] = doubles + triples + hr
 
 # Build active filters
 active_filters = []

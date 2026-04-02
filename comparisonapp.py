@@ -439,30 +439,8 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
     bb = to_num(result.get("BB"))
     hbp = to_num(result.get("HBP"))
     sf = to_num(result.get("SF"))
-    doubles = to_num(result.get("2B"))
-    triples = to_num(result.get("3B"))
-    hr = to_num(result.get("HR"))
-
-    if pd.notna(h) and pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
-        singles = h - doubles - triples - hr
-        result["1B"] = singles if (pd.notna(singles) and singles >= 0) else np.nan
-    else:
-        result["1B"] = np.nan
-
-    tb_components = [
-        result.get("1B"),
-        2 * doubles if pd.notna(doubles) else np.nan,
-        3 * triples if pd.notna(triples) else np.nan,
-        4 * hr if pd.notna(hr) else np.nan,
-    ]
-    if all(pd.notna(x) for x in tb_components):
-        result["TB"] = sum(tb_components)
-
-    if pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
-        result["XBH"] = doubles + triples + hr
-    else:
-        result["XBH"] = np.nan
-
+ 
+ 
     tb = to_num(result.get("TB"))
     if pd.notna(ab) and ab > 0 and pd.notna(h):
         result["AVG"] = h / ab

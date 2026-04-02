@@ -475,7 +475,6 @@ team_val     = "all" if team_disabled else st.session_state.get("hl_team", "all"
 # ─────────────────────────────────────────────
 
 df = load_data(start_year, end_year, mode)
-
 if df is None or df.empty:
     st.error(f"No data found for {start_year}–{end_year}.")
     st.stop()

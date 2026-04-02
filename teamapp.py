@@ -68,37 +68,37 @@ TEAMS = {
 }
 
 STAT_PRESETS = {
-    "Statcast": [
-        "fWAR", "bWAR", "Off", "BsR", "Def",
+     "Statcast": [
+        "fWAR", "bWAR", "Off", "BsR", "Def", "wOBA",
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
-    "Fielding": ["DRS", "FRV", "OAA"],
+    "Fielding": ["DRS", "FRV", "OAA", "FRM"],
     "Standard": [
         "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R", "K%", "BB%",
     ],
-    "Miscellaneous": [
-        "K-BB%", "Chase%", "WPA", "Clutch",
-        "Pull%", "GB%",
-    ],
+
     "Every Stat": [
-        "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",
-        "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-        "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-        "K%", "BB%", "K-BB%", "Chase%", "WPA", "Clutch",
-        "Whiff%",
-        "DRS", "FRV", "OAA",
+        "bWAR", "fWAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
+        "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
+        "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
+        "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
+        "DRS", "WPA", "Clutch",
+    ],
+    "Blank – Create your own": [
+        "fWAR",
     ],
 }
 
 STAT_ALLOWLIST = [
-    "Off", "Def", "BsR", "fWAR", "bWAR", "Barrel%", "HardHit%", "EV",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "H", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "K-BB%", "chase%", "WPA", "Clutch",
-    "Whiff%",
-    "DRS", "FRV", "OAA",
+    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
+    "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
+    "FRV", "OAA", "DRS", "FRM",
 ]
 
 STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%"}
@@ -107,7 +107,7 @@ label_map = {
     "HardHit%": "Hard Hit%",
     "EV": "Avg Exit Velo",
 }
-lower_better = {"K%", "O-Swing%", "Whiff%", "GB%", "SO"}
+lower_better = {"K%", "Chase%", "Whiff%", "SO"}
 
 
 # ─────────────────────────────────────────────
