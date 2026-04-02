@@ -300,11 +300,15 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
 #  Session state defaults
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_ip
+
+min_ip = get_dynamic_min_ip(current_year)
+
 for key, default in [
-    ("pr_start_year",     2024),
-    ("pr_end_year",       2025),
+    ("pr_start_year",     current_year-1),
+    ("pr_end_year",       current_year),
     ("pr_stat",           "ERA"),
-    ("pr_min_ip",         100),
+    ("pr_min_ip",         min_ip),
     ("pr_team",           "all"),
     ("pr_show_fallers",   False),
     ("pr_show_min_ip",    True),
@@ -325,8 +329,8 @@ stat = st.selectbox(
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="pr_start_year")
-    st.selectbox("End Year", options=list(range(2025, 2014, -1)), key="pr_end_year")
+    st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pr_start_year")
+    st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="pr_end_year")
 
     start_year = st.session_state["pr_start_year"]
     end_year   = st.session_state["pr_end_year"]

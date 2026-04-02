@@ -1,7 +1,7 @@
 import pandas as pd
 from functools import reduce
 
-for year in range(2015, 2026):
+for year in range(2026, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),

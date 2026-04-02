@@ -246,15 +246,16 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 #  Session state defaults
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_pa
+
 for key, default in [
-    ("sc_year",        current_year - 1),
-    ("sc_min_pa",      300),
+    ("sc_year",        current_year),
     ("sc_position",    "all"),
     ("sc_team",        "all"),
     ("sc_show_min_pa", True),
     ("sc_top10",       False),
-    ("sc_val_0",       30.0),
-    ("sc_val_1",       30.0),
+    ("sc_val_0",       150),
+    ("sc_val_1",       .400),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -267,12 +268,25 @@ col1, col2 = st.columns([0.5, 2])
 
 with col1:
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="sc_num_stats")
-    st.selectbox("Year", options=list(range(2025, 2014, -1)), key="sc_year")
+    st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="sc_year")
+    selected_year = st.session_state["sc_year"]
+    if "sc_min_pa" not in st.session_state:
+        st.session_state.sc_min_pa = get_dynamic_min_pa(selected_year)
+    if "sc_last_year" not in st.session_state:
+        st.session_state.sc_last_year = selected_year
+
+    if selected_year != st.session_state.sc_last_year:
+        st.session_state["sc_min_pa"] = get_dynamic_min_pa(selected_year)
+        st.session_state.sc_last_year = selected_year
+
+    default_min_pa = get_dynamic_min_pa(selected_year)
     st.number_input("Min PA", min_value=0, max_value=20000, key="sc_min_pa")
+
+
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
-        default_stat = "HR" if i == 0 else "SB" if i == 1 else STAT_ALLOWLIST[0]
+        default_stat = "wRC+" if i == 0 else "xwOBA" if i == 1 else STAT_ALLOWLIST[0]
         default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
 
         new_stat = st.selectbox(

@@ -9,6 +9,7 @@ import matplotlib.image as mpimg
 from matplotlib.colors import LinearSegmentedColormap
 from pathlib import Path
 from io import BytesIO
+from datetime import date
 
 st.set_page_config(page_title="Custom Team Pitching Savant Page", layout="wide", page_icon="⚾")
 
@@ -184,6 +185,8 @@ def load_bwar() -> pd.DataFrame:
 
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
+current_year = date.today().year
+
 # ─────────────────────────────────────────────
 #  Controls
 # ─────────────────────────────────────────────
@@ -191,7 +194,7 @@ def load_bwar() -> pd.DataFrame:
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
-    year = st.selectbox("Select Year", list(range(2025, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
     teams_for_year = get_teams_for_year(year)
     team_options = list(teams_for_year.keys())
     team_select_key = "team_abbr_select"
@@ -241,8 +244,9 @@ if not bwar_df.empty:
     year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
     df = df.merge(year_bwar, on="MLBAMID", how="left")
 
-# League for percentile distribution (40+ IP)
-PCT_IP = 40
+# League for percentiles
+from utils import get_percentile_min_ip
+PCT_IP = get_percentile_min_ip(year)
 league_for_pct = df[df["IP"] >= PCT_IP].copy()
 if league_for_pct.empty:
     st.error(f"No pitchers with ≥ {PCT_IP} IP in {year}.")

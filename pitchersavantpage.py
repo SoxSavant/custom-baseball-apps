@@ -8,6 +8,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO
 from pathlib import Path
 import unicodedata
+from datetime import date
 
 plt.rcdefaults()
 
@@ -160,6 +161,8 @@ def load_bwar() -> pd.DataFrame:
 
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
+current_year = date.today().year
+
 
 # ─────────────────────────────────────────────
 #  Controls
@@ -171,7 +174,7 @@ with left_col:
     stat_builder_container = st.container()
 
 with controls_container:
-    year = st.selectbox("Select Year", list(range(2025, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     if player_mode == "Name":
         player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Paul Skenes"), key="player_select")
@@ -212,8 +215,9 @@ if not bwar_df.empty:
 if "bWAR" not in df.columns:
     df["bWAR"] = np.nan
 
-# League for percentiles (40+ IP)
-PCT_IP = 40
+# League for percentiles
+from utils import get_percentile_min_ip
+PCT_IP = get_percentile_min_ip(year)
 league_for_pct = df[pd.to_numeric(df.get("IP", 0), errors="coerce") >= PCT_IP].copy()
 if league_for_pct.empty:
     st.error(f"No pitchers with ≥ {PCT_IP} IP in {year}.")

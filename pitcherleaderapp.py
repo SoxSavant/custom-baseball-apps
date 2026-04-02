@@ -393,12 +393,16 @@ def format_stat(stat: str, val) -> str:
 #  Session state defaults
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_ip
+
+min_ip = get_dynamic_min_ip(current_year)
+
 for key, default in [
-    ("pl_year",           current_year-1),
-    ("pl_start_year",     current_year - 2),
-    ("pl_end_year",       current_year-1),
+    ("pl_year",           current_year),
+    ("pl_start_year",     current_year - 1),
+    ("pl_end_year",       current_year),
     ("pl_stat",           "fWAR"),
-    ("pl_min_ip",         162),
+    ("pl_min_ip",         min_ip),
     ("pl_team",           "all"),
     ("pl_mode",           MODE_SINGLE),
     ("pl_sort_worst",     False),
@@ -423,13 +427,21 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="pl_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(2025, 2014, -1)), key="pl_year")
+        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="pl_year")
         start_year = st.session_state["pl_year"]
         end_year   = st.session_state["pl_year"]
+
+        if "last_year" not in st.session_state:
+            st.session_state.last_year = start_year
+
+        if start_year != st.session_state.last_year:
+            st.session_state["pl_min_ip"] = get_dynamic_min_ip(start_year)
+            st.session_state.last_year = start_year
+
     else:
-        st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="pl_start_year", 
+        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pl_start_year", 
                       )
-        st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="pl_end_year", 
+        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pl_end_year", 
                      )
     
         start_year = st.session_state["pl_start_year"]

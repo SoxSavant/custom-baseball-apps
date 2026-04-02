@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import html
 import unicodedata
-import re
+from datetime import date
 from pathlib import Path
 from functools import lru_cache
 
@@ -631,7 +631,7 @@ with left_col:
     controls_container = st.container()
     stat_builder_container = st.container()
 
-current_year = 2025
+current_year = date.today().year
 years_desc = list(range(current_year, 2014, -1))  # data starts 2015
 MAX_PLAYERS = 5
 default_names = ["Shohei Ohtani", "Aaron Judge", "", "", ""]

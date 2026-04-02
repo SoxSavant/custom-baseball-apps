@@ -10,6 +10,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 from io import BytesIO
+from datetime import date
 
 st.set_page_config(page_title="Custom Team Hitting Savant Page", layout="wide", page_icon="⚾")
 
@@ -190,6 +191,7 @@ def load_bwar() -> pd.DataFrame:
 
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
+current_year = date.today().year
 
 # ─────────────────────────────────────────────
 #  Controls
@@ -198,7 +200,7 @@ def load_bwar() -> pd.DataFrame:
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
-    year = st.selectbox("Select Year", list(range(2025, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
     teams_for_year = get_teams_for_year(year)
     team_options = list(teams_for_year.keys())
     team_select_key = "team_abbr_select"
@@ -254,7 +256,8 @@ if not bwar_df.empty:
     df = df.merge(year_bwar, on="MLBAMID", how="left")
 
 # League for percentile distribution
-PCT_PA = 126 if year == 2020 else 340
+from utils import get_percentile_min_pa
+PCT_PA = get_percentile_min_pa(year)
 league_for_pct = df[df["PA"] >= PCT_PA].copy()
 if league_for_pct.empty:
     st.error(f"No hitters with ≥ {PCT_PA} PA in {year}.")

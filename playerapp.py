@@ -8,6 +8,7 @@ from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO
 from pathlib import Path
 import unicodedata
+from datetime import date
 
 plt.rcdefaults()
 
@@ -162,6 +163,7 @@ def load_bwar() -> pd.DataFrame:
 
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
+current_year = date.today().year
 
 # ─────────────────────────────────────────────
 #  Controls
@@ -174,10 +176,10 @@ with left_col:
     stat_builder_container = st.container()
 
 with controls_container:
-    year = st.selectbox("Select Year", list(range(2025, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     if player_mode == "Name":
-        player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Roman Anthony"), key="player_select")
+        player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Yordan Alvarez"), key="player_select")
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 
@@ -211,8 +213,10 @@ if not bwar_df.empty:
     # We use 'left' so we don't lose players who might be missing from the bWAR file
     df = df.merge(year_bwar, on="MLBAMID", how="left")
 
-# League for percentile distribution (340+ PA, or 126 in 2020)
-PCT_PA = 126 if year == 2020 else 340
+# League for percentile distribution 
+from utils import get_percentile_min_pa
+PCT_PA = get_percentile_min_pa(year)
+
 league_for_pct = df[df["PA"] >= PCT_PA].copy()
 if league_for_pct.empty:
     st.error(f"No hitters with ≥ {PCT_PA} PA in {year}.")

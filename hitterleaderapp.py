@@ -411,12 +411,17 @@ def format_stat(stat: str, val) -> str:
 #  Session state defaults
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_pa
+
+min_pa = get_dynamic_min_pa(current_year)
+
+
 for key, default in [
-    ("hl_year", current_year-1),
-    ("hl_start_year", current_year - 2),
-    ("hl_end_year", current_year-1),
+    ("hl_year", current_year),
+    ("hl_start_year", current_year - 1),
+    ("hl_end_year", current_year),
     ("hl_stat", "fWAR"),
-    ("hl_min_pa", 502),
+    ("hl_min_pa", min_pa),
     ("hl_position", "all"),
     ("hl_team", "all"),
     ("hl_mode", MODE_SINGLE),
@@ -442,12 +447,20 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="hl_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(2025, 2014, -1)), key="hl_year")
+        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="hl_year")
         start_year = st.session_state["hl_year"]
         end_year   = st.session_state["hl_year"]
+        
+        if "last_year" not in st.session_state:
+            st.session_state.last_year = start_year
+
+        if start_year != st.session_state.last_year:
+            st.session_state["hl_min_pa"] = get_dynamic_min_pa(start_year)
+            st.session_state.last_year = start_year
+
     else:
-        st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="hl_start_year")
-        st.selectbox("End Year", options=list(range(2025, 2014, -1)), key="hl_end_year")
+        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="hl_start_year")
+        st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="hl_end_year")
         start_year = st.session_state["hl_start_year"]
         end_year   = max(st.session_state["hl_end_year"], start_year)
 
@@ -469,6 +482,7 @@ with col1:
 min_pa_val   = int(st.session_state.get("hl_min_pa", 0))
 position_val = st.session_state.get("hl_position", "all")
 team_val     = "all" if team_disabled else st.session_state.get("hl_team", "all")
+
 
 # ─────────────────────────────────────────────
 #  Load & filter data

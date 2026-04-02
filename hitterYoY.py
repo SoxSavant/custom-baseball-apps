@@ -345,11 +345,15 @@ def format_stat(stat: str, val, show_sign: bool = False) -> str:
 #  Session state defaults
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_pa
+
+min_pa = get_dynamic_min_pa(current_year)
+
 for key, default in [
-    ("rf_start_year",     2024),
-    ("rf_end_year",       2025),
+    ("rf_start_year",     current_year-1),
+    ("rf_end_year",       current_year),
     ("rf_stat",           "fWAR"),
-    ("rf_min_pa",         300),
+    ("rf_min_pa",         min_pa),
     ("rf_position",       "all"),
     ("rf_team",           "all"),
     ("rf_show_fallers",   False),
@@ -378,8 +382,8 @@ stat = st.selectbox(
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    st.selectbox("Start Year", options=list(range(2025, 2014, -1)), key="rf_start_year")
-    st.selectbox("End Year", options=list(range(2025, 2014, -1)), key="rf_end_year")
+    st.selectbox("Start Year", options=list(range(current_year-1, 2014, -1)), key="rf_start_year")
+    st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="rf_end_year")
     start_year = st.session_state["rf_start_year"]
     end_year   = st.session_state["rf_end_year"]
     if end_year <= start_year:

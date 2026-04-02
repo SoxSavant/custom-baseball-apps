@@ -240,9 +240,13 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 #  Session state defaults
 # ─────────────────────────────────────────────
 
+from utils import get_dynamic_min_ip
+
+min_ip = get_dynamic_min_ip(current_year)
+
 for key, default in [
-    ("pc_year",        current_year - 1),
-    ("pc_min_ip",      100),
+    ("pc_year",        current_year),
+    ("pc_min_ip",      min_ip),
     ("pc_team",        "all"),
     ("pc_show_ip",     False),
     ("pc_show_min_ip", True),
@@ -261,7 +265,7 @@ col1, col2 = st.columns([0.5, 2])
 
 with col1:
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="pc_num_stats")
-    st.selectbox("Year", options=list(range(2025, 2014, -1)), key="pc_year")
+    st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="pc_year")
     st.number_input("Min IP", min_value=0, max_value=5000, key="pc_min_ip")
 
     for i in range(num_stats):
