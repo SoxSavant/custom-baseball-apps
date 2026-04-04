@@ -650,7 +650,7 @@ grid_html = f"""
 
 card_count = len(cards)
 est_rows   = max(1, (card_count + 4) // 5)
-est_height = 120 + est_rows * 280 + 80
+est_height = 180 + est_rows * 280 + 80
 
 full_html = f"""<!DOCTYPE html>
 <html>
