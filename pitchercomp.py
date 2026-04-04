@@ -479,7 +479,7 @@ def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
 # ─────────────────────────────────────────────
 
 def get_headshot(player_row: pd.Series) -> str:
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
+    for col in ["MLBAMID"]:
         val = player_row.get(col)
         if val is not None and pd.notna(val):
             try:

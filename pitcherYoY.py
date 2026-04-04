@@ -136,7 +136,7 @@ def get_team_display(team_value: str) -> str:
 
 
 def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
+    for col in ["MLBAMID"]:
         val = row.get(col)
         if val is not None and pd.notna(val):
             try:

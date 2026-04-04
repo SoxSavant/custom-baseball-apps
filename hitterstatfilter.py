@@ -53,7 +53,7 @@ HEADSHOT_PLACEHOLDER = (
 MAX_DISPLAY = 30
 
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR",  "Barrel%", "HardHit%", "EV",  "Chase%", "Whiff%",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "WPA", "Clutch",
@@ -65,7 +65,6 @@ lower_better = {"K%", "O-Swing%", "SO", "Chase%"}
 label_map = {
     "HardHit%": "Hard Hit%",
     "EV": "Avg Exit Velo",
-    
 }
 
 STAT_DEFAULTS = {
@@ -80,9 +79,17 @@ STAT_DEFAULTS = {
     "Chase%": 25.0, "Whiff%": 20.0,
 }
 
-PCT_STATS = {
-    "K%", "BB%", "K-BB%", "Chase%", "Whiff%",
-    "Barrel%", "HardHit%",
+PCT_STATS = {"K%", "BB%", "K-BB%", "Chase%", "Whiff%", "Barrel%", "HardHit%"}
+
+SUM_STATS = {
+    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
+    "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
+    "fWAR", "Off", "Def", "BsR", "DRS", "OAA", "FRV",
+}
+RATE_STATS = {
+    "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP", "ISO",
+    "K%", "BB%", "K-BB%", "Chase%", "Barrel%", "HardHit%",
+    "EV", "WPA", "Clutch", "wRC+", "Whiff%"
 }
 
 POSITION_OPTIONS = {
@@ -102,6 +109,10 @@ TEAM_OPTIONS = {
     "TOR": "TOR", "WSN": "WSN",
 }
 
+MODE_SINGLE = "Single Season"
+MODE_SPLIT  = "Split Seasons"
+MODE_MULTI  = "Multi-Year Span"
+
 current_year = date.today().year
 
 
@@ -114,28 +125,17 @@ def load_bwar() -> pd.DataFrame:
     if not LOCAL_BWAR_FILE.exists():
         return pd.DataFrame()
     try:
-        # 1. Read the raw data
         df = pd.read_csv(LOCAL_BWAR_FILE)
     except Exception:
         return pd.DataFrame()
-    
     if df is None or df.empty:
         return pd.DataFrame()
-
     df = df.copy()
-    
-    # 2. Standardize IDs and Years
     df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    
-    # 3. Clean up missing values before aggregating
     df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-
-    # 4. THE FIX: Group by ID and Year, then SUM the WAR
-    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
     df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
 
@@ -152,7 +152,7 @@ def get_team_display(team_value: str) -> str:
 
 
 def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
+    for col in ["MLBAMID"]:
         val = row.get(col)
         if val is not None and pd.notna(val):
             try:
@@ -190,7 +190,7 @@ def update_stat_default(i):
 
 
 # ─────────────────────────────────────────────
-#  Data loading
+#  Data loading & aggregation
 # ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -199,13 +199,156 @@ def load_final_year(year: int) -> pd.DataFrame:
     try:
         df = pd.read_csv(path)
         df["Season"] = year
-        bwar_df = load_bwar()
-        if not bwar_df.empty:
-            year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
-            df = df.merge(year_bwar, on="MLBAMID", how="left")
         return df
     except Exception:
         return pd.DataFrame()
+
+
+def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool = False) -> pd.DataFrame:
+    if df.empty or "MLBAMID" not in df.columns:
+        return df
+    bwar_master = load_bwar()
+    if bwar_master.empty:
+        return df
+
+    def get_player_war(row):
+        p_id = row.get("MLBAMID")
+        if not p_id or pd.isna(p_id):
+            return np.nan
+        s_yr = int(row["Season"]) if use_season_col and "Season" in row else start
+        e_yr = int(row["Season"]) if use_season_col and "Season" in row else end
+        subset = bwar_master[
+            (bwar_master["MLBAMID"] == p_id) &
+            (bwar_master["year_ID"] >= s_yr) &
+            (bwar_master["year_ID"] <= e_yr)
+        ]
+        return subset["bWAR"].sum(min_count=1)
+
+    df["bWAR"] = df.apply(get_player_war, axis=1)
+    return df
+
+
+def aggregate_player_group(grp: pd.DataFrame) -> dict:
+    result: dict = {}
+
+    if "Name" in grp.columns:
+        result["Name"] = str(grp["Name"].dropna().iloc[0]) if not grp["Name"].dropna().empty else ""
+    if "PlayerId" in grp.columns:
+        ids = grp["PlayerId"].dropna()
+        if not ids.empty:
+            result["PlayerId"] = ids.iloc[0]
+    if "MLBAMID" in grp.columns:
+        ids = grp["MLBAMID"].dropna()
+        if not ids.empty:
+            result["MLBAMID"] = ids.iloc[0]
+
+    if "Team" in grp.columns:
+        teams = grp["Team"].dropna().astype(str).tolist()
+        result["Team"] = (
+            "2+ Teams" if any(get_team_display(t) == "2+ Teams" for t in teams)
+            else "2+ Teams" if len({normalize_team(t) for t in teams if t.strip() and t.strip() != "- - -"}) > 1
+            else (normalize_team(teams[0]) if teams else "N/A")
+        )
+    else:
+        result["Team"] = "N/A"
+
+    pa_weight = pd.to_numeric(grp["PA"], errors="coerce").fillna(0) if "PA" in grp.columns else pd.Series(np.zeros(len(grp)), index=grp.index)
+    pa_total = pa_weight.sum()
+
+    numeric_cols = [
+        col for col in grp.columns
+        if pd.api.types.is_numeric_dtype(grp[col]) and col not in {"PlayerId", "MLBAMID", "Season"}
+    ]
+
+    for col in numeric_cols:
+        series = pd.to_numeric(grp[col], errors="coerce")
+        if series.isna().all():
+            continue
+        if col in SUM_STATS:
+            result[col] = series.sum(skipna=True)
+        elif col in RATE_STATS and pa_total > 0:
+            result[col] = (series * pa_weight).sum(skipna=True) / pa_total
+        else:
+            result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
+
+    # Recompute derived rate stats from counting stats
+    def to_num(x):
+        try:
+            return float(x)
+        except Exception:
+            return np.nan
+
+    h = to_num(result.get("H"))
+    ab = to_num(result.get("AB"))
+    bb = to_num(result.get("BB"))
+    hbp = to_num(result.get("HBP"))
+    sf = to_num(result.get("SF"))
+    doubles = to_num(result.get("2B"))
+    triples = to_num(result.get("3B"))
+    hr = to_num(result.get("HR"))
+
+    if pd.notna(h) and pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
+        singles = h - doubles - triples - hr
+        result["1B"] = singles if singles >= 0 else np.nan
+        result["XBH"] = doubles + triples + hr
+        tb = singles + 2 * doubles + 3 * triples + 4 * hr
+        result["TB"] = tb
+        if pd.notna(ab) and ab > 0:
+            result["AVG"] = h / ab
+            result["SLG"] = tb / ab
+
+    bb_v = 0 if pd.isna(bb) else bb
+    hbp_v = 0 if pd.isna(hbp) else hbp
+    sf_v = 0 if pd.isna(sf) else sf
+    obp_den = (ab if pd.notna(ab) else 0) + bb_v + hbp_v + sf_v
+    if obp_den > 0 and pd.notna(h):
+        result["OBP"] = (h + bb_v + hbp_v) / obp_den
+
+    slg = result.get("SLG")
+    obp = result.get("OBP")
+    avg = result.get("AVG")
+    if pd.notna(slg) and pd.notna(obp):
+        result["OPS"] = slg + obp
+    if pd.notna(slg) and pd.notna(avg):
+        result["ISO"] = slg - avg
+
+    return result
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_data(start_year: int, end_year: int, mode: str, position: str = "all") -> pd.DataFrame:
+    if mode == MODE_SINGLE:
+        df = load_final_year(start_year)
+        return add_bwar_to_df(df, start_year, start_year)
+
+    frames = []
+    for year in range(start_year, end_year + 1):
+        df = load_final_year(year)
+        if df is not None and not df.empty:
+            frames.append(df)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+
+    if mode == MODE_SPLIT:
+        return add_bwar_to_df(combined, start_year, end_year, use_season_col=True)
+
+    # MODE_MULTI: filter by position on raw rows first, then aggregate
+    if "PlayerId" not in combined.columns:
+        return combined
+
+    combined = filter_by_position(combined, position)
+    if combined.empty:
+        return pd.DataFrame()
+
+    grouped_rows = []
+    for _, grp in combined.groupby("PlayerId"):
+        grouped_rows.append(aggregate_player_group(grp))
+
+    final_df = pd.DataFrame(grouped_rows)
+    return add_bwar_to_df(final_df, start_year, end_year)
 
 
 # ─────────────────────────────────────────────
@@ -250,9 +393,13 @@ from utils import get_dynamic_min_pa
 
 for key, default in [
     ("sc_year",        current_year),
+    ("sc_start_year",  current_year - 1),
+    ("sc_end_year",    current_year),
+    ("sc_mode",        MODE_SINGLE),
     ("sc_position",    "all"),
     ("sc_team",        "all"),
     ("sc_show_min_pa", True),
+    ("sc_show_player_pa", False),
     ("sc_top10",       False),
     ("sc_val_0",       150),
     ("sc_val_1",       .400),
@@ -268,21 +415,31 @@ col1, col2 = st.columns([0.5, 2])
 
 with col1:
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="sc_num_stats")
-    st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="sc_year")
-    selected_year = st.session_state["sc_year"]
+
+    mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="sc_mode")
+
+    if mode == MODE_SINGLE:
+        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="sc_year")
+        start_year = st.session_state["sc_year"]
+        end_year   = st.session_state["sc_year"]
+
+        if "sc_last_year" not in st.session_state:
+            st.session_state.sc_last_year = start_year
+        if start_year != st.session_state.sc_last_year:
+            st.session_state["sc_min_pa"] = get_dynamic_min_pa(start_year)
+            st.session_state.sc_last_year = start_year
+    else:
+        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="sc_start_year")
+        st.selectbox("End Year",   options=list(range(current_year, 2014, -1)), key="sc_end_year")
+        start_year = st.session_state["sc_start_year"]
+        end_year   = max(st.session_state["sc_end_year"], start_year)
+
     if "sc_min_pa" not in st.session_state:
-        st.session_state.sc_min_pa = get_dynamic_min_pa(selected_year)
-    if "sc_last_year" not in st.session_state:
-        st.session_state.sc_last_year = selected_year
+        st.session_state["sc_min_pa"] = get_dynamic_min_pa(
+            start_year if mode == MODE_SINGLE else current_year
+        )
 
-    if selected_year != st.session_state.sc_last_year:
-        st.session_state["sc_min_pa"] = get_dynamic_min_pa(selected_year)
-        st.session_state.sc_last_year = selected_year
-
-    default_min_pa = get_dynamic_min_pa(selected_year)
     st.number_input("Min PA", min_value=0, max_value=20000, key="sc_min_pa")
-
-
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
@@ -315,38 +472,45 @@ with col1:
 
     st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
                  format_func=lambda x: POSITION_OPTIONS[x], key="sc_position")
-    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
-                 format_func=lambda x: TEAM_OPTIONS[x], key="sc_team")
+
+    team_disabled = (mode == MODE_MULTI)
+    st.selectbox(
+        "Team", options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x], key="sc_team",
+        disabled=team_disabled,
+        help="Team filter unavailable for multi-year span" if team_disabled else None,
+    )
+
     st.checkbox("Show min PA",         key="sc_show_min_pa")
+    st.checkbox("Show player PA", key="sc_show_player_pa")
     st.checkbox("Only display top 10", key="sc_top10")
 
 # ─────────────────────────────────────────────
 #  Load & filter
 # ─────────────────────────────────────────────
 
-year_val     = int(st.session_state["sc_year"])
 min_pa_val   = int(st.session_state["sc_min_pa"])
 position_val = st.session_state["sc_position"]
-team_val     = st.session_state["sc_team"]
+team_val     = "all" if team_disabled else st.session_state["sc_team"]
 
-df = load_final_year(year_val)
+df = load_data(start_year, end_year, mode, position=position_val)
 
 if df is None or df.empty:
-    st.error(f"No data found for {year_val}.")
+    st.error(f"No data found for {start_year}–{end_year}.")
     st.stop()
 
-# Min PA filter
+# Min PA
 if min_pa_val > 0 and "PA" in df.columns:
     df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
-# Position filter (with DH override)
-df = filter_by_position(df, position_val)
+# Position filter — skip for MULTI (already applied pre-aggregation inside load_data)
+if mode != MODE_MULTI:
+    df = filter_by_position(df, position_val)
 
 # Team filter
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(normalize_team) == target]
-
 
 # Team display
 if "Team" in df.columns:
@@ -354,21 +518,24 @@ if "Team" in df.columns:
 else:
     df["TeamDisplay"] = "N/A"
 
-
+# Derived stats
 if "TB" not in df.columns or df["TB"].isna().all():
     doubles = pd.to_numeric(df.get("2B"), errors="coerce")
     triples = pd.to_numeric(df.get("3B"), errors="coerce")
-    hr = pd.to_numeric(df.get("HR"), errors="coerce")
+    hr      = pd.to_numeric(df.get("HR"), errors="coerce")
     singles = pd.to_numeric(df.get("1B"), errors="coerce")
-    df["TB"] = singles + 2*doubles + 3*triples + 4*hr
+    df["TB"] = singles + 2 * doubles + 3 * triples + 4 * hr
 
 if "XBH" not in df.columns or df["XBH"].isna().all():
     doubles = pd.to_numeric(df.get("2B"), errors="coerce")
     triples = pd.to_numeric(df.get("3B"), errors="coerce")
-    hr = pd.to_numeric(df.get("HR"), errors="coerce")
+    hr      = pd.to_numeric(df.get("HR"), errors="coerce")
     df["XBH"] = doubles + triples + hr
 
-# Build active filters
+# ─────────────────────────────────────────────
+#  Apply stat filters
+# ─────────────────────────────────────────────
+
 active_filters = []
 for i in range(num_stats):
     stat = st.session_state.get(f"sc_stat_{i}")
@@ -377,7 +544,6 @@ for i in range(num_stats):
     if stat:
         active_filters.append((stat, op, val))
 
-# Apply each filter
 total_qualified = 0
 if not df.empty:
     mask = pd.Series([True] * len(df), index=df.index)
@@ -386,7 +552,6 @@ if not df.empty:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
         compare_val = val
-        # Handle pct stats stored as decimals vs whole numbers
         if stat in PCT_STATS:
             median_col = col_vals.median()
             if pd.notna(median_col) and median_col <= 1:
@@ -397,7 +562,6 @@ if not df.empty:
     df = df[mask]
     total_qualified = len(df)
 
-    # Sort by first filter stat
     if active_filters:
         sort_stat, sort_op, _ = active_filters[0]
         if sort_stat in df.columns:
@@ -417,6 +581,10 @@ for _, row in df.iterrows():
     name = str(row.get("Name", "")).strip()
     team = str(row.get("TeamDisplay", ""))
 
+    # In Split mode, append the season year to the team label
+    if mode == MODE_SPLIT and "Season" in row.index and pd.notna(row.get("Season")):
+        team = f"{team} ({int(row['Season'])})"
+
     stat_lines = []
     for stat, op, threshold in active_filters:
         val = row.get(stat, np.nan)
@@ -428,6 +596,11 @@ for _, row in df.iterrows():
             )
 
     src = get_headshot(row)
+    pa_val = row.get("PA", np.nan)
+    player_pa_html = (
+        f'<div class="player-pa">{int(pa_val)} PA</div>'
+        if st.session_state.get("sc_show_player_pa") and pd.notna(pa_val) else ""
+    )
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" width="155" height="155" style="object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;background:#f6f6f6;display:block;"/>'
     cards.append(f"""
     <div class="player-card">
@@ -435,6 +608,7 @@ for _, row in df.iterrows():
       <div class="player-name">{html.escape(name)}</div>
       <div class="player-team">{html.escape(team)}</div>
       {'<div class="player-stat-line">' + " | ".join(stat_lines) + "</div>" if stat_lines else ""}
+      {player_pa_html}
     </div>""")
 
 # ─────────────────────────────────────────────
@@ -442,10 +616,12 @@ for _, row in df.iterrows():
 # ─────────────────────────────────────────────
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
-filter_str  = ", ".join(filter_parts)
-pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
-team_suffix = f"({team_val}) " if team_val != "all" else ""
-title = f"{filter_str} in {year_val} {team_suffix}{pos_suffix}"
+filter_str   = ", ".join(filter_parts)
+span_label   = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_year}"
+mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
+pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
+team_suffix  = f" ({team_val})" if team_val != "all" else ""
+title = f"{filter_str} in {span_label}{mode_label}{team_suffix}{pos_suffix}"
 
 display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
 overflow_note = (
@@ -522,6 +698,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .player-name {{ font-weight: 800; font-size: 1rem; margin-top: 0.35rem; line-height: 1.2; }}
 .player-team {{ color: #666; font-size: 0.8rem; margin-bottom: 0.25rem; }}
 .player-stat-line {{ text-align: center; font-size: 0.95rem; margin-top: 0.15rem; }}
+.player-pa {{ color: #666; font-size: .9rem; }}
 .stat-label {{ color: #888; font-size: 0.85rem; }}
 .stat-value {{ font-weight: 800; font-size: 0.95rem; color: #1a1a1a; }}
 .footer {{ display: flex; justify-content: space-between; margin-top: 1.5rem; padding: 0 4rem; }}

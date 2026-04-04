@@ -295,7 +295,7 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
 # ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
+def load_data(start_year: int, end_year: int, mode: str, position: str = "all") -> pd.DataFrame:
     if mode == MODE_SINGLE:
         # If single year, we still want bWAR for that specific year
         df = load_final_year(start_year)
@@ -320,6 +320,10 @@ def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     # MODE_MULTI: aggregate by PlayerId
     if "PlayerId" not in combined.columns:
         return combined
+    
+    combined = filter_by_position(combined, position)
+    if combined.empty:
+        return pd.DataFrame
 
     grouped_rows = []
     for _, grp in combined.groupby("PlayerId"):
@@ -366,7 +370,7 @@ def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool 
 # ─────────────────────────────────────────────
 
 def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
+    for col in ["MLBAMID"]:
         val = row.get(col)
         if val is not None and pd.notna(val):
             try:
@@ -488,7 +492,7 @@ team_val     = "all" if team_disabled else st.session_state.get("hl_team", "all"
 #  Load & filter data
 # ─────────────────────────────────────────────
 
-df = load_data(start_year, end_year, mode)
+df = load_data(start_year, end_year, mode, position_val)
 if df is None or df.empty:
     st.error(f"No data found for {start_year}–{end_year}.")
     st.stop()
@@ -497,7 +501,9 @@ if df is None or df.empty:
 if min_pa_val > 0 and "PA" in df.columns:
     df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
-df = filter_by_position(df, position_val)
+# After load_data call:
+if mode != MODE_MULTI:
+    df = filter_by_position(df, position_val)
 
 # Team filter (single/split season only)
 if team_val != "all" and "Team" in df.columns:

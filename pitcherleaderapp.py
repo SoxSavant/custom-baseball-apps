@@ -347,7 +347,7 @@ def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool 
 # ─────────────────────────────────────────────
 
 def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
+    for col in ["MLBAMID"]:
         val = row.get(col)
         if val is not None and pd.notna(val):
             try:
@@ -441,7 +441,7 @@ with col1:
     else:
         st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pl_start_year", 
                       )
-        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pl_end_year", 
+        st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="pl_end_year", 
                      )
     
         start_year = st.session_state["pl_start_year"]

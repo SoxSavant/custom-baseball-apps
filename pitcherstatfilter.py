@@ -33,7 +33,7 @@ with meta_col:
     )
 
 # ─────────────────────────────────────────────
-#  Constants — identical to pitcher leaderboard
+#  Constants
 # ─────────────────────────────────────────────
 
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
@@ -51,7 +51,6 @@ HEADSHOT_PLACEHOLDER = (
 
 MAX_DISPLAY = 30
 
-# Same stat list, label_map, lower_better as pitcher leaderboard
 STAT_ALLOWLIST = [
     "fWAR", "bWAR",
     "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
@@ -67,7 +66,7 @@ SUM_STATS = {
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
-    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Pull%", "Cent%", "Oppo%", "Clutch",
+    "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
     "ERA-", "FIP-",
 }
 
@@ -97,6 +96,11 @@ STAT_DEFAULTS = {
     "CG": 1.0, "ShO": 1.0,
 }
 
+PCT_STATS = {
+    "K%", "BB%", "K-BB%", "Chase%", "Whiff%", "Barrel%", "HardHit%",
+    "GB%", "FB%", "LOB%", "HR/FB",
+}
+
 TEAM_OPTIONS = {
     "all": "All Teams",
     "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
@@ -108,6 +112,10 @@ TEAM_OPTIONS = {
     "SFG": "SFG", "STL": "STL", "TBR": "TBR", "TEX": "TEX",
     "TOR": "TOR", "WSN": "WSN",
 }
+
+MODE_SINGLE = "Single Season"
+MODE_SPLIT  = "Split Seasons"
+MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
 
@@ -121,28 +129,17 @@ def load_bwar() -> pd.DataFrame:
     if not LOCAL_BWAR_FILE.exists():
         return pd.DataFrame()
     try:
-        # 1. Read the raw data
         df = pd.read_csv(LOCAL_BWAR_FILE)
     except Exception:
         return pd.DataFrame()
-    
     if df is None or df.empty:
         return pd.DataFrame()
-
     df = df.copy()
-    
-    # 2. Standardize IDs and Years
     df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
     df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
     df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    
-    # 3. Clean up missing values before aggregating
     df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-
-    # 4. THE FIX: Group by ID and Year, then SUM the WAR
-    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
     df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
 
@@ -159,14 +156,39 @@ def get_team_display(team_value: str) -> str:
 
 
 def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
-        val = row.get(col)
-        if val is not None and pd.notna(val):
-            try:
-                return HEADSHOT_BASE.format(mlbam=int(val))
-            except Exception:
-                pass
+    val = row.get("MLBAMID")
+    if val is not None and pd.notna(val):
+        try:
+            return HEADSHOT_BASE.format(mlbam=int(val))
+        except Exception:
+            pass
     return HEADSHOT_PLACEHOLDER
+
+
+def ip_to_outs(value) -> float:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return np.nan
+    try:
+        v = float(value)
+    except Exception:
+        return np.nan
+    innings = int(np.floor(v))
+    frac = v - innings
+    if abs(frac - 0.1) < 0.05:
+        extra = 1
+    elif abs(frac - 0.2) < 0.05:
+        extra = 2
+    else:
+        extra = min(max(int(round(frac * 3)), 0), 2)
+    return innings * 3 + extra
+
+
+def outs_to_ip(outs: float) -> float:
+    if pd.isna(outs):
+        return np.nan
+    innings = int(outs // 3)
+    remainder = int(round(outs % 3))
+    return innings + remainder / 10
 
 
 def update_stat_default(i):
@@ -176,7 +198,7 @@ def update_stat_default(i):
 
 
 # ─────────────────────────────────────────────
-#  Data loading
+#  Data loading & aggregation
 # ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -185,38 +207,158 @@ def load_final_year(year: int) -> pd.DataFrame:
     try:
         df = pd.read_csv(path)
         df["Season"] = year
-        bwar_df = load_bwar()
-        if not bwar_df.empty:
-            year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
-            df = df.merge(year_bwar, on="MLBAMID", how="left")
         return df
     except Exception:
         return pd.DataFrame()
 
 
+def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool = False) -> pd.DataFrame:
+    if df.empty or "MLBAMID" not in df.columns:
+        return df
+    bwar_master = load_bwar()
+    if bwar_master.empty:
+        return df
+
+    def get_player_war(row):
+        p_id = row.get("MLBAMID")
+        if not p_id or pd.isna(p_id):
+            return np.nan
+        s_yr = int(row["Season"]) if use_season_col and "Season" in row else start
+        e_yr = int(row["Season"]) if use_season_col and "Season" in row else end
+        subset = bwar_master[
+            (bwar_master["MLBAMID"] == p_id) &
+            (bwar_master["year_ID"] >= s_yr) &
+            (bwar_master["year_ID"] <= e_yr)
+        ]
+        return subset["bWAR"].sum(min_count=1)
+
+    df["bWAR"] = df.apply(get_player_war, axis=1)
+    return df
+
+
+def aggregate_player_group(grp: pd.DataFrame) -> dict:
+    result: dict = {}
+
+    if "Name" in grp.columns:
+        result["Name"] = str(grp["Name"].dropna().iloc[0]) if not grp["Name"].dropna().empty else ""
+    if "PlayerId" in grp.columns:
+        ids = grp["PlayerId"].dropna()
+        if not ids.empty:
+            result["PlayerId"] = ids.iloc[0]
+    if "MLBAMID" in grp.columns:
+        ids = grp["MLBAMID"].dropna()
+        if not ids.empty:
+            result["MLBAMID"] = ids.iloc[0]
+
+    if "Team" in grp.columns:
+        teams = grp["Team"].dropna().astype(str).tolist()
+        result["Team"] = (
+            "2+ Teams" if any(get_team_display(t) == "2+ Teams" for t in teams)
+            else "2+ Teams" if len({normalize_team(t) for t in teams if t.strip() and t.strip() != "- - -"}) > 1
+            else (normalize_team(teams[0]) if teams else "N/A")
+        )
+    else:
+        result["Team"] = "N/A"
+
+    # IP: convert to outs, sum, convert back
+    ip_outs_total = np.nan
+    if "IP" in grp.columns:
+        outs = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).dropna()
+        if not outs.empty:
+            ip_outs_total = outs.sum()
+            result["IP"] = outs_to_ip(ip_outs_total)
+
+    # Weight rate stats by IP outs
+    if "IP" in grp.columns:
+        weight = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).fillna(0)
+    elif "TBF" in grp.columns:
+        weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
+    else:
+        weight = pd.Series(np.ones(len(grp)), index=grp.index)
+    weight_total = weight.sum()
+
+    numeric_cols = [
+        col for col in grp.columns
+        if pd.api.types.is_numeric_dtype(grp[col])
+        and col not in {"PlayerId", "MLBAMID", "Season", "IP"}
+    ]
+
+    total_er = np.nan
+    for col in numeric_cols:
+        series = pd.to_numeric(grp[col], errors="coerce")
+        if series.isna().all():
+            continue
+        if col == "ER":
+            total_er = series.sum(skipna=True)
+        if col in SUM_STATS:
+            result[col] = series.sum(skipna=True)
+        elif col in RATE_STATS and weight_total > 0:
+            result[col] = (series * weight).sum(skipna=True) / weight_total
+        else:
+            result[col] = series.mean(skipna=True)
+
+    # Recompute ERA from totals
+    if pd.notna(total_er) and not pd.isna(ip_outs_total) and ip_outs_total > 0:
+        result["ERA"] = (total_er / (ip_outs_total / 3)) * 9
+
+    return result
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
+    if mode == MODE_SINGLE:
+        df = load_final_year(start_year)
+        return add_bwar_to_df(df, start_year, start_year)
+
+    frames = []
+    for year in range(start_year, end_year + 1):
+        df = load_final_year(year)
+        if df is not None and not df.empty:
+            frames.append(df)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+
+    if mode == MODE_SPLIT:
+        return add_bwar_to_df(combined, start_year, end_year, use_season_col=True)
+
+    # MODE_MULTI: aggregate by PlayerId
+    if "PlayerId" not in combined.columns:
+        return combined
+
+    grouped_rows = []
+    for _, grp in combined.groupby("PlayerId"):
+        grouped_rows.append(aggregate_player_group(grp))
+
+    final_df = pd.DataFrame(grouped_rows)
+    return add_bwar_to_df(final_df, start_year, end_year)
+
+
 # ─────────────────────────────────────────────
-#  Formatting — identical to pitcher leaderboard
+#  Formatting
 # ─────────────────────────────────────────────
 
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""
-    upper_stat = stat.upper()
-    if upper_stat in {"fWAR", "EV", "bWAR"}:
+    upper = stat.upper()
+    if upper in {"fWAR", "EV", "bWAR"}:
         v = float(val)
-        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "K/9", "BB/9", "HR/9"}:
+        return f"{v:.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(v))}.0"
+    if upper in {"ERA", "FIP", "XFIP", "XERA", "K/9", "BB/9", "HR/9"}:
         return f"{float(val):.2f}"
-    if upper_stat == "WHIP":
+    if upper == "WHIP":
         return f"{float(val):.3f}"
-    if upper_stat == "IP":
+    if upper == "IP":
         v = float(val)
-        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-    if upper_stat in {"ERA-", "FIP-"}:
+        return f"{v:.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(v))}.0"
+    if upper in {"ERA-", "FIP-"}:
         return f"{int(round(float(val)))}"
-    if upper_stat in {"WPA", "CLUTCH"}:
+    if upper in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
-    if upper_stat == "BABIP":
+    if upper == "BABIP":
         return f"{float(val):.3f}".lstrip("0") or ".000"
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
@@ -242,10 +384,11 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 
 from utils import get_dynamic_min_ip
 
-
-
 for key, default in [
     ("pc_year",        current_year),
+    ("pc_start_year",  current_year - 1),
+    ("pc_end_year",    current_year),
+    ("pc_mode",        MODE_SINGLE),
     ("pc_team",        "all"),
     ("pc_show_ip",     False),
     ("pc_show_min_ip", True),
@@ -264,19 +407,29 @@ col1, col2 = st.columns([0.5, 2])
 
 with col1:
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="pc_num_stats")
-    st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="pc_year")
 
-    selected_year = st.session_state["pc_year"]
+    mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="pc_mode")
+
+    if mode == MODE_SINGLE:
+        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="pc_year")
+        start_year = st.session_state["pc_year"]
+        end_year   = st.session_state["pc_year"]
+
+        if "pc_last_year" not in st.session_state:
+            st.session_state.pc_last_year = start_year
+        if start_year != st.session_state.pc_last_year:
+            st.session_state["pc_min_ip"] = get_dynamic_min_ip(start_year)
+            st.session_state.pc_last_year = start_year
+    else:
+        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pc_start_year")
+        st.selectbox("End Year",   options=list(range(current_year, 2014, -1)), key="pc_end_year")
+        start_year = st.session_state["pc_start_year"]
+        end_year   = max(st.session_state["pc_end_year"], start_year)
+
     if "pc_min_ip" not in st.session_state:
-        st.session_state.pc_min_ip = get_dynamic_min_ip(selected_year)
-    if "pc_last_year" not in st.session_state:
-        st.session_state.pc_last_year = selected_year
-
-    if selected_year != st.session_state.pc_last_year:
-        st.session_state["pc_min_ip"] = get_dynamic_min_ip(selected_year)
-        st.session_state.pc_last_year = selected_year
-
-    default_min_ip = get_dynamic_min_ip(selected_year)
+        st.session_state["pc_min_ip"] = get_dynamic_min_ip(
+            start_year if mode == MODE_SINGLE else current_year
+        )
 
     st.number_input("Min IP", min_value=0, max_value=5000, key="pc_min_ip")
 
@@ -312,8 +465,14 @@ with col1:
             st.number_input(f"Value {i+1}", step=step, key=f"pc_val_{i}",
                             label_visibility="collapsed", format=fmt)
 
-    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
-                 format_func=lambda x: TEAM_OPTIONS[x], key="pc_team")
+    team_disabled = (mode == MODE_MULTI)
+    st.selectbox(
+        "Team", options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x], key="pc_team",
+        disabled=team_disabled,
+        help="Team filter unavailable for multi-year span" if team_disabled else None,
+    )
+
     st.checkbox("Show player IP",      key="pc_show_ip")
     st.checkbox("Show min IP",         key="pc_show_min_ip")
     st.checkbox("Only display top 10", key="pc_top10")
@@ -322,21 +481,22 @@ with col1:
 #  Load & filter
 # ─────────────────────────────────────────────
 
-year_val   = int(st.session_state["pc_year"])
+start_year = int(start_year)
+end_year   = int(max(start_year, end_year))
 min_ip_val = int(st.session_state["pc_min_ip"])
-team_val   = st.session_state["pc_team"]
+team_val   = "all" if team_disabled else st.session_state["pc_team"]
 
-df = load_final_year(year_val)
+df = load_data(start_year, end_year, mode)
 
 if df is None or df.empty:
-    st.error(f"No data found for {year_val}.")
+    st.error(f"No data found for {start_year}–{end_year}.")
     st.stop()
 
 # Min IP filter
 if min_ip_val > 0 and "IP" in df.columns:
     df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip_val]
 
-# Team filter
+# Team filter (disabled in Multi mode)
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(normalize_team) == target]
@@ -347,7 +507,10 @@ if "Team" in df.columns:
 else:
     df["TeamDisplay"] = "N/A"
 
-# Build active filters
+# ─────────────────────────────────────────────
+#  Apply stat filters
+# ─────────────────────────────────────────────
+
 active_filters = []
 for i in range(num_stats):
     stat = st.session_state.get(f"pc_stat_{i}")
@@ -356,7 +519,6 @@ for i in range(num_stats):
     if stat:
         active_filters.append((stat, op, val))
 
-# Apply filters
 total_qualified = 0
 if not df.empty:
     mask = pd.Series([True] * len(df), index=df.index)
@@ -365,8 +527,7 @@ if not df.empty:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
         compare_val = val
-        # Handle pct stats stored as decimals
-        if stat in RATE_STATS:
+        if stat in PCT_STATS:
             median_col = col_vals.median()
             if pd.notna(median_col) and median_col <= 1:
                 if val > 1:
@@ -376,7 +537,6 @@ if not df.empty:
     df = df[mask]
     total_qualified = len(df)
 
-    # Sort by first filter stat
     if active_filters:
         sort_stat, sort_op, _ = active_filters[0]
         if sort_stat in df.columns:
@@ -395,6 +555,9 @@ cards = []
 for _, row in df.iterrows():
     name = str(row.get("Name", "")).strip()
     team = str(row.get("TeamDisplay", ""))
+
+    if mode == MODE_SPLIT and "Season" in row.index and pd.notna(row.get("Season")):
+        team = f"{team} ({int(row['Season'])})"
 
     stat_lines = []
     for stat, op, threshold in active_filters:
@@ -424,13 +587,15 @@ for _, row in df.iterrows():
     </div>""")
 
 # ─────────────────────────────────────────────
-#  Title
+#  Title & layout
 # ─────────────────────────────────────────────
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
-filter_str  = ", ".join(filter_parts)
-team_suffix = f"({team_val}) " if team_val != "all" else ""
-title = f"{filter_str} in {year_val} {team_suffix}".strip()
+filter_str   = ", ".join(filter_parts)
+span_label   = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_year}"
+mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
+team_suffix  = f" ({team_val})" if team_val != "all" else ""
+title = f"{filter_str} in {span_label}{mode_label}{team_suffix}"
 
 display_limit = 10 if st.session_state.get("pc_top10") and total_qualified > 10 else MAX_DISPLAY
 overflow_note = (
