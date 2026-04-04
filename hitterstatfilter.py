@@ -60,7 +60,7 @@ STAT_ALLOWLIST = [
     "FRV", "OAA", "DRS", "FRM"
 ]
 
-lower_better = {"K%", "O-Swing%", "SO", "Chase%"}
+lower_better = {"K%", "Chase%", "SO", "Whiff%"}
 
 label_map = {
     "HardHit%": "Hard Hit%",
