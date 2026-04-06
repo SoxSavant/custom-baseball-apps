@@ -26,7 +26,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Year-over-Year Pitcher Risers & Fallers")
+    st.title("Year-over-Year Pitcher Improvers & Decliners")
 with meta_col:
     st.markdown(
         """
@@ -428,7 +428,7 @@ for _, row in df.iterrows():
 
 title_stat_label = label_map.get(stat, stat)
 team_prefix  = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
-riser_label  = "Fallers" if show_fallers else "Risers"
+riser_label  = "Decliners" if show_fallers else "Improvers"
 title = f"Top {team_prefix}{title_stat_label} {riser_label}: {int(start_year)} → {int(end_year)}"
 
 min_ip_subtitle = ""
@@ -448,7 +448,7 @@ grid_html = f"""
     </div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs</p>
+        <p>Data: FanGraphs, Bref</p>
     </div>
 </div>
 """

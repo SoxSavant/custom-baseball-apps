@@ -617,7 +617,7 @@ grid_html = f"""
     <div class="players-grid">{body}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs</p>
+        <p>Data: FanGraphs, Bref</p>
     </div>
 </div>
 """

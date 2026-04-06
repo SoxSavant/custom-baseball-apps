@@ -43,12 +43,7 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
-LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
-
-TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
-
-STAT_DISPLAY_NAMES = {"HardHit%": "Hard Hit%"}
+from h_utils import EVERY_STAT_PRESET
 
 STAT_PRESETS = {
      "Statcast": [
@@ -62,34 +57,14 @@ STAT_PRESETS = {
         "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R", "K%", "BB%",
     ],
 
-    "Every Stat": [
-        "bWAR", "fWAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
-        "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
-        "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
-        "DRS", "WPA", "Clutch",
-    ],
+   "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": [
         "fWAR",
     ],
 }
 
-STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
-    "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
-    "FRV", "OAA", "DRS", "FRM",
-]
-
-lower_better = {"K%", "Chase%", "Whiff%", "SO"}
-
-label_map = {
-    "HardHit%": "Hard Hit%",
-    "EV": "Avg Exit Velo",
-}
+from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, TRUTHY_STRINGS
+from h_utils import label_map, lower_better, load_bwar, get_team_display
 
 
 # ─────────────────────────────────────────────
@@ -106,19 +81,6 @@ def normalize_name(raw: str) -> str:
         pass
     return " ".join(cleaned.split()).lower()
 
-
-def normalize_team(team: str) -> str:
-    t = str(team).strip()
-    return TEAM_ALIASES.get(t, t)
-
-
-def get_team_display(team_value: str) -> str:
-    t = str(team_value).strip()
-    if t == "- - -":
-        return "2+ Teams"
-    return normalize_team(t)
-
-
 # ─────────────────────────────────────────────
 #  Data loading
 # ─────────────────────────────────────────────
@@ -133,35 +95,6 @@ def load_final_year(year: int) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar() -> pd.DataFrame:
-    if not LOCAL_BWAR_FILE.exists():
-        return pd.DataFrame()
-    try:
-        # 1. Read the raw data
-        df = pd.read_csv(LOCAL_BWAR_FILE)
-    except Exception:
-        return pd.DataFrame()
-    
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    df = df.copy()
-    
-    # 2. Standardize IDs and Years
-    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    
-    # 3. Clean up missing values before aggregating
-    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-
-    # 4. THE FIX: Group by ID and Year, then SUM the WAR
-    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
-    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-
-    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 current_year = date.today().year
 

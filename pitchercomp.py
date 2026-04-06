@@ -1142,7 +1142,7 @@ with right_col:
             '    </tbody>', '  </table>',
             '  <div style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555; font-size:0.9rem;">',
             '    <div>By: Sox_Savant</div>',
-            '    <div>Data: FanGraphs</div>',
+            '    <div>Data: FanGraphs, Bref</div>',
             '  </div>',
             '</div>',
         ]

@@ -154,11 +154,10 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
-
-FIELDING_METRICS = {"DRS", "OAA", "FRV"}
 
 STATCAST_HITTING_START_YEAR = 2015
+
+from h_utils import EVERY_STAT_PRESET
 
 STAT_PRESETS = {
     "Default": [
@@ -179,15 +178,7 @@ STAT_PRESETS = {
     "Fielding": [
         "DRS", "FRV", "OAA", "FRM"
     ],
-    
-    "Every Stat": [
-        "bWAR", "fWAR", "G", "AB","PA", "H", "1B", "2B", "3B", "SB", "HR", "RBI", "XBH", "TB", "R", 
-        "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
-        "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM",  "wOBA",
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
-        "K-BB%", "DRS", "WPA", "Clutch",
-    ],
+    "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": [
         "fWAR",
     ],
@@ -198,84 +189,13 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
-STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
-    "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
-    "FRV", "OAA", "DRS", "FRM",
-]
-
-STAT_DISPLAY_NAMES = {
-    "HardHit%": "Hard Hit%",
-    "EV": "Avg Exit Velo",
-}
-
-SUM_STATS = {
-    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB",
-    "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "WAR", "Off", "Def", "BsR",
-    "DRS", "OAA", "FRV",
-}
-RATE_STATS = {
-    "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Whiff%",
-    "Barrel%", "HardHit%", 
-     "EV", "MaxEV", "BB/K", "ISO",
-}
-STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}
-
-HEADSHOT_BASES = [
-    "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current",
-    "https://img.mlbstatic.com/mlb-photos/image/upload/w_213,d_people:generic:headshot:silo:current.png,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current",
-]
-HEADSHOT_PLACEHOLDER = (
-    "data:image/svg+xml;base64,"
-    "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
-    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
-    "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
-    "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
-    "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
-    "YycvPgo8L3N2Zz4="
-)
-
-LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
-
-label_map = {
-    "HardHit%": "Hard Hit%",
-    "EV": "Avg Exit Velo",
-}
-lower_better = {"K%", "Chase%", "Whiff%","SO"}
-
-# Teams that should be treated as the same franchise
-TEAM_ALIASES = {
-    "ATH": "OAK",
-    "ATH/OAK": "OAK",
-    "OAK/ATH": "OAK",
-}
-
+from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS
+from h_utils import get_headshot, label_map, lower_better,  load_bwar, TRUTHY_STRINGS, normalize_team, get_team_display
 
 # ─────────────────────────────────────────────
 #  Team display helper
 # ─────────────────────────────────────────────
 
-def normalize_team(team: str) -> str:
-    """Normalize team abbreviations (OAK/ATH treated as same)."""
-    t = str(team).strip()
-    return TEAM_ALIASES.get(t, t)
-
-
-def get_team_display(team_value: str) -> str:
-    """
-    Simple rule:
-      - '- - -' means player was on 2+ teams → '2+ Teams'
-      - Otherwise show the (normalized) team abbreviation
-    """
-    t = str(team_value).strip()
-    if t == "- - -":
-        return "2+ Teams"
-    return normalize_team(t)
 
 
 def get_team_display_multiseason(teams: list[str]) -> str:
@@ -306,36 +226,6 @@ def load_final_year(year: int) -> pd.DataFrame:
         return df
     except Exception:
         return pd.DataFrame()
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar() -> pd.DataFrame:
-    if not LOCAL_BWAR_FILE.exists():
-        return pd.DataFrame()
-    try:
-        # 1. Read the raw data
-        df = pd.read_csv(LOCAL_BWAR_FILE)
-    except Exception:
-        return pd.DataFrame()
-    
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    df = df.copy()
-    
-    # 2. Standardize IDs and Years
-    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    
-    # 3. Clean up missing values before aggregating
-    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-
-    # 4. THE FIX: Group by ID and Year, then SUM the WAR
-    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
-    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-
-    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 
 # ─────────────────────────────────────────────
@@ -544,32 +434,6 @@ def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
             return pid
     return None
 
-
-# ─────────────────────────────────────────────
-#  Headshots — MLBAM only (no pybaseball reverse lookup)
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=21600)
-def build_mlb_headshot(mlbam: int | str | None) -> str:
-    if mlbam is None:
-        return HEADSHOT_PLACEHOLDER
-    mlbam_val = str(mlbam).strip()
-    if not mlbam_val or mlbam_val in {"nan", "0"}:
-        return HEADSHOT_PLACEHOLDER
-    # Return first URL format — browser will handle 404 gracefully
-    return HEADSHOT_BASES[0].format(mlbam=mlbam_val)
-
-
-def get_headshot(player_row: pd.Series) -> str:
-    """Get headshot URL from MLBAMID in the player row."""
-    for col in ["MLBAMID", "mlbamid", "mlbam_id", "MLBID"]:
-        val = player_row.get(col)
-        if val is not None and pd.notna(val):
-            try:
-                return build_mlb_headshot(int(val))
-            except Exception:
-                pass
-    return HEADSHOT_PLACEHOLDER
 
 
 # ─────────────────────────────────────────────
@@ -1268,7 +1132,7 @@ with right_col:
             '  </table>',
             '  <div style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555; font-size:0.9rem;">',
             '    <div>By: Sox_Savant</div>',
-            '    <div>Data: FanGraphs</div>',
+            '    <div>Data: FanGraphs, Bref</div>',
             '  </div>',
             '</div>',
         ])

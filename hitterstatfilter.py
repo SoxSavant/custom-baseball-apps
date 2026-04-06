@@ -36,36 +36,11 @@ with meta_col:
 # ─────────────────────────────────────────────
 #  Constants
 # ─────────────────────────────────────────────
-
-TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
-LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
-HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
-HEADSHOT_PLACEHOLDER = (
-    "data:image/svg+xml;base64,"
-    "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
-    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
-    "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
-    "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
-    "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
-    "YycvPgo8L3N2Zz4="
-)
-
 MAX_DISPLAY = 30
 
-STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "Chase%", "Whiff%",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
-    "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H", "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "WPA", "Clutch",
-    "FRV", "OAA", "DRS", "FRM"
-]
-
-lower_better = {"K%", "Chase%", "SO", "Whiff%"}
-
-label_map = {
-    "HardHit%": "Hard Hit%",
-    "EV": "Avg Exit Velo",
-}
+from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS
+from h_utils import get_headshot, label_map, lower_better, TEAM_ALIASES, load_bwar
+from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
 STAT_DEFAULTS = {
     "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
@@ -81,33 +56,6 @@ STAT_DEFAULTS = {
 
 PCT_STATS = {"K%", "BB%", "K-BB%", "Chase%", "Whiff%", "Barrel%", "HardHit%"}
 
-SUM_STATS = {
-    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB", "CS",
-    "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "fWAR", "Off", "Def", "BsR", "DRS", "OAA", "FRV",
-}
-RATE_STATS = {
-    "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP", "ISO",
-    "K%", "BB%", "K-BB%", "Chase%", "Barrel%", "HardHit%",
-    "EV", "WPA", "Clutch", "wRC+", "Whiff%"
-}
-
-POSITION_OPTIONS = {
-    "all": "All Positions", "C": "C", "1B": "1B", "2B": "2B", "3B": "3B",
-    "SS": "SS", "LF": "LF", "CF": "CF", "RF": "RF", "OF": "OF", "DH": "DH",
-}
-
-TEAM_OPTIONS = {
-    "all": "All Teams",
-    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
-    "CHC": "CHC", "CIN": "CIN", "CLE": "CLE", "COL": "COL",
-    "CHW": "CHW", "DET": "DET", "HOU": "HOU", "KCR": "KCR",
-    "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL",
-    "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "ATH": "ATH",
-    "PHI": "PHI", "PIT": "PIT", "SDP": "SDP", "SEA": "SEA",
-    "SFG": "SFG", "STL": "STL", "TBR": "TBR", "TEX": "TEX",
-    "TOR": "TOR", "WSN": "WSN",
-}
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
@@ -119,47 +67,6 @@ current_year = date.today().year
 # ─────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar() -> pd.DataFrame:
-    if not LOCAL_BWAR_FILE.exists():
-        return pd.DataFrame()
-    try:
-        df = pd.read_csv(LOCAL_BWAR_FILE)
-    except Exception:
-        return pd.DataFrame()
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-    return df[["MLBAMID", "year_ID", "bWAR"]]
-
-
-def normalize_team(team: str) -> str:
-    t = str(team).strip()
-    return TEAM_ALIASES.get(t, t)
-
-
-def get_team_display(team_value: str) -> str:
-    t = str(team_value).strip()
-    if t == "- - -":
-        return "2+ Teams"
-    return normalize_team(t)
-
-
-def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID"]:
-        val = row.get(col)
-        if val is not None and pd.notna(val):
-            try:
-                return HEADSHOT_BASE.format(mlbam=int(val))
-            except Exception:
-                pass
-    return HEADSHOT_PLACEHOLDER
 
 
 def apply_dh_override(df: pd.DataFrame) -> pd.DataFrame:
@@ -643,7 +550,7 @@ grid_html = f"""
     <div class="players-grid">{body}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs</p>
+        <p>Data: FanGraphs, Bref</p>
     </div>
 </div>
 """
