@@ -570,10 +570,10 @@ title_label = label_map.get(stat, stat)
 pos_suffix = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 team_label = TEAM_OPTIONS.get(team_val, "") if team_val != "all" else ""
 mode_label = " Single Season" if mode == MODE_SPLIT else ""
+worst_label = "Worst " if sort_worst else ""
 
-title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label} {title_label} Leaders{pos_suffix}".strip())
-if sort_worst:
-    title += " (Worst)"
+title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label} {worst_label}{title_label} Leaders{pos_suffix}".strip())
+
 
 min_pa_subtitle = (
     f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
