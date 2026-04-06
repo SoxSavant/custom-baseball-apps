@@ -303,7 +303,7 @@ with col1:
     position_val = st.session_state.get("rf_position", "all")
     team_val     = st.session_state.get("rf_team", "all")
 
-    st.checkbox("Show Fallers",   key="rf_show_fallers")
+    st.checkbox("Show Decliners",   key="rf_show_fallers")
     st.checkbox("Show min PA",    key="rf_show_min_pa")
     st.checkbox("Show player PA", key="rf_show_player_pa")
 

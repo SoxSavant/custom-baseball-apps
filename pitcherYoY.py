@@ -342,7 +342,7 @@ with col1:
                  format_func=lambda x: TEAM_OPTIONS[x], key="pr_team",
                  help="Filters by team in the end year only")
 
-    st.checkbox("Show Fallers",    key="pr_show_fallers")
+    st.checkbox("Show Decliners",    key="pr_show_fallers")
     st.checkbox("Show min IP",     key="pr_show_min_ip")
     st.checkbox("Show player IP",  key="pr_show_player_ip")
 
