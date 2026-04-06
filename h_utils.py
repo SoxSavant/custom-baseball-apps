@@ -162,5 +162,87 @@ def get_team_display(team_value: str) -> str:
         return "2+ Teams"
     return normalize_team(t)
 
+def format_stat(stat: str, val) -> str:
+    if pd.isna(val):
+        return ""
+    upper_stat = stat.upper()
+
+    if upper_stat in {"FRV", "OAA", "DRS"}:
+        return f"{int(round(float(val)))}"
+
+    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+        v = float(val)
+        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
+
+    if upper_stat in {"WPA", "CLUTCH"}:
+        return f"{float(val):.2f}"
+
+    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
+        return f"{float(val):.3f}".lstrip("0") or ".000"
+
+    if upper_stat in {"WRC+", "OPS+"}:
+        return f"{int(round(float(val)))}"
+
+    if (
+        "Barrel" in stat or "Hard" in stat or "K%" in stat
+        or "Swing" in stat or "Whiff" in stat or "%" in stat
+    ):
+        v = float(val)
+        if v <= 1:
+            v *= 100
+        return f"{v:.1f}%"
+
+    v = float(val)
+    return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
+
+def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
+    if pd.isna(val):
+        return ""
+    upper_stat = stat.upper()
+
+    if upper_stat in {"FRV", "OAA", "DRS"}:
+        v = int(round(float(val)))
+        return f"+{v}" if show_sign and v > 0 else f"{v}"
+
+    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+        v = float(val)
+        formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
+        if show_sign and v > 0:
+            return f"+{formatted}"
+        return f"-{formatted}" if v < 0 else formatted
+
+    if upper_stat in {"WPA", "CLUTCH"}:
+        v = float(val)
+        return f"+{v:.2f}" if show_sign and v > 0 else f"{v:.2f}"
+
+    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
+        v = float(val)
+        formatted = f"{abs(v):.3f}".lstrip("0") or ".000"
+        if show_sign and v > 0:
+            return f"+{formatted}"
+        return f"-{formatted}" if v < 0 else formatted
+
+    if upper_stat in {"WRC+", "OPS+"}:
+        v = int(round(float(val)))
+        return f"+{v}" if show_sign and v > 0 else f"{v}"
+
+    if (
+        "Barrel" in stat or "Hard" in stat or "K%" in stat
+        or "Swing" in stat or "Whiff" in stat or "%" in stat
+    ):
+        v = float(val)
+        if v <= 1:
+            v *= 100
+        formatted = f"{abs(v):.1f}%"
+        if show_sign and v > 0:
+            return f"+{formatted}"
+        return f"-{abs(v):.1f}%" if v < 0 else formatted
+
+    v = float(val)
+    formatted = f"{abs(v):.0f}" if abs(v - round(v)) < 1e-6 else f"{abs(v):.1f}"
+    if show_sign and v > 0:
+        return f"+{formatted}"
+    return f"-{formatted}" if v < 0 else formatted
+
 
 

@@ -42,28 +42,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
-LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
-TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
-
-TEAMS = {
-    "ARI": "Arizona Diamondbacks",   "ATL": "Atlanta Braves",
-    "BAL": "Baltimore Orioles",      "BOS": "Boston Red Sox",
-    "CHC": "Chicago Cubs",           "CIN": "Cincinnati Reds",
-    "CLE": "Cleveland Guardians",    "COL": "Colorado Rockies",
-    "CHW": "Chicago White Sox",      "DET": "Detroit Tigers",
-    "HOU": "Houston Astros",         "KCR": "Kansas City Royals",
-    "LAA": "Los Angeles Angels",     "LAD": "Los Angeles Dodgers",
-    "MIA": "Miami Marlins",          "MIL": "Milwaukee Brewers",
-    "MIN": "Minnesota Twins",        "NYM": "New York Mets",
-    "NYY": "New York Yankees",       "OAK": "Oakland Athletics",
-    "ATH": "Athletics",
-    "PHI": "Philadelphia Phillies",  "PIT": "Pittsburgh Pirates",
-    "SDP": "San Diego Padres",       "SEA": "Seattle Mariners",
-    "SFG": "San Francisco Giants",   "STL": "St. Louis Cardinals",
-    "TBR": "Tampa Bay Rays",         "TEX": "Texas Rangers",
-    "TOR": "Toronto Blue Jays",      "WSN": "Washington Nationals",
-}
+from p_utils import STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS
+from p_utils import  label_map, lower_better, load_bwar
+from p_utils import normalize_team
 
 STAT_PRESETS = {
     "Statcast": [
@@ -85,36 +66,12 @@ STAT_PRESETS = {
     ],
 }
 
-STAT_ALLOWLIST = [
-    "fWAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
-    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
-    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
-    "Chase%", "Whiff%", "WPA", "Clutch",
-    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
-]
-
-
-label_map = {
-    "EV": "Avg Exit Velo",
-    "HardHit%": "Hard Hit%",
-    "vFA (pi)": "vFA",
-}
-
-lower_better = {
-    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
-    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-}
 
 
 # ─────────────────────────────────────────────
 #  Team helpers
 # ─────────────────────────────────────────────
 
-def normalize_team(team: str) -> str:
-    t = str(team).strip()
-    return TEAM_ALIASES.get(t, t)
 
 
 def get_teams_for_year(season: int) -> dict[str, str]:
@@ -155,35 +112,6 @@ def load_final_year(year: int) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar() -> pd.DataFrame:
-    if not LOCAL_BWAR_FILE.exists():
-        return pd.DataFrame()
-    try:
-        # 1. Read the raw data
-        df = pd.read_csv(LOCAL_BWAR_FILE)
-    except Exception:
-        return pd.DataFrame()
-    
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    df = df.copy()
-    
-    # 2. Standardize IDs and Years
-    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    
-    # 3. Clean up missing values before aggregating
-    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-
-    # 4. THE FIX: Group by ID and Year, then SUM the WAR
-    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
-    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-
-    return df[["MLBAMID", "year_ID", "bWAR"]]
 
 current_year = date.today().year
 
@@ -498,39 +426,6 @@ with stat_builder_container:
     st.session_state[stat_state_key] = normalize_stat_rows(
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
     )
-
-# ─────────────────────────────────────────────
-#  Stat formatting
-# ─────────────────────────────────────────────
-
-def format_stat(stat: str, val) -> str:
-    if pd.isna(val):
-        return ""
-    upper_stat = stat.upper()
-    if upper_stat in {"WAR", "BWAR", "FWAR"}:
-        v = float(val)
-        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-    if upper_stat in {"WPA", "CLUTCH"}:
-        return f"{float(val):.2f}"
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "WHIP", "K/9", "BB/9", "HR/9", "GB/FB"}:
-        return f"{float(val):.2f}"
-    if upper_stat in {"ERA-", "FIP-"}:
-        return f"{int(round(float(val)))}"
-    if upper_stat == "IP":
-        v = float(val)
-        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-    if upper_stat == "EV":
-        return f"{float(val):.1f}"
-    if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
-    ):
-        v = float(val)
-        if v <= 1:
-            v *= 100
-        return f"{v:.1f}%"
-    v = float(val)
-    return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
 # ─────────────────────────────────────────────

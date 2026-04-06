@@ -63,7 +63,7 @@ STAT_PRESETS = {
     ],
 }
 
-from h_utils import STAT_ALLOWLIST, TEAMS, STAT_DISPLAY_NAMES, TRUTHY_STRINGS
+from h_utils import STAT_ALLOWLIST, TEAMS, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat
 from h_utils import label_map, lower_better, normalize_team, load_bwar
 
 
@@ -435,32 +435,6 @@ with stat_builder_container:
     st.session_state[stat_state_key] = normalize_stat_rows(
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
     )
-
-# ─────────────────────────────────────────────
-#  Stat formatting
-# ─────────────────────────────────────────────
-
-def format_stat(stat: str, val) -> str:
-    if pd.isna(val):
-        return ""
-    upper_stat = stat.upper()
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
-        v = float(val)
-        return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-    if upper_stat in {"WPA", "CLUTCH"}:
-        return f"{float(val):.2f}"
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        return f"{float(val):.3f}".lstrip("0")
-    if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
-    ):
-        v = float(val)
-        if v <= 1:
-            v *= 100
-        return f"{v:.1f}%"
-    v = float(val)
-    return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
 # ─────────────────────────────────────────────

@@ -58,3 +58,4 @@ def get_percentile_min_ip(year):
     min_ip = max(3, days_since * 0.25)
 
     return min(min_ip, 40)
+

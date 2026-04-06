@@ -189,7 +189,7 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
-from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS
+from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS, format_stat
 from h_utils import get_headshot, label_map, lower_better,  load_bwar, TRUTHY_STRINGS, normalize_team, get_team_display
 
 # ─────────────────────────────────────────────
@@ -433,45 +433,6 @@ def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
         if pid is not None:
             return pid
     return None
-
-
-
-# ─────────────────────────────────────────────
-#  Stat formatting
-# ─────────────────────────────────────────────
-
-def format_stat(stat: str, val) -> str:
-    if pd.isna(val):
-        return ""
-    upper_stat = stat.upper()
-    if upper_stat in {"FRV", "OAA", "DRS"}:
-        return f"{int(round(float(val)))}"
-    if upper_stat == "AGE":
-        if isinstance(val, str):
-            return val
-        v = float(val)
-        return f"{int(round(v))}" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
-        v = float(val)
-        if abs(v - round(v)) < 1e-9:
-            return f"{int(round(v))}.0"
-        return f"{v:.1f}"
-    if upper_stat in {"WPA", "CLUTCH"}:
-        return f"{float(val):.2f}"
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        return f"{float(val):.3f}".lstrip("0")
-    if upper_stat in {"WRC+", "OPS+"}:
-        return f"{int(round(float(val)))}"
-    if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
-    ):
-        v = float(val)
-        if v <= 1:
-            v *= 100
-        return f"{v:.1f}%"
-    v = float(val)
-    return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
 # ─────────────────────────────────────────────

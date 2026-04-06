@@ -42,7 +42,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from h_utils import STAT_ALLOWLIST
-from h_utils import get_headshot, label_map, lower_better, load_bwar
+from h_utils import get_headshot, label_map, lower_better, load_bwar, format_stat_yoy
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
 current_year = date.today().year
@@ -191,60 +191,6 @@ def load_risers_data(
 
 
 # ─────────────────────────────────────────────
-#  Stat formatting
-# ─────────────────────────────────────────────
-
-def format_stat(stat: str, val, show_sign: bool = False) -> str:
-    if pd.isna(val):
-        return ""
-    upper_stat = stat.upper()
-
-    if upper_stat in {"FRV", "OAA", "DRS"}:
-        v = int(round(float(val)))
-        return f"+{v}" if show_sign and v > 0 else f"{v}"
-
-    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
-        v = float(val)
-        formatted = f"{abs(v):.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(abs(v)))}.0"
-        if show_sign and v > 0:
-            return f"+{formatted}"
-        return f"-{formatted}" if v < 0 else formatted
-
-    if upper_stat in {"WPA", "CLUTCH"}:
-        v = float(val)
-        return f"+{v:.2f}" if show_sign and v > 0 else f"{v:.2f}"
-
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        v = float(val)
-        formatted = f"{abs(v):.3f}".lstrip("0") or "0"
-        if show_sign and v > 0:
-            return f"+{formatted}"
-        return f"-{formatted}" if v < 0 else formatted
-
-    if upper_stat in {"WRC+", "OPS+"}:
-        v = int(round(float(val)))
-        return f"+{v}" if show_sign and v > 0 else f"{v}"
-
-    if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
-    ):
-        v = float(val)
-        if v <= 1:
-            v *= 100
-        formatted = f"{abs(v):.1f}%"
-        if show_sign and v > 0:
-            return f"+{formatted}"
-        return f"-{abs(v):.1f}%" if v < 0 else formatted
-
-    v = float(val)
-    formatted = f"{abs(v):.0f}" if abs(v - round(v)) < 1e-6 else f"{abs(v):.1f}"
-    if show_sign and v > 0:
-        return f"+{formatted}"
-    return f"-{formatted}" if v < 0 else formatted
-
-
-# ─────────────────────────────────────────────
 #  Session state defaults
 # ─────────────────────────────────────────────
 
@@ -352,10 +298,10 @@ for _, row in df.iterrows():
     delta = row.get(stat, np.nan)
 
     is_positive = pd.notna(delta) and float(delta) > 0
-    display_val = format_stat(stat, delta, show_sign=is_positive)
+    display_val = format_stat_yoy(stat, delta, show_sign=is_positive)
 
     end_val = row.get(f"{stat}_end", np.nan)
-    end_display = format_stat(stat, end_val) if pd.notna(end_val) else ""
+    end_display = format_stat_yoy(stat, end_val) if pd.notna(end_val) else ""
     stat_label = label_map.get(stat, stat)
 
     pa_start = row.get("PA_start", np.nan)

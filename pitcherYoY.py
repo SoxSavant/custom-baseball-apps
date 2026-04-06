@@ -41,109 +41,11 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
-LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
-HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
-HEADSHOT_PLACEHOLDER = (
-    "data:image/svg+xml;base64,"
-    "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
-    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
-    "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
-    "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
-    "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
-    "YycvPgo8L3N2Zz4="
-)
-
-STAT_ALLOWLIST = [
-    "fWAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
-    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
-    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
-    "Chase%", "Whiff%", "WPA", "Clutch",
-    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
-]
-
-label_map = {
-    "EV": "Avg Exit Velo",
-    "HardHit%": "Hard Hit%",
-    "vFA (pi)": "vFA",
-}
-
-lower_better = {
-    "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
-    "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-}
-
-TEAM_OPTIONS = {
-    "all": "All Teams",
-    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
-    "CHC": "CHC", "CIN": "CIN", "CLE": "CLE", "COL": "COL",
-    "CHW": "CHW", "DET": "DET", "HOU": "HOU", "KCR": "KCR",
-    "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL",
-    "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "ATH": "ATH",
-    "PHI": "PHI", "PIT": "PIT", "SDP": "SDP", "SEA": "SEA",
-    "SFG": "SFG", "STL": "STL", "TBR": "TBR", "TEX": "TEX",
-    "TOR": "TOR", "WSN": "WSN",
-}
+from p_utils import STAT_ALLOWLIST, format_stat_yoy
+from p_utils import get_headshot, label_map, lower_better, load_bwar, TEAM_OPTIONS
+from p_utils import normalize_team, get_team_display
 
 current_year = date.today().year
-
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_bwar() -> pd.DataFrame:
-    if not LOCAL_BWAR_FILE.exists():
-        return pd.DataFrame()
-    try:
-        # 1. Read the raw data
-        df = pd.read_csv(LOCAL_BWAR_FILE)
-    except Exception:
-        return pd.DataFrame()
-    
-    if df is None or df.empty:
-        return pd.DataFrame()
-
-    df = df.copy()
-    
-    # 2. Standardize IDs and Years
-    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
-    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
-    df["bWAR"] = pd.to_numeric(df.get("WAR"), errors="coerce")
-    
-    # 3. Clean up missing values before aggregating
-    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR"])
-
-    # 4. THE FIX: Group by ID and Year, then SUM the WAR
-    # This combines traded players (e.g. 0.5 WAR + 1.2 WAR) into one 1.7 WAR row
-    df = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR"].sum()
-
-    return df[["MLBAMID", "year_ID", "bWAR"]]
-
-def normalize_team(team: str) -> str:
-    t = str(team).strip()
-    return TEAM_ALIASES.get(t, t)
-
-
-def get_team_display(team_value: str) -> str:
-    t = str(team_value).strip()
-    if t == "- - -":
-        return "2+ Teams"
-    return normalize_team(t)
-
-
-def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID"]:
-        val = row.get(col)
-        if val is not None and pd.notna(val):
-            try:
-                return HEADSHOT_BASE.format(mlbam=int(val))
-            except Exception:
-                pass
-    return HEADSHOT_PLACEHOLDER
 
 
 # ─────────────────────────────────────────────
@@ -244,59 +146,6 @@ def load_risers_data(
 
 
 # ─────────────────────────────────────────────
-#  Stat formatting
-# ─────────────────────────────────────────────
-
-def format_stat(stat: str, val, show_sign: bool = False) -> str:
-    if pd.isna(val):
-        return ""
-    upper_stat = stat.upper()
-
-    if upper_stat in {"WAR", "FWAR", "EV"}:
-        v = float(val)
-        formatted = f"{abs(v):.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(abs(v)))}.0"
-        if show_sign and v > 0: return f"+{formatted}"
-        return f"-{formatted}" if v < 0 else formatted
-
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "K/9", "BB/9", "HR/9"}:
-        v = float(val)
-        formatted = f"{abs(v):.2f}"
-        if show_sign and v > 0: return f"+{formatted}"
-        return f"-{formatted}" if v < 0 else formatted
-
-    if upper_stat == "WHIP":
-        v = float(val)
-        formatted = f"{abs(v):.3f}"
-        if show_sign and v > 0: return f"+{formatted}"
-        return f"-{formatted}" if v < 0 else formatted
-
-    if upper_stat == "IP":
-        v = float(val)
-        formatted = f"{abs(v):.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(abs(v)))}.0"
-        if show_sign and v > 0: return f"+{formatted}"
-        return f"-{formatted}" if v < 0 else formatted
-
-    if upper_stat in {"ERA-", "FIP-"}:
-        v = int(round(float(val)))
-        return f"+{v}" if show_sign and v > 0 else f"{v}"
-
-    if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
-    ):
-        v = float(val)
-        if v <= 1: v *= 100
-        formatted = f"{abs(v):.1f}%"
-        if show_sign and v > 0: return f"+{formatted}"
-        return f"-{abs(v):.1f}%" if v < 0 else formatted
-
-    v = float(val)
-    formatted = f"{abs(v):.0f}" if abs(v - round(v)) < 1e-6 else f"{abs(v):.1f}"
-    if show_sign and v > 0: return f"+{formatted}"
-    return f"-{formatted}" if v < 0 else formatted
-
-
-# ─────────────────────────────────────────────
 #  Session state defaults
 # ─────────────────────────────────────────────
 
@@ -386,10 +235,10 @@ for _, row in df.iterrows():
     delta = row.get(stat, np.nan)
 
     is_positive = pd.notna(delta) and float(delta) > 0
-    display_val = format_stat(stat, delta, show_sign=is_positive)
+    display_val = format_stat_yoy(stat, delta, show_sign=is_positive)
 
     end_val = row.get(f"{stat}_end", np.nan)
-    end_display = format_stat(stat, end_val) if pd.notna(end_val) else ""
+    end_display = format_stat_yoy(stat, end_val) if pd.notna(end_val) else ""
     stat_label = label_map.get(stat, stat)
 
     ip_start = row.get("IP_start", np.nan)
@@ -397,8 +246,8 @@ for _, row in df.iterrows():
     player_ip_html = ""
     if st.session_state.get("pr_show_player_ip"):
         parts = []
-        if pd.notna(ip_start): parts.append(format_stat("IP", ip_start))
-        if pd.notna(ip_end):   parts.append(format_stat("IP", ip_end))
+        if pd.notna(ip_start): parts.append(format_stat_yoy("IP", ip_start))
+        if pd.notna(ip_end):   parts.append(format_stat_yoy("IP", ip_end))
         if parts:
             player_ip_html = f'<div class="player-ip">{" → ".join(parts)} IP</div>'
 

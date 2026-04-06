@@ -38,8 +38,8 @@ with meta_col:
 # ─────────────────────────────────────────────
 MAX_DISPLAY = 30
 
-from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS
-from h_utils import get_headshot, label_map, lower_better, TEAM_ALIASES, load_bwar
+from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat
+from h_utils import get_headshot, label_map, lower_better, load_bwar
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
 STAT_DEFAULTS = {
@@ -261,29 +261,6 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
 # ─────────────────────────────────────────────
 #  Formatting
 # ─────────────────────────────────────────────
-
-def format_stat(stat: str, val) -> str:
-    if pd.isna(val):
-        return ""
-    upper = stat.upper()
-    if upper in {"FRV", "OAA", "DRS"}:
-        return f"{int(round(float(val)))}"
-    if upper in {"fWAR", "OFF", "DEF", "BSR", "EV"}:
-        v = float(val)
-        return f"{v:.1f}" if abs(v - round(v)) >= 1e-9 else f"{int(round(v))}.0"
-    if upper == "WPA":
-        return f"{float(val):.2f}"
-    if upper in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
-        return f"{float(val):.3f}".lstrip("0") or ".000"
-    if upper == "WRC+":
-        return f"{int(round(float(val)))}"
-    if "%" in stat or any(x in stat for x in ["Barrel", "Hard", "K%", "Swing", "Whiff"]):
-        v = float(val)
-        if v <= 1:
-            v *= 100
-        return f"{v:.1f}%"
-    v = float(val)
-    return f"{v:.0f}" if abs(v - round(v)) < 1e-6 else f"{v:.1f}"
 
 
 def format_threshold(stat: str, val: float, op: str) -> str:
