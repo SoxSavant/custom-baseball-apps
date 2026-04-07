@@ -179,7 +179,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
+    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO", "WOBA-XWOBA"}:
         return f"{float(val):.3f}".lstrip("0") or ".000"
 
     if upper_stat in {"WRC+", "OPS+"}:
@@ -217,7 +217,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = float(val)
         return f"+{v:.2f}" if show_sign and v > 0 else f"{v:.2f}"
 
-    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO"}:
+    if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO", "WOBA-XWOBA"}:
         v = float(val)
         formatted = f"{abs(v):.3f}".lstrip("0") or ".000"
         if show_sign and v > 0:
