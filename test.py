@@ -67,6 +67,7 @@ for year in range(2015, 2027):
     final["Contact%"] = 1 - final["Contact%"]
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
+    final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
     if "BatSpd" not in final.columns:
         final["BatSpd"] = None
 

@@ -11,7 +11,7 @@ STAT_ALLOWLIST = [
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM", "Swing%", "Z-Swing%",
-    "O-Contact%","Z-Contact%","Whiff%","Zone%", "BatSpd"
+    "O-Contact%","Z-Contact%","Whiff%","Zone%", "BatSpd", "wOBA-xwOBA"
 ]
 
 EVERY_STAT_PRESET = [
@@ -22,7 +22,7 @@ EVERY_STAT_PRESET = [
     "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
     "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%",
-    "O-Contact%","Z-Contact%","Whiff%","Zone%"
+    "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "wOBA-xwOBA"
 ]
 
 STAT_DISPLAY_NAMES = {
