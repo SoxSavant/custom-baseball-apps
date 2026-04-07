@@ -11,7 +11,7 @@ STAT_ALLOWLIST = [
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM", "Swing%", "Z-Swing%",
-    "O-Contact%","Z-Contact%","Whiff%","Zone%"
+    "O-Contact%","Z-Contact%","Whiff%","Zone%", "BatSpd"
 ]
 
 EVERY_STAT_PRESET = [
@@ -28,6 +28,7 @@ EVERY_STAT_PRESET = [
 STAT_DISPLAY_NAMES = {
     "HardHit%": "Hard Hit%",
     "EV": "Avg Exit Velo",
+    "BatSpd": "Bat Speed"
 }
 
 SUM_STATS = {
@@ -60,6 +61,7 @@ LOCAL_BWAR_FILE = Path(__file__).with_name("warhitters2025.txt")
 label_map = {
     "HardHit%": "Hard Hit%",
     "EV": "Avg Exit Velo",
+    "BatSpd": "Bat Speed"
 }
 lower_better = {"K%", "Chase%", "Whiff%","SO"}
 

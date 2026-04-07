@@ -1,16 +1,22 @@
 import pandas as pd
-from functools import reduce
+import os
 
-for year in range(2026, 2027):
+for year in range(2015, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
         pd.read_csv(f"data/standard_{year}.csv"),
         pd.read_csv(f"data/advanced_{year}.csv"),
-        pd.read_csv(f"data/statcast_{year}.csv"),
         pd.read_csv(f"data/winprob_{year}.csv"),
         pd.read_csv(f"data/discipline_{year}.csv"),
     ]
+
+    bat_speed_path = f"data/batspeed_{year}.csv"
+    if os.path.exists(bat_speed_path):
+        hitting_dfs.append(pd.read_csv(bat_speed_path))
+    statcast_path = f"data/statcast_{year}.csv"
+    if os.path.exists(statcast_path):
+        hitting_dfs.append(pd.read_csv(statcast_path))
 
     base_cols = {"Name", "Team", "MLBAMID", "NameASCII"}
 
@@ -61,6 +67,8 @@ for year in range(2026, 2027):
     final["Contact%"] = 1 - final["Contact%"]
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
+    if "BatSpd" not in final.columns:
+        final["BatSpd"] = None
 
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR"}, inplace=True)
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)
