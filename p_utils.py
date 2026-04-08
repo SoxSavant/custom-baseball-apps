@@ -28,7 +28,7 @@ STAT_ALLOWLIST = [
     "fWAR", "bWAR",
     "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
     "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
-    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA", "vFA",
     "Chase%", "Whiff%", "WPA", "Clutch",
     "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
@@ -40,13 +40,12 @@ RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
-    "ERA-", "FIP-",
+    "ERA-", "FIP-", "vFA",
 }
 
 label_map = {
     "EV": "Avg Exit Velo",
     "HardHit%": "Hard Hit%",
-    "vFA (pi)": "vFA",
 }
 
 lower_better = {
@@ -175,7 +174,7 @@ def format_stat(stat: str, val) -> str:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
-    if upper_stat == "EV":
+    if upper_stat in {"EV", "vFA"}:
         return f"{float(val):.1f}"
 
     if upper_stat in {"WPA", "CLUTCH"}:
@@ -222,7 +221,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
             return f"+{formatted}"
         return f"-{formatted}" if v < 0 else formatted
 
-    if upper_stat == "EV":
+    if upper_stat in {"EV", "vFA"}:
         v = float(val)
         formatted = f"{abs(v):.1f}"
         if show_sign and v > 0:

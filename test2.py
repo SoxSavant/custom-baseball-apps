@@ -46,5 +46,5 @@ for year in range(2014, 2027):
         final["HardHit%"] = None
         final["xERA"] = None
     
-    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR"}, inplace=True)
+    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR","vFA (pi)": "vFA"}, inplace=True)
     final.to_csv(f"data/final/pitching_final_{year}.csv", index=False)
