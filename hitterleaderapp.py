@@ -41,7 +41,7 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from h_utils import STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat
+from h_utils import STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat, start_year
 from h_utils import get_headshot, label_map, lower_better, load_bwar
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
@@ -310,7 +310,7 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="hl_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="hl_year")
+        st.selectbox("Year", options=list(range(current_year, start_year-1, -1)), key="hl_year")
         start_year = st.session_state["hl_year"]
         end_year   = st.session_state["hl_year"]
         
@@ -322,8 +322,8 @@ with col1:
             st.session_state.last_year = start_year
 
     else:
-        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="hl_start_year")
-        st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="hl_end_year")
+        st.selectbox("Start Year", options=list(range(current_year, start_year-1, -1)), key="hl_start_year")
+        st.selectbox("End Year", options=list(range(current_year, start_year-1, -1)), key="hl_end_year")
         start_year = st.session_state["hl_start_year"]
         end_year   = max(st.session_state["hl_end_year"], start_year)
 

@@ -41,7 +41,7 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS
+from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, start_year
 from p_utils import get_headshot, label_map, lower_better, load_bwar, TEAM_OPTIONS
 from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs, format_stat
 
@@ -260,7 +260,7 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="pl_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="pl_year")
+        st.selectbox("Year", options=list(range(current_year, start_year-1, -1)), key="pl_year")
         start_year = st.session_state["pl_year"]
         end_year   = st.session_state["pl_year"]
 
@@ -272,9 +272,9 @@ with col1:
             st.session_state.last_year = start_year
 
     else:
-        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pl_start_year", 
+        st.selectbox("Start Year", options=list(range(current_year, start_year-1, -1)), key="pl_start_year", 
                       )
-        st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="pl_end_year", 
+        st.selectbox("End Year", options=list(range(current_year, start_year-1, -1)), key="pl_end_year", 
                      )
     
         start_year = st.session_state["pl_start_year"]

@@ -37,7 +37,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TEAM_OPTIONS, format_stat
-from p_utils import get_headshot, label_map, lower_better, load_bwar
+from p_utils import get_headshot, label_map, lower_better, load_bwar, start_year
 from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs
 
 MAX_DISPLAY = 30
@@ -258,7 +258,7 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="pc_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="pc_year")
+        st.selectbox("Year", options=list(range(current_year, start_year-1, -1)), key="pc_year")
         start_year = st.session_state["pc_year"]
         end_year   = st.session_state["pc_year"]
 
@@ -268,8 +268,8 @@ with col1:
             st.session_state["pc_min_ip"] = get_dynamic_min_ip(start_year)
             st.session_state.pc_last_year = start_year
     else:
-        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="pc_start_year")
-        st.selectbox("End Year",   options=list(range(current_year, 2014, -1)), key="pc_end_year")
+        st.selectbox("Start Year", options=list(range(current_year, start_year-1, -1)), key="pc_start_year")
+        st.selectbox("End Year",   options=list(range(current_year, start_year-1, -1)), key="pc_end_year")
         start_year = st.session_state["pc_start_year"]
         end_year   = max(st.session_state["pc_end_year"], start_year)
 

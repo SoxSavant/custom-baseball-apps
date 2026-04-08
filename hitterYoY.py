@@ -41,7 +41,7 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from h_utils import STAT_ALLOWLIST
+from h_utils import STAT_ALLOWLIST, start_year
 from h_utils import get_headshot, label_map, lower_better, load_bwar, format_stat_yoy
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
@@ -231,8 +231,8 @@ stat = st.selectbox(
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    st.selectbox("Start Year", options=list(range(current_year-1, 2014, -1)), key="rf_start_year")
-    st.selectbox("End Year", options=list(range(current_year, 2014, -1)), key="rf_end_year")
+    st.selectbox("Start Year", options=list(range(current_year-1, start_year-1, -1)), key="rf_start_year")
+    st.selectbox("End Year", options=list(range(current_year, start_year-1, -1)), key="rf_end_year")
     start_year = st.session_state["rf_start_year"]
     end_year   = st.session_state["rf_end_year"]
     if end_year <= start_year:

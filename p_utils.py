@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
+
+start_year = 2014
+
 LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
 HEADSHOT_PLACEHOLDER = (

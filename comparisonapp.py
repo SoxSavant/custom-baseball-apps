@@ -189,7 +189,7 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
-from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS, format_stat
+from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS, format_stat, start_year
 from h_utils import get_headshot, label_map, lower_better,  load_bwar, TRUTHY_STRINGS, normalize_team, get_team_display
 
 # ─────────────────────────────────────────────
@@ -457,7 +457,7 @@ with left_col:
     stat_builder_container = st.container()
 
 current_year = date.today().year
-years_desc = list(range(current_year, 2014, -1))  # data starts 2015
+years_desc = list(range(current_year, start_year-1, -1)) 
 MAX_PLAYERS = 5
 default_names = ["Shohei Ohtani", "Aaron Judge", "", "", ""]
 

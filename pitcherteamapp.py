@@ -44,7 +44,7 @@ with meta_col:
 
 from p_utils import STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS
 from p_utils import  label_map, lower_better, load_bwar
-from p_utils import normalize_team
+from p_utils import normalize_team, start_year
 
 STAT_PRESETS = {
     "Statcast": [
@@ -126,7 +126,7 @@ min_ip = get_dynamic_min_ip(current_year)
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
-    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, start_year-1, -1)))
     teams_for_year = get_teams_for_year(year)
     team_options = list(teams_for_year.keys())
     team_select_key = "team_abbr_select"

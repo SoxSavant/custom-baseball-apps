@@ -143,7 +143,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TRUTHY_STRINGS
-from p_utils import get_headshot, label_map, lower_better, load_bwar
+from p_utils import get_headshot, label_map, lower_better, load_bwar, start_year
 from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs, format_stat
 
 
@@ -386,7 +386,7 @@ with left_col:
     stat_builder_container = st.container()
 
 current_year = date.today().year
-years_desc = list(range(current_year, 2014, -1))
+years_desc = list(range(current_year, start_year-1, -1))
 MAX_PLAYERS = 5
 default_names = ["Tarik Skubal", "Paul Skenes", "", "", ""]
 

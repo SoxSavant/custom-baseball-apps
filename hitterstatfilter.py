@@ -38,23 +38,10 @@ with meta_col:
 # ─────────────────────────────────────────────
 MAX_DISPLAY = 30
 
-from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat
-from h_utils import get_headshot, label_map, lower_better, load_bwar
+from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS
+from h_utils import get_headshot, label_map, lower_better, load_bwar, start_year
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
-STAT_DEFAULTS = {
-    "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
-    "fWAR": 4.0, "bWAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
-    "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
-    "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
-    "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
-    "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450,
-    "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 300, "G": 140,
-    "Age": 30, "Clutch": 1.0, "FRV": 10, "OAA": 10, "DRS": 10,
-    "Chase%": 25.0, "Whiff%": 20.0,
-}
-
-PCT_STATS = {"K%", "BB%", "K-BB%", "Chase%", "Whiff%", "Barrel%", "HardHit%"}
 
 
 MODE_SINGLE = "Single Season"
@@ -303,7 +290,7 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="sc_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(current_year, 2014, -1)), key="sc_year")
+        st.selectbox("Year", options=list(range(current_year, start_year-1, -1)), key="sc_year")
         start_year = st.session_state["sc_year"]
         end_year   = st.session_state["sc_year"]
 
@@ -313,8 +300,8 @@ with col1:
             st.session_state["sc_min_pa"] = get_dynamic_min_pa(start_year)
             st.session_state.sc_last_year = start_year
     else:
-        st.selectbox("Start Year", options=list(range(current_year, 2014, -1)), key="sc_start_year")
-        st.selectbox("End Year",   options=list(range(current_year, 2014, -1)), key="sc_end_year")
+        st.selectbox("Start Year", options=list(range(current_year, start_year-1, -1)), key="sc_start_year")
+        st.selectbox("End Year",   options=list(range(current_year, start_year-1, -1)), key="sc_end_year")
         start_year = st.session_state["sc_start_year"]
         end_year   = max(st.session_state["sc_end_year"], start_year)
 
@@ -436,7 +423,7 @@ if not df.empty:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
         compare_val = val
-        if stat in PCT_STATS:
+        if stat in RATE_STATS:
             median_col = col_vals.median()
             if pd.notna(median_col) and median_col <= 1:
                 if val > 1:

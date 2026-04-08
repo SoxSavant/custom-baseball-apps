@@ -65,7 +65,7 @@ STAT_PRESETS = {
     "Blank – Create your own": ["fWAR"],
 }
 
-from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS
+from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS, start_year
 from p_utils import label_map, lower_better, load_bwar, STAT_DISPLAY_NAMES
 from p_utils import get_team_display, format_stat
 
@@ -113,7 +113,7 @@ with left_col:
     stat_builder_container = st.container()
 
 with controls_container:
-    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, start_year-1, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     if player_mode == "Name":
         player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Paul Skenes"), key="player_select")

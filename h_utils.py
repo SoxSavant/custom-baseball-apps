@@ -4,26 +4,63 @@ import pandas as pd
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
+start_year = 2014
+
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "maxEV",
     "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM", "Swing%", "Z-Swing%",
-    "O-Contact%","Z-Contact%","Whiff%","Zone%", "BatSpd", "wOBA-xwOBA"
+    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "wOBA-xwOBA"
 ]
+
+SUM_STATS = {
+    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB",
+    "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
+    "fWAR", "bWAR", "Off", "Def", "BsR",
+    "DRS", "OAA", "FRV",
+    "WPA", "FRM",
+}
+
+RATE_STATS = {
+    "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
+    "K%", "BB%", "K-BB%", "O-Swing%", "Whiff%",
+    "Barrel%", "HardHit%",
+    "EV", "maxEV", "BB/K", "ISO", "BatSpd",
+    "wRC+", "Clutch", "Chase%", "Swing%", "Z-Swing%",
+    "O-Contact%", "Z-Contact%", "Zone%", "wOBA-xwOBA",
+}
 
 EVERY_STAT_PRESET = [
     "bWAR", "fWAR", "G", "AB", "PA",  "SB", "HR", "RBI", "XBH",
     "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
     "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM", "wOBA",
-    "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
+    "xwOBA", "xBA", "xSLG", "EV", "maxEV", "Barrel%", "HardHit%",
     "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
     "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%",
     "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "wOBA-xwOBA"
 ]
+
+STAT_DEFAULTS = {
+    "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
+    "fWAR": 4.0, "bWAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
+    "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
+    "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
+    "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
+    "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450,
+    "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 300, "G": 140,
+    "Clutch": 1.0, "FRV": 10, "OAA": 10, "DRS": 10,
+    "Chase%": 25.0, "Whiff%": 20.0,
+    "Off": 10.0, "Def": 5.0, "BsR": 3.0,
+    "BABIP": 0.320, "WPA": 2.0, "wOBA-xwOBA": 0.020,
+    "FRM": 5,
+    "Swing%": 45.0, "Z-Swing%": 65.0, "O-Contact%": 65.0,
+    "Z-Contact%": 85.0, "Zone%": 45.0,
+    "maxEV": 112.0, "BatSpd": 73.0,
+}
 
 STAT_DISPLAY_NAMES = {
     "HardHit%": "Hard Hit%",
@@ -31,19 +68,7 @@ STAT_DISPLAY_NAMES = {
     "BatSpd": "Bat Speed"
 }
 
-SUM_STATS = {
-    "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB",
-    "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "WAR", "Off", "Def", "BsR",
-    "DRS", "OAA", "FRV",
-}
-RATE_STATS = {
-    "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
-    "K%", "BB%", "K-BB%", "O-Swing%", "Whiff%",
-    "Barrel%", "HardHit%", 
-     "EV", "MaxEV", "BB/K", "ISO",
-}
-STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%"}
+STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "maxEV"}
 
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
 HEADSHOT_PLACEHOLDER = (
@@ -172,7 +197,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"FRV", "OAA", "DRS"}:
         return f"{int(round(float(val)))}"
 
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "maxEV", "BatSpd"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -206,7 +231,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR"}:
+    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "maxEV", "BatSpd"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:

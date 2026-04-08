@@ -64,7 +64,7 @@ STAT_PRESETS = {
 }
 
 from h_utils import STAT_ALLOWLIST, TEAMS, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat
-from h_utils import label_map, lower_better, normalize_team, load_bwar
+from h_utils import label_map, lower_better, normalize_team, load_bwar, start_year
 
 
 # ─────────────────────────────────────────────
@@ -127,7 +127,7 @@ min_pa = get_dynamic_min_pa(current_year)
 left_col, right_col = st.columns([1, 1.3])
 
 with left_col:
-    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, start_year-1, -1)))
     teams_for_year = get_teams_for_year(year)
     team_options = list(teams_for_year.keys())
     team_select_key = "team_abbr_select"

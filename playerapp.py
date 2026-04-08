@@ -64,7 +64,7 @@ STAT_PRESETS = {
 }
 
 from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat
-from h_utils import label_map, lower_better, load_bwar, get_team_display
+from h_utils import label_map, lower_better, load_bwar, get_team_display, start_year
 
 
 # ─────────────────────────────────────────────
@@ -109,7 +109,7 @@ with left_col:
     stat_builder_container = st.container()
 
 with controls_container:
-    year = st.selectbox("Select Year", list(range(current_year, 2014, -1)))
+    year = st.selectbox("Select Year", list(range(current_year, start_year-1, -1)))
     player_mode = st.selectbox("Player Input", ["Name", "FanGraphs ID"], key="player_mode")
     if player_mode == "Name":
         player_input = st.text_input("Player Name", value=st.session_state.get("player_select", "Yordan Alvarez"), key="player_select")

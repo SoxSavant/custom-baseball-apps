@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-for year in range(2015, 2027):
+for year in range(2014, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -68,8 +68,16 @@ for year in range(2015, 2027):
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
     final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
-    if "BatSpd" not in final.columns:
+    if year < 2023:
         final["BatSpd"] = None
+    if year < 2015:
+        final["EV"] = None
+        final["Barrel%"] = None
+        final["HardHit%"] = None
+        final["xBA"] = None
+        final["xSLG"] = None
+        final["xwOBA"] = None
+        final["maxEV"] = None
 
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR"}, inplace=True)
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)
