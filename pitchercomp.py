@@ -142,7 +142,7 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TRUTHY_STRINGS
+from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TRUTHY_STRINGS, EVERY_STAT_PRESET
 from p_utils import get_headshot, label_map, lower_better, load_bwar, start_year
 from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs, format_stat
 
@@ -157,15 +157,8 @@ STAT_PRESETS = {
     ],
     "Standard": [
         "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
-    ],
-    "Every Stat": [
-        "fWAR", "bWAR", "W-L",
-        "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
-        "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
-        "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-",
-        "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
-        "Chase%", "Whiff%", "WPA",
-    ],
+    ], 
+    "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": ["fWAR"],
     "Player A leads": [],
     "Player B leads": [],

@@ -51,21 +51,16 @@ STAT_PRESETS = {
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "fWAR", "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Standard": [
         "WAR", "bWAR", "ERA", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
     ],
-    "Every Stat": [
-        "fWAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
-        "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
-        "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-        "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
-    ],
+    "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": ["fWAR"],
 }
 
-from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS, start_year
+from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS, start_year, EVERY_STAT_PRESET
 from p_utils import label_map, lower_better, load_bwar, STAT_DISPLAY_NAMES
 from p_utils import get_team_display, format_stat
 

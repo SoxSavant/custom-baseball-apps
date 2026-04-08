@@ -26,12 +26,19 @@ STAT_DISPLAY_NAMES = {
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "ERA", "xERA", "FIP", "xFIP", "vFA", "K%", "BB%", "K-BB%", "IP", "G", "GS",
     "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
-    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA", "vFA",
+    "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
     "Chase%", "Whiff%", "WPA", "Clutch",
     "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
 ]
+
+EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
+        "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
+        "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
+        "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-",
+        "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
+        "Chase%", "Whiff%", "WPA", "Clutch" ]
 
 SUM_STATS = {
     "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR"
@@ -180,7 +187,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB"}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB", "HR/FB"}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":

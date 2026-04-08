@@ -43,7 +43,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS
-from p_utils import  label_map, lower_better, load_bwar
+from p_utils import  label_map, lower_better, load_bwar, EVERY_STAT_PRESET
 from p_utils import normalize_team, start_year
 
 STAT_PRESETS = {
@@ -58,12 +58,7 @@ STAT_PRESETS = {
     "Miscellaneous": [
         "K-BB%", "WPA", "Clutch", "GB%", "HR/FB",
     ],
-    "Every Stat": [
-        "fWAR", "bWAR", "ERA", "xERA", "FIP", "xFIP", "IP", "SO", "BB", "HBP", "HR",
-        "K/9", "BB/9", "HR/9", "BABIP", "QS", "CG", "ShO", "SV",
-        "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
-        "GB%", "SIERA", "Chase%", "Whiff%", "WPA", "Clutch",
-    ],
+    "Every Stat": EVERY_STAT_PRESET,
 }
 
 
