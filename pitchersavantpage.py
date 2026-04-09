@@ -43,6 +43,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
+from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS, start_year, EVERY_STAT_PRESET
+from p_utils import label_map, lower_better, load_bwar, STAT_DISPLAY_NAMES
+from p_utils import get_team_display, format_stat
 
 
 STAT_PRESETS = {
@@ -60,9 +63,6 @@ STAT_PRESETS = {
     "Blank – Create your own": ["fWAR"],
 }
 
-from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS, start_year, EVERY_STAT_PRESET
-from p_utils import label_map, lower_better, load_bwar, STAT_DISPLAY_NAMES
-from p_utils import get_team_display, format_stat
 
 # ─────────────────────────────────────────────
 #  Helpers
