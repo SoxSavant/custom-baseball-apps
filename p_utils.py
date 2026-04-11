@@ -2,22 +2,34 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import numpy as np
+import requests
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
 start_year = 2000
 
 LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
-HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
+
+HEADSHOT_BASE_SILO = (
+    "https://img.mlbstatic.com/mlb-photos/image/upload"
+    "/d_people:generic:headshot:67:current.png"
+    "/w_240,q_auto:best,f_auto/v1/people/{mlbam}/headshot/silo/current"
+)
+HEADSHOT_BASE_67 = (
+    "https://img.mlbstatic.com/mlb-photos/image/upload"
+    "/d_people:generic:headshot:67:current.png"
+    "/w_240,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current"
+)
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
     "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
-    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjAaJyBmaWxsPScjZWVmJy8+"
+    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
     "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
     "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
     "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
     "YycvPgo8L3N2Zz4="
 )
+
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
 
 STAT_DISPLAY_NAMES = {
@@ -102,16 +114,22 @@ def load_bwar() -> pd.DataFrame:
 
     return df[["MLBAMID", "year_ID", "bWAR"]]
 
-def get_headshot(player_row: pd.Series) -> str:
-    for col in ["MLBAMID"]:
-        val = player_row.get(col)
-        if val is not None and pd.notna(val):
-            try:
-                return HEADSHOT_BASE.format(mlbam=int(val))
-            except Exception:
-                pass
-    return HEADSHOT_PLACEHOLDER
+def _silo_exists(mlbam: int) -> bool:
+    try:
+        url = HEADSHOT_BASE_SILO.format(mlbam=mlbam)
+        r = requests.head(url, timeout=3)
+        return r.status_code == 200 and int(r.headers.get("content-length", 0)) > 10000
+    except Exception:
+        return False
 
+def get_headshot(row: pd.Series) -> str:
+    val = row.get("MLBAMID")
+    if val is not None and pd.notna(val):
+        mlbam = int(val)
+        if _silo_exists(mlbam):
+            return HEADSHOT_BASE_SILO.format(mlbam=mlbam)
+        return HEADSHOT_BASE_67.format(mlbam=mlbam)
+    return HEADSHOT_PLACEHOLDER
 TEAM_OPTIONS = {
     "all": "All Teams",
     "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
