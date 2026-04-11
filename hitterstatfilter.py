@@ -332,9 +332,9 @@ with col1:
             st.selectbox("Op", [">=", "<="], key=f"sc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
             RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
-            if new_stat in RATE_STATS_3DP:
+            if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or new_stat == "EV" or "WAR" in new_stat:
+            elif "%" in new_stat or new_stat == "EV" or "WAR" or "BatSpd" in new_stat:
                 step, fmt = 0.1, "%.1f"
             else:
                 step, fmt = 1.0, "%.0f"
