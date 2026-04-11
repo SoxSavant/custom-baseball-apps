@@ -1,22 +1,22 @@
 import pandas as pd
 import os
 
-for year in range(2026, 2027):
+for year in range(2000, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
         pd.read_csv(f"data/standard_{year}.csv"),
         pd.read_csv(f"data/advanced_{year}.csv"),
         pd.read_csv(f"data/winprob_{year}.csv"),
-        pd.read_csv(f"data/discipline_{year}.csv"),
     ]
 
-    bat_speed_path = f"data/batspeed_{year}.csv"
-    if os.path.exists(bat_speed_path):
-        hitting_dfs.append(pd.read_csv(bat_speed_path))
-    statcast_path = f"data/statcast_{year}.csv"
-    if os.path.exists(statcast_path):
-        hitting_dfs.append(pd.read_csv(statcast_path))
+    
+    if year >=2023: #bat speed data started in 2023
+        hitting_dfs.append(pd.read_csv(f"data/batspeed_{year}.csv"))
+    if year>=2015: #statcast data started in 2015
+        hitting_dfs.append(pd.read_csv(f"data/statcast_{year}.csv"))
+    if year>=2007: #discipline data started in 2015
+        hitting_dfs.append(pd.read_csv(f"data/discipline_{year}.csv"))
 
     base_cols = {"Name", "Team", "MLBAMID", "NameASCII"}
 
@@ -64,10 +64,12 @@ for year in range(2026, 2027):
 
     final = hitting_merged.merge(fielding_agg, on="PlayerId", how="left")
     final["Year"] = year
-    final["Contact%"] = 1 - final["Contact%"]
+    if year>=2007:
+        final["Contact%"] = 1 - final["Contact%"]
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
-    final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
+    if year >=2025:
+        final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
     if year < 2023:
         final["BatSpd"] = None
     if year < 2015:
@@ -78,6 +80,21 @@ for year in range(2026, 2027):
         final["xSLG"] = None
         final["xwOBA"] = None
         final["maxEV"] = None
+    if year < 2016:
+        final["FRV"] = None
+        final["OAA"] = None
+    if year < 2007:
+        final["O-Swing%"] = None
+        final["Z-Swing%"] = None
+        final["Swing%"] = None
+        final["O-Contact%"] = None
+        final["Z-Contact%"] = None
+        final["Contact%"] = None
+        final["Zone%"] = None
+    if year >=2002: # TZ records ended in 2001, DRS started in 2002
+        final["TZ"] = None
+    else:
+        final["DRS"] = None
 
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR"}, inplace=True)
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)

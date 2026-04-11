@@ -1,19 +1,20 @@
 from pathlib import Path
 import streamlit as st
 import pandas as pd
+import requests
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
-start_year = 2014
+start_year = 2000
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "maxEV",
-    "wRC+", "wOBA", "xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
+    "wRC+", "wOBA", "xwOBA", "wOBA-xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
-    "FRV", "OAA", "DRS", "FRM", "Swing%", "Z-Swing%",
-    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "wOBA-xwOBA"
+    "FRV", "OAA", "DRS", "FRM", "TZ","Swing%", "Z-Swing%",
+    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", 
 ]
 
 SUM_STATS = {
@@ -21,7 +22,7 @@ SUM_STATS = {
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
     "fWAR", "bWAR", "Off", "Def", "BsR",
     "DRS", "OAA", "FRV",
-    "WPA", "FRM",
+    "WPA", "FRM", "TZ",
 }
 
 RATE_STATS = {
@@ -41,7 +42,7 @@ EVERY_STAT_PRESET = [
     "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
     "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%",
-    "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "wOBA-xwOBA"
+    "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "wOBA-xwOBA", "TZ",
 ]
 
 STAT_DEFAULTS = {
@@ -60,6 +61,7 @@ STAT_DEFAULTS = {
     "Swing%": 45.0, "Z-Swing%": 65.0, "O-Contact%": 65.0,
     "Z-Contact%": 85.0, "Zone%": 45.0,
     "maxEV": 112.0, "BatSpd": 73.0,
+    "TZ": 10,
 }
 
 STAT_DISPLAY_NAMES = {
@@ -70,7 +72,16 @@ STAT_DISPLAY_NAMES = {
 
 STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "maxEV"}
 
-HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
+HEADSHOT_BASE_SILO = (
+    "https://img.mlbstatic.com/mlb-photos/image/upload"
+    "/d_people:generic:headshot:67:current.png"
+    "/w_240,q_auto:best,f_auto/v1/people/{mlbam}/headshot/silo/current"
+)
+HEADSHOT_BASE_67 = (
+    "https://img.mlbstatic.com/mlb-photos/image/upload"
+    "/d_people:generic:headshot:67:current.png"
+    "/w_240,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current"
+)
 HEADSHOT_PLACEHOLDER = (
     "data:image/svg+xml;base64,"
     "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
@@ -163,16 +174,23 @@ TEAMS = {
     "TOR": "Toronto Blue Jays",      "WSN": "Washington Nationals",
 }
 
-def get_headshot(row: pd.Series) -> str:
-    for col in ["MLBAMID"]:
-        val = row.get(col)
-        if val is not None and pd.notna(val):
-            try:
-                return HEADSHOT_BASE.format(mlbam=int(val))
-            except Exception:
-                pass
-    return HEADSHOT_PLACEHOLDER
 
+def _silo_exists(mlbam: int) -> bool:
+    try:
+        url = HEADSHOT_BASE_SILO.format(mlbam=mlbam)
+        r = requests.head(url, timeout=3)
+        return r.status_code == 200 and int(r.headers.get("content-length", 0)) > 10000
+    except Exception:
+        return False
+
+def get_headshot(row: pd.Series) -> str:
+    val = row.get("MLBAMID")
+    if val is not None and pd.notna(val):
+        mlbam = int(val)
+        if _silo_exists(mlbam):
+            return HEADSHOT_BASE_SILO.format(mlbam=mlbam)
+        return HEADSHOT_BASE_67.format(mlbam=mlbam)
+    return HEADSHOT_PLACEHOLDER
 
 def normalize_team(team: str) -> str:
     t = str(team).strip()
@@ -194,7 +212,7 @@ def format_stat(stat: str, val) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FRV", "OAA", "DRS"}:
+    if upper_stat in {"FRV", "OAA", "DRS","TZ"}:
         return f"{int(round(float(val)))}"
 
     if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "maxEV", "BatSpd"}:
@@ -227,7 +245,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FRV", "OAA", "DRS"}:
+    if upper_stat in {"FRV", "OAA", "DRS","TZ"}:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 

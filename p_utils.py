@@ -5,7 +5,7 @@ import numpy as np
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
-start_year = 2014
+start_year = 2000
 
 LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 HEADSHOT_BASE = "https://img.mlbstatic.com/mlb-photos/image/upload/w_240,q_auto:best,f_auto/people/{mlbam}/headshot/silo/current"
@@ -30,7 +30,7 @@ STAT_ALLOWLIST = [
     "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
     "Chase%", "Whiff%", "WPA", "Clutch",
-    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO"
 ]
 
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
