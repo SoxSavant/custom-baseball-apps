@@ -300,7 +300,7 @@ with col1:
             st.selectbox("Op", ["<=", ">="], key=f"pc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
             RATE_3DP = {"WHIP", "BABIP"}
-            RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB"}
+            RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB", "WPA", "Clutch"}
             if new_stat in RATE_3DP:
                 step, fmt = 0.001, "%.3f"
             elif new_stat in RATE_2DP:
