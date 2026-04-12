@@ -334,8 +334,10 @@ with col1:
             RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
             if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or new_stat == "EV" or "WAR" or "BatSpd" in new_stat:
+            elif "%" in new_stat or new_stat == "EV" or "WAR" in new_stat or new_stat == "BatSpd":
                 step, fmt = 0.1, "%.1f"
+            elif  new_stat == "WPA" or new_stat == "Clutch":
+                step, fmt = 0.01, "%.2f"
             else:
                 step, fmt = 1.0, "%.0f"
             st.number_input(f"Value {i+1}", step=step, key=f"sc_val_{i}",
