@@ -38,7 +38,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 MAX_DISPLAY = 30
 
-from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS
+from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS
 from h_utils import get_headshot, label_map, lower_better, load_bwar, start_year
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
@@ -162,6 +162,8 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
             result[col] = series.sum(skipna=True)
         elif col in RATE_STATS and pa_total > 0:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total
+        elif col in MAX_STATS:
+            result[col] = series.max(skipna=True)
         else:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
 
@@ -334,7 +336,7 @@ with col1:
             RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
             if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or new_stat == "EV" or "WAR" in new_stat or new_stat == "BatSpd":
+            elif "%" in new_stat or  "EV" in new_stat or "WAR" in new_stat or new_stat == "BatSpd":
                 step, fmt = 0.1, "%.1f"
             elif  new_stat == "WPA" or new_stat == "Clutch":
                 step, fmt = 0.01, "%.2f"

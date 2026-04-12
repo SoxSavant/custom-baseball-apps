@@ -41,7 +41,7 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from h_utils import STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat, start_year
+from h_utils import STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS
 from h_utils import get_headshot, label_map, lower_better, load_bwar
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
@@ -148,6 +148,8 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
             result[col] = series.sum(skipna=True)
         elif col in RATE_STATS and pa_total > 0:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total
+        elif col in MAX_STATS:
+            result[col] = series.max(skipna=True)
         else:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
 

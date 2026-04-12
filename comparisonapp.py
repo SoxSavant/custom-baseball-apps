@@ -190,7 +190,7 @@ STAT_PRESETS = {
 }
 
 from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS, format_stat, start_year
-from h_utils import get_headshot, label_map, lower_better,  load_bwar, TRUTHY_STRINGS, normalize_team, get_team_display
+from h_utils import get_headshot, label_map, lower_better,  load_bwar, TRUTHY_STRINGS, normalize_team, get_team_display, MAX_STATS
 
 # ─────────────────────────────────────────────
 #  Team display helper
@@ -314,6 +314,8 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
                     result[col] = np.nan
             else:
                 result[col] = (series * pa_weight).sum(skipna=True) / pa_total
+        elif col in MAX_STATS:
+            result[col] = series.max(skipna=True)
         else:
             result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else np.nan
 

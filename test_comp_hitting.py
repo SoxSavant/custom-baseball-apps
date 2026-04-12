@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-for year in range(2000, 2027):
+for year in range(2026, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),

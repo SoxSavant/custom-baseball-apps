@@ -29,10 +29,12 @@ RATE_STATS = {
     "AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "BABIP",
     "K%", "BB%", "K-BB%", "O-Swing%", "Whiff%",
     "Barrel%", "HardHit%",
-    "EV", "maxEV", "BB/K", "ISO", "BatSpd",
+    "EV","BB/K", "ISO", "BatSpd",
     "wRC+", "Clutch", "Chase%", "Swing%", "Z-Swing%",
     "O-Contact%", "Z-Contact%", "Zone%", "wOBA-xwOBA",
 }
+
+MAX_STATS = {"maxEV"}
 
 EVERY_STAT_PRESET = [
     "bWAR", "fWAR", "G", "AB", "PA",  "SB", "HR", "RBI", "XBH",
