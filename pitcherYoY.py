@@ -74,7 +74,7 @@ def load_final_year(year: int) -> pd.DataFrame:
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_risers_data(
     start_year: int, end_year: int,
-    min_ip: int = 0, team: str = "all"
+    min_ip_start: int = 0, min_ip_end: int = 0, team: str = "all"
 ) -> pd.DataFrame:
     df_s = load_final_year(start_year)
     df_e = load_final_year(end_year)
@@ -83,9 +83,10 @@ def load_risers_data(
         return pd.DataFrame()
 
     # Min IP filter
-    if min_ip > 0:
-        df_s = df_s[pd.to_numeric(df_s.get("IP", 0), errors="coerce").fillna(0) >= min_ip]
-        df_e = df_e[pd.to_numeric(df_e.get("IP", 0), errors="coerce").fillna(0) >= min_ip]
+    if min_ip_start > 0:
+        df_s = df_s[pd.to_numeric(df_s.get("IP", 0), errors="coerce").fillna(0) >= min_ip_start]
+    if min_ip_end > 0:
+        df_e = df_e[pd.to_numeric(df_e.get("IP", 0), errors="coerce").fillna(0) >= min_ip_end]
 
     # Team filter on end year only
     if team != "all" and "Team" in df_e.columns:
@@ -151,13 +152,15 @@ def load_risers_data(
 
 from utils import get_dynamic_min_ip
 
-min_ip = get_dynamic_min_ip(current_year)
+min_ip_end = get_dynamic_min_ip(current_year)
+min_ip_start = 162
 
 for key, default in [
     ("pr_start_year",     current_year-1),
     ("pr_end_year",       current_year),
     ("pr_stat",           "ERA"),
-    ("pr_min_ip",         min_ip),
+    ("pr_min_ip_start",         min_ip_start),
+    ("pr_min_ip_end",         min_ip_end),
     ("pr_team",           "all"),
     ("pr_show_fallers",   False),
     ("pr_show_min_ip",    True),
@@ -186,7 +189,8 @@ with col1:
     if end_year <= start_year:
         st.warning("End Year must be greater than Start Year.")
 
-    st.number_input("Min IP (each year)", min_value=0, max_value=5000, key="pr_min_ip")
+    st.number_input("Start Year min IP", min_value=0, max_value=5000, key="pr_min_ip_start")
+    st.number_input("End Year min IP", min_value=0, max_value=5000, key="pr_min_ip_end")
     st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
                  format_func=lambda x: TEAM_OPTIONS[x], key="pr_team",
                  help="Filters by team in the end year only")
@@ -195,7 +199,8 @@ with col1:
     st.checkbox("Show min IP",     key="pr_show_min_ip")
     st.checkbox("Show player IP",  key="pr_show_player_ip")
 
-min_ip_val   = int(st.session_state.get("pr_min_ip", 0))
+min_ip_start_val   = int(st.session_state.get("pr_min_ip_start", 0))
+min_ip_end_val   = int(st.session_state.get("pr_min_ip_end", 0))
 team_val     = st.session_state.get("pr_team", "all")
 show_fallers = st.session_state.get("pr_show_fallers", False)
 
@@ -205,7 +210,7 @@ show_fallers = st.session_state.get("pr_show_fallers", False)
 
 if end_year > start_year:
     with st.spinner("Loading data..."):
-        df = load_risers_data(start_year, end_year, min_ip_val, team_val)
+        df = load_risers_data(start_year, end_year, min_ip_start_val, min_ip_end_val, team_val)
 else:
     df = pd.DataFrame()
 
@@ -282,7 +287,7 @@ title = f"Top {team_prefix}{title_stat_label} {riser_label}: {int(start_year)} �
 
 min_ip_subtitle = ""
 if st.session_state.get("pr_show_min_ip"):
-    min_ip_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_val} IP each year</div>'
+    min_ip_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_start_val} IP → {min_ip_end_val} IP</div>'
 
 # ─────────────────────────────────────────────
 #  Render HTML
