@@ -112,7 +112,7 @@ def filter_by_position(df, position):
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_risers_data(
     start_year: int, end_year: int,
-    min_pa: int = 0, position: str = "all", team: str = "all"
+    min_pa_start: int = 0, min_pa_end: int = 0, position: str = "all", team: str = "all"
 ) -> pd.DataFrame:
     df_s = load_final_year(start_year)
     df_e = load_final_year(end_year)
@@ -121,9 +121,10 @@ def load_risers_data(
         return pd.DataFrame()
 
     # Min PA filter
-    if min_pa > 0:
-        df_s = df_s[pd.to_numeric(df_s.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
-        df_e = df_e[pd.to_numeric(df_e.get("PA", 0), errors="coerce").fillna(0) >= min_pa]
+    if min_pa_start > 0:
+        df_s = df_s[pd.to_numeric(df_s.get("PA", 0), errors="coerce").fillna(0) >= min_pa_start]
+    if min_pa_end > 0:
+        df_e = df_e[pd.to_numeric(df_e.get("PA", 0), errors="coerce").fillna(0) >= min_pa_end]
     # position filter
     df_s = filter_by_position(df_s, position)
     df_e = filter_by_position(df_e, position)
@@ -196,13 +197,15 @@ def load_risers_data(
 
 from utils import get_dynamic_min_pa
 
-min_pa = get_dynamic_min_pa(current_year)
+min_pa_end = get_dynamic_min_pa(current_year)
+min_pa_start = 502
 
 for key, default in [
     ("rf_start_year",     current_year-1),
     ("rf_end_year",       current_year),
     ("rf_stat",           "fWAR"),
-    ("rf_min_pa",         min_pa),
+    ("rf_min_pa_start",         min_pa_start),
+    ("rf_min_pa_end",         min_pa_end),
     ("rf_position",       "all"),
     ("rf_team",           "all"),
     ("rf_show_fallers",   False),
@@ -238,14 +241,16 @@ with col1:
     if end_year <= start_year:
         st.warning("End Year must be greater than Start Year.")
 
-    st.number_input("Min PA (each year)", min_value=0, max_value=20000, key="rf_min_pa")
+    st.number_input("Start Year min PA", min_value=0, max_value=20000, key="rf_min_pa_start")
+    st.number_input("End Year min PA", min_value=0, max_value=20000, key="rf_min_pa_end")
     st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
                     format_func=lambda x: POSITION_OPTIONS[x], key="rf_position")
     st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
                      format_func=lambda x: TEAM_OPTIONS[x], key="rf_team",
                      help="Filters by team in the end year only")
 
-    min_pa_val   = int(st.session_state.get("rf_min_pa", 0))
+    min_pa_start_val   = int(st.session_state.get("rf_min_pa_start", 0))
+    min_pa_end_val   = int(st.session_state.get("rf_min_pa_end", 0))
     position_val = st.session_state.get("rf_position", "all")
     team_val     = st.session_state.get("rf_team", "all")
 
@@ -262,7 +267,7 @@ show_fallers = st.session_state.get("rf_show_fallers", False)
 
 if end_year > start_year:
     with st.spinner("Loading data..."):
-        df = load_risers_data(start_year, end_year, min_pa_val, position_val, team_val)
+        df = load_risers_data(start_year, end_year, min_pa_start_val, min_pa_end_val, position_val, team_val)
 else:
     df = pd.DataFrame()
 
@@ -348,8 +353,9 @@ title = f"Top {team_prefix}{title_stat_label} {riser_label}{pos_suffix}: {int(st
 
 min_pa_subtitle = ""
 if st.session_state.get("rf_show_min_pa"):
-    display_min =  min_pa_val
-    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min} PA each year</div>'
+    display_min_start =  min_pa_start_val
+    display_min_end =  min_pa_end_val
+    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min_start} PA → {display_min_end} PA</div>'
 
 # ─────────────────────────────────────────────
 #  Render HTML
