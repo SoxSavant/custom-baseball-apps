@@ -143,7 +143,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TRUTHY_STRINGS, EVERY_STAT_PRESET
-from p_utils import get_headshot, label_map, lower_better, load_bwar, start_year
+from p_utils import get_headshot, label_map, lower_better, start_year
 from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs, format_stat
 
 
@@ -323,15 +323,6 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
         return None
 
     player_id = agg.get("MLBAMID")
-    bwar_df = load_bwar()
-    if not bwar_df.empty and player_id:
-        subset = bwar_df[
-            (bwar_df["MLBAMID"] == player_id) &
-            (bwar_df["year_ID"] >= start_year) &
-            (bwar_df["year_ID"] <= end_year)
-        ]
-        if not subset.empty:
-            agg["bWAR"] = subset["bWAR"].sum(min_count=1)
 
     return pd.Series(agg)
 

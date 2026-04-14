@@ -42,7 +42,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from h_utils import STAT_ALLOWLIST, start_year
-from h_utils import get_headshot, label_map, lower_better, load_bwar, format_stat_yoy
+from h_utils import get_headshot, label_map, lower_better, format_stat_yoy
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
 current_year = date.today().year
@@ -76,10 +76,6 @@ def load_final_year(year: int) -> pd.DataFrame:
         df = pd.read_csv(path)
         df["Season"] = year
     
-        bwar_df = load_bwar()
-        if not bwar_df.empty:
-            year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
-            df = df.merge(year_bwar, on="MLBAMID", how="left")
         return df
     except Exception:
         return pd.DataFrame()

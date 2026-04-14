@@ -42,7 +42,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from h_utils import STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS
-from h_utils import get_headshot, label_map, lower_better, load_bwar
+from h_utils import get_headshot, label_map, lower_better
 from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
 
 
@@ -202,10 +202,8 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_data(start_year: int, end_year: int, mode: str, position: str = "all") -> pd.DataFrame:
     if mode == MODE_SINGLE:
-        # If single year, we still want bWAR for that specific year
-        df = load_final_year(start_year)
-        # See below for helper to add bWAR to dataframes
-        return add_bwar_to_df(df, start_year, start_year)
+        return load_final_year(start_year)
+        
 
     frames = []
     for year in range(start_year, end_year + 1):
@@ -219,8 +217,7 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
     combined = pd.concat(frames, ignore_index=True)
 
     if mode == MODE_SPLIT:
-        # Every row is a separate season, so we match bWAR 1:1 with the 'Season' column
-        return add_bwar_to_df(combined, start_year, end_year, use_season_col=True)
+        return combined
 
     # MODE_MULTI: aggregate by PlayerId
     if "PlayerId" not in combined.columns:
@@ -234,43 +231,8 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
     for _, grp in combined.groupby("PlayerId"):
         grouped_rows.append(aggregate_player_group(grp))
 
-    final_df = pd.DataFrame(grouped_rows)
+    return pd.DataFrame(grouped_rows)
     
-    # Add bWAR to the aggregated rows
-    return add_bwar_to_df(final_df, start_year, end_year)
-
-# ─────────────────────────────────────────────
-#  New Helper: add_bwar_to_df
-# ─────────────────────────────────────────────
-def add_bwar_to_df(df: pd.DataFrame, start: int, end: int, use_season_col: bool = False) -> pd.DataFrame:
-    if df.empty or "MLBAMID" not in df.columns:
-        return df
-    
-    bwar_master = load_bwar()
-    if bwar_master.empty:
-        return df
-
-    def get_player_war(row):
-        p_id = row.get("MLBAMID")
-        if not p_id:
-            return np.nan
-        
-        # If 'Split' mode, only get WAR for that specific row's season
-        # Otherwise, use the full range provided by the app filters
-        s_yr = int(row["Season"]) if use_season_col and "Season" in row else start
-        e_yr = int(row["Season"]) if use_season_col and "Season" in row else end
-        
-        subset = bwar_master[
-            (bwar_master["MLBAMID"] == p_id) & 
-            (bwar_master["year_ID"] >= s_yr) & 
-            (bwar_master["year_ID"] <= e_yr)
-        ]
-        return subset["bWAR"].sum(min_count=1)
-
-    df["bWAR"] = df.apply(get_player_war, axis=1)
-    return df
-
-
 
 # ─────────────────────────────────────────────
 #  Session state defaults

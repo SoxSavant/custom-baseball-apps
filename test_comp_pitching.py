@@ -1,7 +1,32 @@
 import pandas as pd
-import os
+from pathlib import Path
 
-for year in range(2026, 2027):
+
+LOCAL_BWAR_FILE = Path("warpitchers.txt") 
+
+def load_bwar_master() -> pd.DataFrame:
+    """Loads the entire BRef pitching history and aggregates by ID and Year."""
+    if not LOCAL_BWAR_FILE.exists():
+        print(f"Warning: {LOCAL_BWAR_FILE} not found.")
+        return pd.DataFrame()
+    
+    # Read raw data
+    df = pd.read_csv(LOCAL_BWAR_FILE)
+    
+    # Standardize columns to match your merge keys
+    df["MLBAMID"] = pd.to_numeric(df.get("mlb_ID"), errors="coerce")
+    df["year_ID"] = pd.to_numeric(df.get("year_ID"), errors="coerce")
+    df["bWAR_val"] = pd.to_numeric(df.get("WAR"), errors="coerce")
+    
+    # Clean and Aggregate: This handles players with multiple rows per season (trades)
+    df = df.dropna(subset=["MLBAMID", "year_ID", "bWAR_val"])
+    df_agg = df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR_val"].sum()
+    
+    return df_agg
+
+bwar_master = load_bwar_master()
+
+for year in range(2000, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
@@ -39,6 +64,25 @@ for year in range(2026, 2027):
 
     final = pitching_merged
     final["Year"] = year
+
+    if not bwar_master.empty:
+        # Ensure MLBAMID is numeric for matching
+        final["MLBAMID"] = pd.to_numeric(final["MLBAMID"], errors="coerce")
+        
+        # Filter master bWAR for current year
+        year_bwar = bwar_master[bwar_master["year_ID"] == year].copy()
+        
+        # Merge
+        final = final.merge(
+            year_bwar[["MLBAMID", "bWAR_val"]], 
+            on="MLBAMID", 
+            how="left"
+        )
+        
+        # Finalize bWAR column
+        final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
+        final["bWAR"] = final["bWAR"].fillna(0)
+
     if year >=2007:
         final["Contact%"] = 1 - final["Contact%"]
     

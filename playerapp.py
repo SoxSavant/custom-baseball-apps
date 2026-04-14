@@ -64,7 +64,7 @@ STAT_PRESETS = {
 }
 
 from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat
-from h_utils import label_map, lower_better, load_bwar, get_team_display, start_year
+from h_utils import label_map, lower_better, get_team_display, start_year
 
 
 # ─────────────────────────────────────────────
@@ -135,16 +135,6 @@ if "Team" in df.columns:
 
 
 
-
-bwar_df = load_bwar()
-if not bwar_df.empty:
-    # 1. Filter the bWAR database for only the current year
-    # 2. Select only the columns we need for the merge
-    year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
-    
-    # 3. Merge directly on MLBAMID
-    # We use 'left' so we don't lose players who might be missing from the bWAR file
-    df = df.merge(year_bwar, on="MLBAMID", how="left")
 
 # League for percentile distribution 
 from utils import get_percentile_min_pa

@@ -44,7 +44,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import STAT_ALLOWLIST, TRUTHY_STRINGS, start_year, EVERY_STAT_PRESET
-from p_utils import label_map, lower_better, load_bwar, STAT_DISPLAY_NAMES
+from p_utils import label_map, lower_better, STAT_DISPLAY_NAMES
 from p_utils import get_team_display, format_stat
 
 
@@ -134,20 +134,6 @@ for col in ["IP", "G", "GS"]:
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-
-# Attach bWAR for this year
-bwar_df = load_bwar()
-if not bwar_df.empty:
-    # 1. Filter the bWAR database for only the current year
-    # 2. Select only the columns we need for the merge
-    year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
-    
-    # 3. Merge directly on MLBAMID
-    # We use 'left' so we don't lose players who might be missing from the bWAR file
-    df = df.merge(year_bwar, on="MLBAMID", how="left")
-
-if "bWAR" not in df.columns:
-    df["bWAR"] = np.nan
 
 # League for percentiles
 from utils import get_percentile_min_ip

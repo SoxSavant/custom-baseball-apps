@@ -43,7 +43,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS
-from p_utils import  label_map, lower_better, load_bwar, EVERY_STAT_PRESET
+from p_utils import  label_map, lower_better,  EVERY_STAT_PRESET
 from p_utils import normalize_team, start_year
 
 STAT_PRESETS = {
@@ -179,13 +179,6 @@ df["IP"] = pd.to_numeric(df.get("IP", 0), errors="coerce")
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-
-
-# Attach bWAR
-bwar_df = load_bwar()
-if not bwar_df.empty:
-    year_bwar = bwar_df[bwar_df["year_ID"] == year][["MLBAMID", "bWAR"]].copy()
-    df = df.merge(year_bwar, on="MLBAMID", how="left")
 
 # League for percentiles
 from utils import get_percentile_min_ip
