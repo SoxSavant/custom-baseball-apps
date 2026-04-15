@@ -190,7 +190,7 @@ STAT_PRESETS = {
 }
 
 from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS, format_stat, start_year
-from h_utils import get_headshot, label_map, lower_better,  load_bwar, TRUTHY_STRINGS, normalize_team, get_team_display, MAX_STATS
+from h_utils import get_headshot, label_map, lower_better, TRUTHY_STRINGS, normalize_team, get_team_display, MAX_STATS
 
 # ─────────────────────────────────────────────
 #  Team display helper
@@ -387,17 +387,6 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
     if not agg:
         return None
 
-    # Merge bWAR warhitters file by name + year range
-    player_id = agg.get("MLBAMID")
-    bwar_df = load_bwar()
-    if not bwar_df.empty and player_id:
-        subset = bwar_df[
-            (bwar_df["MLBAMID"] == player_id) &
-            (bwar_df["year_ID"] >= start_year) &
-            (bwar_df["year_ID"] <= end_year)
-        ]
-        if not subset.empty:
-            agg["bWAR"] = subset["bWAR"].sum(min_count=1)
     return pd.Series(agg)
 
 
