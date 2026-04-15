@@ -36,9 +36,9 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import (
-    STAT_ALLOWLIST, RATE_STATS, PCT_STATS, format_stat, STAT_DEFAULTS,
+    STAT_ALLOWLIST,  PCT_STATS, format_stat, STAT_DEFAULTS,
     get_headshot, label_map, lower_better, start_year,
-    get_team_display, ip_to_outs, outs_to_ip
+    get_team_display
 )
 
 MAX_DISPLAY  = 10
