@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 
 # --- Configuration ---
-LOCAL_BWAR_FILE = Path("warhitters2025.txt") 
+LOCAL_BWAR_FILE = Path("war_daily_bat.txt") 
 
 def load_bwar_master() -> pd.DataFrame:
     """Loads the entire BRef history and aggregates by ID and Year."""
@@ -137,5 +137,5 @@ for year in range(2000, 2027):
     else:
         final["DRS"] = None
 
-    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR"}, inplace=True)
+    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR", "SqUpSw%":"Squared-Up%"}, inplace=True)
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)

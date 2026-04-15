@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 
 
-LOCAL_BWAR_FILE = Path("warpitchers.txt") 
+LOCAL_BWAR_FILE = Path("war_daily_pitch.txt") 
 
 def load_bwar_master() -> pd.DataFrame:
     """Loads the entire BRef pitching history and aggregates by ID and Year."""

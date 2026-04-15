@@ -47,8 +47,7 @@ from h_utils import EVERY_STAT_PRESET
 
 STAT_PRESETS = {
      "Statcast": [
-        "fWAR", "bWAR", "Off", "BsR", "Def", "wOBA",
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Fielding": ["DRS", "FRV", "OAA", "FRM"],

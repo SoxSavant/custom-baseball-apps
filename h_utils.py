@@ -14,7 +14,7 @@ STAT_ALLOWLIST = [
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM", "TZ","Swing%", "Z-Swing%",
-    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", 
+    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "Squared-Up%",
 ]
 
 SUM_STATS = {
@@ -32,6 +32,7 @@ RATE_STATS = {
     "EV","BB/K", "ISO", "BatSpd",
     "wRC+", "Clutch", "Chase%", "Swing%", "Z-Swing%",
     "O-Contact%", "Z-Contact%", "Zone%", "wOBA-xwOBA",
+    "Squared-Up%"
 }
 
 MAX_STATS = {"maxEV"}
@@ -64,6 +65,7 @@ STAT_DEFAULTS = {
     "Z-Contact%": 85.0, "Zone%": 45.0,
     "maxEV": 112.0, "BatSpd": 73.0,
     "TZ": 10,
+    "Squared-Up%": 25.0,
 }
 
 STAT_DISPLAY_NAMES = {
@@ -72,7 +74,7 @@ STAT_DISPLAY_NAMES = {
     "BatSpd": "Bat Speed"
 }
 
-STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "maxEV"}
+STATCAST_RATE_STATS = {"xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "Squared-Up%"}
 
 HEADSHOT_BASE_SILO = (
     "https://img.mlbstatic.com/mlb-photos/image/upload"
