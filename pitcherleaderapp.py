@@ -41,9 +41,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, start_year
-from p_utils import get_headshot, label_map, lower_better,  TEAM_OPTIONS
-from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs, format_stat
+from p_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, start_year,
+get_headshot, label_map, lower_better,  TEAM_OPTIONS, normalize_team, get_team_display, 
+outs_to_ip, ip_to_outs, format_stat)
 
 
 MODE_SINGLE = "Single Season"

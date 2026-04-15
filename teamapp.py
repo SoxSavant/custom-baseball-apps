@@ -43,7 +43,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from h_utils import EVERY_STAT_PRESET
+from h_utils import (EVERY_STAT_PRESET,STAT_ALLOWLIST, TEAMS, 
+                     STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat,
+                     label_map, lower_better, normalize_team, start_year)
 
 
 STAT_PRESETS = {
@@ -62,13 +64,7 @@ STAT_PRESETS = {
     ],
 }
 
-from h_utils import STAT_ALLOWLIST, TEAMS, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat
-from h_utils import label_map, lower_better, normalize_team, start_year
 
-
-# ─────────────────────────────────────────────
-#  Team helpers
-# ─────────────────────────────────────────────
 
 def get_teams_for_year(season: int) -> dict[str, str]:
     key = "ATH" if season >= 2025 else "OAK"

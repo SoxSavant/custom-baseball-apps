@@ -42,9 +42,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS
-from p_utils import  label_map, lower_better,  EVERY_STAT_PRESET
-from p_utils import normalize_team, start_year
+from p_utils import (STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS,
+ label_map, lower_better,  EVERY_STAT_PRESET,
+normalize_team, start_year)
 
 STAT_PRESETS = {
     "Statcast": [

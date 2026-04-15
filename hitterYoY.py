@@ -37,20 +37,12 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
-from h_utils import STAT_ALLOWLIST, start_year
-from h_utils import get_headshot, label_map, lower_better, format_stat_yoy
-from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
+
+from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better, 
+format_stat_yoy, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display)
 
 current_year = date.today().year
-
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
 
 
 def normalize_name(raw: str) -> str:

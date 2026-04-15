@@ -189,8 +189,11 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
-from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, RATE_STATS, STATCAST_RATE_STATS, format_stat, start_year
-from h_utils import get_headshot, label_map, lower_better, TRUTHY_STRINGS, normalize_team, get_team_display, MAX_STATS
+from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, 
+                     RATE_STATS, STATCAST_RATE_STATS, format_stat, start_year,
+                    get_headshot, label_map, lower_better, TRUTHY_STRINGS, 
+                    normalize_team, get_team_display, MAX_STATS 
+                    )
 
 # ─────────────────────────────────────────────
 #  Team display helper

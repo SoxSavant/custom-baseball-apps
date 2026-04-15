@@ -36,6 +36,8 @@ STAT_DISPLAY_NAMES = {
     "HardHit%": "Hard Hit%",
 }
 
+
+
 STAT_ALLOWLIST = [
     "fWAR", "bWAR",
     "ERA", "xERA", "FIP", "xFIP", "vFA", "K%", "BB%", "K-BB%", "IP", "G", "GS",
@@ -44,6 +46,20 @@ STAT_ALLOWLIST = [
     "Chase%", "Whiff%", "WPA", "Clutch",
     "SO", "BB", "HBP", "HR", "QS", "CG", "ShO"
 ]
+
+STAT_DEFAULTS = {
+    "fWAR": 4.0, "bWAR": 4.0, "ERA": 3.00, "xERA": 3.00, "FIP": 3.00, "xFIP": 3.00,
+    "WHIP": 1.10, "ERA-": 80.0, "FIP-": 80.0, "SIERA": 3.50,
+    "IP": 162.0, "G": 30.0, "GS": 25.0, "W": 12.0, "L": 10.0,
+    "SV": 20.0, "SO": 180.0, "BB": 50.0,
+    "K/9": 10.0, "BB/9": 2.5, "HR/9": 1.0,
+    "K%": 25.0, "BB%": 7.0, "K-BB%": 18.0,
+    "Barrel%": 6.0, "HardHit%": 35.0, "EV": 88.0,
+    "Chase%": 32.0, "Whiff%": 25.0,
+    "GB%": 50.0, "HR/FB": 10.0,
+    "BABIP": 0.280, "WPA": 2.0, "Clutch": 1.0,
+    "CG": 1.0, "ShO": 1.0,
+}
 
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
         "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
@@ -60,6 +76,11 @@ RATE_STATS = {
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
     "ERA-", "FIP-", "vFA",
+}
+
+PCT_STATS = {
+    "K%", "BB%", "K-BB%", "Chase%", "Whiff%", "Barrel%", "HardHit%",
+    "GB%", "FB%", "LOB%", "HR/FB",
 }
 
 label_map = {

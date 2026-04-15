@@ -36,25 +36,12 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TEAM_OPTIONS, format_stat
-from p_utils import get_headshot, label_map, lower_better,  start_year
-from p_utils import normalize_team, get_team_display, outs_to_ip, ip_to_outs
+from p_utils import ( STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TEAM_OPTIONS, format_stat,
+get_headshot, label_map, lower_better,  start_year, STAT_DEFAULTS,
+normalize_team, get_team_display, outs_to_ip, ip_to_outs )
 
 MAX_DISPLAY = 30
 
-STAT_DEFAULTS = {
-    "fWAR": 4.0, "bWAR": 4.0, "ERA": 3.00, "xERA": 3.00, "FIP": 3.00, "xFIP": 3.00,
-    "WHIP": 1.10, "ERA-": 80.0, "FIP-": 80.0, "SIERA": 3.50,
-    "IP": 162.0, "G": 30.0, "GS": 25.0, "W": 12.0, "L": 10.0,
-    "SV": 20.0, "SO": 180.0, "BB": 50.0,
-    "K/9": 10.0, "BB/9": 2.5, "HR/9": 1.0,
-    "K%": 25.0, "BB%": 7.0, "K-BB%": 18.0,
-    "Barrel%": 6.0, "HardHit%": 35.0, "EV": 88.0,
-    "Chase%": 32.0, "Whiff%": 25.0,
-    "GB%": 50.0, "HR/FB": 10.0,
-    "BABIP": 0.280, "WPA": 2.0, "Clutch": 1.0,
-    "CG": 1.0, "ShO": 1.0,
-}
 
 PCT_STATS = {
     "K%", "BB%", "K-BB%", "Chase%", "Whiff%", "Barrel%", "HardHit%",

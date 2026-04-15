@@ -41,9 +41,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import STAT_ALLOWLIST, format_stat_yoy, start_year
-from p_utils import get_headshot, label_map, lower_better, TEAM_OPTIONS
-from p_utils import normalize_team, get_team_display
+from p_utils import (STAT_ALLOWLIST, format_stat_yoy, start_year,
+get_headshot, label_map, lower_better, TEAM_OPTIONS,
+normalize_team, get_team_display)
 
 current_year = date.today().year
 

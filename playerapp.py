@@ -62,8 +62,8 @@ STAT_PRESETS = {
     ],
 }
 
-from h_utils import STAT_ALLOWLIST, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat
-from h_utils import label_map, lower_better, get_team_display, start_year
+from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat,
+label_map, lower_better, get_team_display, start_year)
 
 
 # ─────────────────────────────────────────────

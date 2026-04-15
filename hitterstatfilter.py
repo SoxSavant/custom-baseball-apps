@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
-import unicodedata
 import html
 from pathlib import Path
 from datetime import date
@@ -38,9 +37,9 @@ with meta_col:
 # ─────────────────────────────────────────────
 MAX_DISPLAY = 30
 
-from h_utils import STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS
-from h_utils import get_headshot, label_map, lower_better,  start_year
-from h_utils import POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display
+from h_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
+get_headshot, label_map, lower_better,  start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, 
+get_team_display)
 
 
 
