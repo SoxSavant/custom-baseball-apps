@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from datetime import date
 
-st.set_page_config(page_title="Pitching Year-over-Year", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Pitching Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -26,7 +26,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Year-over-Year Pitcher Improvers & Decliners")
+    st.title("Pitching Year-over-Year Improvers & Decliners")
 with meta_col:
     st.markdown(
         """

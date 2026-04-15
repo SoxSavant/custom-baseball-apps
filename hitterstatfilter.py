@@ -248,7 +248,7 @@ for key, default in [
     ("sc_show_min_pa", True),
     ("sc_show_player_pa", False),
     ("sc_top10",       False),
-    ("sc_val_0",       150),
+    ("sc_val_0",       175),
     ("sc_val_1",       .400),
 ]:
     if key not in st.session_state:

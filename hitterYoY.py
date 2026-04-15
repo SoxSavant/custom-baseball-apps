@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from datetime import date
 
-st.set_page_config(page_title="Hitting Year-over-Year", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Hitting Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -26,7 +26,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Year-over-Year Hitter Improvers & Decliners")
+    st.title("Hitting Year-over-Year Improvers & Decliners")
 with meta_col:
     st.markdown(
         """
@@ -199,7 +199,7 @@ min_pa_start = 502
 for key, default in [
     ("rf_start_year",     current_year-1),
     ("rf_end_year",       current_year),
-    ("rf_stat",           "fWAR"),
+    ("rf_stat",           "wRC+"),
     ("rf_min_pa_start",         min_pa_start),
     ("rf_min_pa_end",         min_pa_end),
     ("rf_position",       "all"),
@@ -220,7 +220,7 @@ for key, default in [
 
 active_allowlist =  STAT_ALLOWLIST
 if st.session_state.get("rf_stat") not in active_allowlist:
-    st.session_state["rf_stat"] = "fWAR"
+    st.session_state["rf_stat"] = "wRC+"
 
 stat = st.selectbox(
     "Stat", active_allowlist, key="rf_stat",

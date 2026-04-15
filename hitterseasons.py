@@ -5,7 +5,7 @@ import numpy as np
 import html
 from datetime import date
 
-st.set_page_config(page_title="Hitter Seasons Leaderboard", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Hitter Season Counter Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -23,7 +23,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Hitter Seasons Leaderboard")
+    st.title("Hitter Season Counter Leaderboard")
 with meta_col:
     st.markdown(
         '<div style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
