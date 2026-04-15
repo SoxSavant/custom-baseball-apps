@@ -49,7 +49,7 @@ EVERY_STAT_PRESET = [
 
 STAT_DEFAULTS = {
     "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
-    "fWAR": 4.0, "bWAR": 4.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
+    "fWAR": 5.0, "bWAR": 5.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
     "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
     "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
