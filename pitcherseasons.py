@@ -90,7 +90,7 @@ for key, default in [
     ("ps_end_year",    current_year - 1),
     ("ps_min_ip",      162),
     ("ps_show_min_ip", False),
-    ("ps_val_0",       3.00),
+    ("ps_val_0",       4.00),
     ("ps_val_1",       3.00),
 ]:
     if key not in st.session_state:
@@ -119,12 +119,10 @@ with col1:
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
         default_stat  = "ERA" if i == 0 else "FIP" if i == 1 else STAT_ALLOWLIST[0]
-        default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
 
         chosen_stat = st.selectbox(
             f"Stat {i+1}", STAT_ALLOWLIST,
             key=f"ps_stat_{i}",
-            index=default_index,
             format_func=lambda x: label_map.get(x, x),
             label_visibility="collapsed",
             on_change=update_stat_default,
@@ -133,7 +131,7 @@ with col1:
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            st.selectbox("Op", [">=", "<="], key=f"ps_op_{i}", index=1, label_visibility="collapsed")
+            st.selectbox("Op", [">=", "<="], key=f"ps_op_{i}", label_visibility="collapsed")
         with val_col:
             if chosen_stat in RATE_3DP:
                 step, fmt = 0.001, "%.3f"
