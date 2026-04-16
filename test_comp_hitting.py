@@ -26,7 +26,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2000, 2027):
+for year in range(1990, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -105,14 +105,14 @@ for year in range(2000, 2027):
         final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
         final["bWAR"] = final["bWAR"].fillna(0)
 
-    if year>=2007:
-        final["Contact%"] = 1 - final["Contact%"]
+    
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
-    if year >=2025:
+    if year >=2015:
         final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
     if year < 2023:
         final["BatSpd"] = None
+        final["SqUpSw%"] = None
     if year < 2015:
         final["EV"] = None
         final["Barrel%"] = None
@@ -132,6 +132,8 @@ for year in range(2000, 2027):
         final["Z-Contact%"] = None
         final["Contact%"] = None
         final["Zone%"] = None
+    else:
+        final["Contact%"] = 1 - final["Contact%"]
     if year >=2002: # TZ records ended in 2001, DRS started in 2002
         final["TZ"] = None
     else:

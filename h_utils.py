@@ -5,7 +5,7 @@ import requests
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
-start_year = 2000
+start_year = 1990
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "maxEV",

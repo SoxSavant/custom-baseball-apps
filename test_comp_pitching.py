@@ -26,7 +26,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2000, 2027):
+for year in range(1990, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
@@ -99,6 +99,15 @@ for year in range(2000, 2027):
         final["Z-Contact%"] = None
         final["Contact%"] = None
         final["Zone%"] = None
+        final["vFA (pi)"] = None
+    if year < 2002:
+        final["GB%"] = None
+        final["HR/FB"] = None
+        final["xFIP"] = None
+        final["HLD"] = None
+        final["BS"] = None
+        final["xFIP-"] = None
+        final["SIERA"] = None
     
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR","vFA (pi)": "vFA"}, inplace=True)
     final.to_csv(f"data/final/pitching_final_{year}.csv", index=False)
