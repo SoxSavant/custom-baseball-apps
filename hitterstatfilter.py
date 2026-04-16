@@ -39,7 +39,7 @@ MAX_DISPLAY = 30
 
 from h_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
 get_headshot, label_map, lower_better,  start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, 
-get_team_display)
+get_team_display, filter_by_position)
 
 
 
@@ -53,27 +53,6 @@ current_year = date.today().year
 # ─────────────────────────────────────────────
 #  Helpers
 # ─────────────────────────────────────────────
-
-
-def apply_dh_override(df: pd.DataFrame) -> pd.DataFrame:
-    if "Pos" not in df.columns or "PA" not in df.columns or "Inn" not in df.columns:
-        return df
-    df = df.copy()
-    pa  = pd.to_numeric(df["PA"],  errors="coerce").fillna(0)
-    inn = pd.to_numeric(df["Inn"], errors="coerce").fillna(0)
-    estimated = (pa / 4.1) * 9
-    is_dh = (inn == 0) | ((inn > 0) & (estimated / inn > 3))
-    df.loc[is_dh, "Pos"] = "DH"
-    return df
-
-
-def filter_by_position(df: pd.DataFrame, position: str) -> pd.DataFrame:
-    df = apply_dh_override(df)
-    if position == "all" or "Pos" not in df.columns:
-        return df
-    if position == "OF":
-        return df[df["Pos"].astype(str).str.upper().isin(["LF", "CF", "RF"])]
-    return df[df["Pos"].astype(str).str.upper() == position.upper()]
 
 
 def update_stat_default(i):

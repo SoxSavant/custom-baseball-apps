@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
+from h_utils import STAT_ALLOWLIST
+
 # --- Configuration ---
 LOCAL_BWAR_FILE = Path("war_daily_bat.txt") 
 
@@ -26,22 +28,23 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(1990, 2027):
+for year in range(1901, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
         pd.read_csv(f"data/standard_{year}.csv"),
         pd.read_csv(f"data/advanced_{year}.csv"),
-        pd.read_csv(f"data/winprob_{year}.csv"),
     ]
 
     
     if year >=2023: #bat speed data started in 2023
         hitting_dfs.append(pd.read_csv(f"data/batspeed_{year}.csv"))
-    if year>=2015: #statcast data started in 2015
+    if year >=2015: #statcast data started in 2015
         hitting_dfs.append(pd.read_csv(f"data/statcast_{year}.csv"))
-    if year>=2007: #discipline data started in 2015
+    if year >=2007: #discipline data started in 2015
         hitting_dfs.append(pd.read_csv(f"data/discipline_{year}.csv"))
+    if year >= 1974: # win prob started in 1974
+        hitting_dfs.append(pd.read_csv(f"data/winprob_{year}.csv"))
 
     base_cols = {"Name", "Team", "MLBAMID", "NameASCII"}
 
@@ -68,13 +71,15 @@ for year in range(1990, 2027):
     fielding.columns = fielding.columns.str.strip()
     fielding.columns = fielding.columns.str.replace('\ufeff', '')
 
-   
-    fielding["Inn"] = pd.to_numeric(fielding["Inn"], errors="coerce")
+    if year >=1956: # Inn starts in 1956
+        fielding["Inn"] = pd.to_numeric(fielding["Inn"], errors="coerce")
 
 
-    idx = fielding.groupby("PlayerId")["Inn"].idxmax()
-    primary_pos = fielding.loc[idx, ["PlayerId", "Pos"]]
-
+        idx = fielding.groupby("PlayerId")["Inn"].idxmax()
+        primary_pos = fielding.loc[idx, ["PlayerId", "Pos"]]
+    else:
+        idx = fielding.groupby("PlayerId")["G"].idxmax()
+        primary_pos = fielding.loc[idx, ["PlayerId", "Pos"]]
 
     numeric_agg = fielding.groupby("PlayerId", as_index=False).sum(numeric_only=True)
 
@@ -101,43 +106,22 @@ for year in range(1990, 2027):
             how="left"
         )
         
-        # Rename to your preferred column name and fill missing with 0
         final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
         final["bWAR"] = final["bWAR"].fillna(0)
 
     
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
-    if year >=2015:
+    if "wOBA" in final.columns and "xwOBA" in final.columns:
         final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
-    if year < 2023:
-        final["BatSpd"] = None
-        final["SqUpSw%"] = None
-    if year < 2015:
-        final["EV"] = None
-        final["Barrel%"] = None
-        final["HardHit%"] = None
-        final["xBA"] = None
-        final["xSLG"] = None
-        final["xwOBA"] = None
-        final["maxEV"] = None
-    if year < 2016:
-        final["FRV"] = None
-        final["OAA"] = None
-    if year < 2007:
-        final["O-Swing%"] = None
-        final["Z-Swing%"] = None
-        final["Swing%"] = None
-        final["O-Contact%"] = None
-        final["Z-Contact%"] = None
-        final["Contact%"] = None
-        final["Zone%"] = None
-    else:
+    if "Contact%" in final.columns:
         final["Contact%"] = 1 - final["Contact%"]
-    if year >=2002: # TZ records ended in 2001, DRS started in 2002
-        final["TZ"] = None
-    else:
-        final["DRS"] = None
+    for col in STAT_ALLOWLIST:
+        if col not in final.columns:
+            final[col] = None
+
+    final = final[STAT_ALLOWLIST]
+
 
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR", "SqUpSw%":"Squared-Up%"}, inplace=True)
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)

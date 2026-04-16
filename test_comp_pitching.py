@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 
+from p_utils import STAT_ALLOWLIST
 
 LOCAL_BWAR_FILE = Path("war_daily_pitch.txt") 
 
@@ -83,31 +84,14 @@ for year in range(1990, 2027):
         final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
         final["bWAR"] = final["bWAR"].fillna(0)
 
-    if year >=2007:
+    if "Contact%" in final.columns:
         final["Contact%"] = 1 - final["Contact%"]
-    
-    if year < 2015:
-        final["EV"] = None
-        final["Barrel%"] = None
-        final["HardHit%"] = None
-        final["xERA"] = None
-    if year < 2007:
-        final["O-Swing%"] = None
-        final["Z-Swing%"] = None
-        final["Swing%"] = None
-        final["O-Contact%"] = None
-        final["Z-Contact%"] = None
-        final["Contact%"] = None
-        final["Zone%"] = None
-        final["vFA (pi)"] = None
-    if year < 2002:
-        final["GB%"] = None
-        final["HR/FB"] = None
-        final["xFIP"] = None
-        final["HLD"] = None
-        final["BS"] = None
-        final["xFIP-"] = None
-        final["SIERA"] = None
+    for col in STAT_ALLOWLIST:
+        if col not in final.columns:
+            final[col] = None
+
+    final = final[STAT_ALLOWLIST]
+
     
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR","vFA (pi)": "vFA"}, inplace=True)
     final.to_csv(f"data/final/pitching_final_{year}.csv", index=False)

@@ -5,7 +5,7 @@ import requests
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
-start_year = 1990
+start_year = 1901
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "maxEV",
@@ -70,7 +70,7 @@ STAT_DEFAULTS = {
 
 STAT_DISPLAY_NAMES = {
     "HardHit%": "Hard Hit%",
-    "EV": "Avg Exit Velo",
+    "EV": "Avg EV",
     "BatSpd": "Bat Speed"
 }
 
@@ -99,7 +99,7 @@ HEADSHOT_PLACEHOLDER = (
 
 label_map = {
     "HardHit%": "Hard Hit%",
-    "EV": "Avg Exit Velo",
+    "EV": "Avg EV",
     "BatSpd": "Bat Speed"
 }
 lower_better = {"K%", "Chase%", "Whiff%","SO"}
@@ -241,7 +241,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
             return f"+{formatted}"
         return f"-{formatted}" if v < 0 else formatted
 
-    if upper_stat in {"WRC+", "OPS+"}:
+    if upper_stat in {"WRC+"}:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
@@ -262,6 +262,39 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
     if show_sign and v > 0:
         return f"+{formatted}"
     return f"-{formatted}" if v < 0 else formatted
+
+def apply_dh_override(df):
+    if "Pos" not in df.columns or "PA" not in df.columns or "Inn" not in df.columns or "Year" not in df.columns:
+        return df
+
+    df = df.copy()
+
+    df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
+
+    # row-level DH eligibility (THIS is the key fix)
+    eligible = df["Year"] >= 1973
+
+    is_pitcher = df["Pos"].astype(str).str.upper().eq("P")
+    eligible &= ~is_pitcher
+
+    pa = pd.to_numeric(df["PA"], errors="coerce").fillna(0)
+    inn = pd.to_numeric(df["Inn"], errors="coerce").fillna(0)
+
+    estimated = (pa / 4.1) * 9
+
+    is_dh = eligible & ((inn == 0) | ((inn > 0) & (estimated / inn > 3)))
+
+    df.loc[is_dh, "Pos"] = "DH"
+    return df
+
+def filter_by_position(df, position):
+    df["Pos"] = df["Pos"].astype(str).str.strip().str.upper()
+    df = apply_dh_override(df)
+    if position == "all" or "Pos" not in df.columns:
+        return df
+    if position == "OF":
+        return df[df["Pos"].astype(str).str.upper().isin(["LF", "CF", "RF"])]
+    return df[df["Pos"].astype(str).str.upper() == position.upper()]
 
 
 
