@@ -156,7 +156,7 @@ with col1:
         with val_col:
             if chosen_stat in RATE_STATS_3DP or chosen_stat == "wOBA-xwOBA":
                 step, fmt = 0.001, "%.3f"
-            elif "%" in chosen_stat or "EV" in chosen_stat or "WAR" in chosen_stat or chosen_stat == "BatSpd":
+            elif "%" in new_stat or  new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off"}:
                 step, fmt = 0.1, "%.1f"
             elif chosen_stat in {"WPA", "Clutch"}:
                 step, fmt = 0.01, "%.2f"
