@@ -14,7 +14,7 @@ STAT_ALLOWLIST = [
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
     "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM", "TZ","Swing%", "Z-Swing%",
-    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "Squared-Up%",
+    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "Squared-Up%", "Inn",
 ]
 
 SUM_STATS = {
@@ -264,15 +264,15 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
     return f"-{formatted}" if v < 0 else formatted
 
 def apply_dh_override(df):
-    if "Pos" not in df.columns or "PA" not in df.columns or "Inn" not in df.columns or "Year" not in df.columns:
+    if "Pos" not in df.columns or "PA" not in df.columns or "Inn" not in df.columns or "Season" not in df.columns:
+        print(df.columns)
         return df
 
     df = df.copy()
 
-    df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
 
     # row-level DH eligibility (THIS is the key fix)
-    eligible = df["Year"] >= 1973
+    eligible = df["Season"] >= 1973
 
     is_pitcher = df["Pos"].astype(str).str.upper().eq("P")
     eligible &= ~is_pitcher

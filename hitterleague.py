@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from datetime import date
 
-st.set_page_config(page_title="League Leaders", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Hitter Stat League Leaders", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -26,7 +26,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("League Leaders")
+    st.title("Hitter Stat League Leaders")
 with meta_col:
     st.markdown(
         """
@@ -49,17 +49,21 @@ from h_utils import (
 from utils import get_dynamic_min_pa
 
 # ─────────────────────────────────────────────
-#  Stat presets
+#  Stat presets  (no longer capped at 10)
 # ─────────────────────────────────────────────
 
 PRESETS = {
     "Statcast": [
-         "xwOBA","EV",  "Barrel%", "HardHit%","BatSpd","Squared-Up%",  "Chase%", "Whiff%","K%", "BB%"
+        "xwOBA", "EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%", "Chase%", "Whiff%", "K%", "BB%"
     ],
-    "Standard":["AVG","OBP","SLG","OPS","HR","RBI","R","SB","2B","3B"],
-    "Value":["fWAR","bWAR","Off","Def","BsR","WPA","Clutch"]
-   
+    "Standard": ["AVG", "OBP", "SLG", "OPS", "HR", "RBI", "R", "SB", "2B", "3B"],
+    "Value":    ["fWAR", "bWAR", "Off", "Def", "WPA", "Clutch"],
+    "Defense": ["DRS","OAA","FRV","FRM","Def"],
+    "Discipline": ["Chase%","Swing%", "Z-Swing%",
+    "O-Contact%","Z-Contact%","Whiff%","Zone%",]
 }
+
+MAX_DISPLAY_STATS = 10   # grid cap (5 × 2)
 
 # ─────────────────────────────────────────────
 #  Constants
@@ -70,10 +74,9 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
-NUM_STATS = 10  # how many stats shown as league leaders
 
 # ─────────────────────────────────────────────
-#  Data loading (identical to original app)
+#  Data loading
 # ─────────────────────────────────────────────
 
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -96,7 +99,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
 
 
 def aggregate_player_group(grp: pd.DataFrame) -> dict:
@@ -224,7 +226,6 @@ def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.
 # ─────────────────────────────────────────────
 
 min_pa = get_dynamic_min_pa(current_year)
-
 default_stats = list(PRESETS["Statcast"])
 
 for key, default in [
@@ -238,9 +239,63 @@ for key, default in [
     ("ll_show_worst",  False),
     ("ll_show_min_pa", True),
     ("ll_stats",       default_stats),
+    ("ll_preset",      "Statcast"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
+
+# ─────────────────────────────────────────────
+#  Stat builder callbacks  (mirroring comp app)
+# ─────────────────────────────────────────────
+
+SENTINEL_ADD    = "Add"
+SENTINEL_REMOVE = "Remove"
+ADD_KEY         = "ll_add_stat_select"
+REMOVE_KEY      = "ll_remove_stat_select"
+ADD_RESET_KEY   = "ll_add_reset"
+REMOVE_RESET_KEY = "ll_remove_reset"
+
+
+def _add_stat_cb():
+    choice = st.session_state.get(ADD_KEY)
+    if not choice or choice == SENTINEL_ADD:
+        return
+    current = list(st.session_state["ll_stats"])
+    if choice not in current and len(current) < MAX_DISPLAY_STATS:
+        current.append(choice)
+        st.session_state["ll_stats"] = current
+    st.session_state[ADD_RESET_KEY] = True
+
+
+def _remove_stat_cb():
+    choice = st.session_state.get(REMOVE_KEY)
+    if not choice or choice == SENTINEL_REMOVE:
+        return
+    current = list(st.session_state["ll_stats"])
+    if choice in current:
+        current.remove(choice)
+    st.session_state["ll_stats"] = current
+    st.session_state[REMOVE_RESET_KEY] = True
+
+
+def _move_stat(idx: int, delta: int):
+    stats = list(st.session_state["ll_stats"])
+    target = idx + delta
+    if 0 <= target < len(stats):
+        stats[idx], stats[target] = stats[target], stats[idx]
+        st.session_state["ll_stats"] = stats
+
+
+def _apply_preset_cb():
+    preset_name = st.session_state.get("ll_preset_select")
+    if not preset_name or preset_name not in PRESETS:
+        return
+    valid = [s for s in PRESETS[preset_name] if s in STAT_ALLOWLIST]
+    st.session_state["ll_stats"]  = valid[:MAX_DISPLAY_STATS]
+    st.session_state["ll_preset"] = preset_name
+    st.session_state[ADD_RESET_KEY]    = True
+    st.session_state[REMOVE_RESET_KEY] = True
+
 
 # ─────────────────────────────────────────────
 #  Controls
@@ -249,24 +304,20 @@ for key, default in [
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    # ── Preset buttons ──
+    # ── Preset selector ──
     st.markdown("**Presets**")
-    options =  list(PRESETS.keys())
+    preset_options = list(PRESETS.keys())
+    prior_preset   = st.session_state.get("ll_preset", preset_options[0])
+    preset_index   = preset_options.index(prior_preset) if prior_preset in preset_options else 0
 
-    selected_preset = st.selectbox(
-    "Choose a stat view:", 
-    options,
-    label_visibility="collapsed" 
-)
-
-    preset_stats = PRESETS[selected_preset]
-    
-    valid = [s for s in preset_stats if s in STAT_ALLOWLIST]
-    
-    if st.session_state.get("ll_stats") != valid[:NUM_STATS]:
-        st.session_state["ll_stats"] = valid[:NUM_STATS]
-        st.rerun()
-
+    st.selectbox(
+        "Choose a stat view:",
+        preset_options,
+        index=preset_index,
+        key="ll_preset_select",
+        on_change=_apply_preset_cb,
+        label_visibility="collapsed",
+    )
 
     # ── Mode / year ──
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="ll_mode")
@@ -309,22 +360,68 @@ with col1:
     st.checkbox("Show worst",  key="ll_show_worst")
     st.checkbox("Show min PA", key="ll_show_min_pa")
 
-    st.markdown("**Stats (pick 10)**")
-    current_stats = st.session_state["ll_stats"]
+    # ── Dynamic stat builder ──
+    st.markdown("---")
+    st.markdown("**Stats** (up to 10)")
 
-    new_stats = []
-    for i in range(NUM_STATS):
-        current_val = current_stats[i] if i < len(current_stats) else STAT_ALLOWLIST[0]
-        chosen = st.selectbox(
-            f"Stat {i + 1}",
-            options=STAT_ALLOWLIST,
-            index=STAT_ALLOWLIST.index(current_val) if current_val in STAT_ALLOWLIST else 0,
+    current_stats = list(st.session_state["ll_stats"])
+
+    # Add / Remove dropdowns
+    in_list      = current_stats
+    not_in_list  = [s for s in STAT_ALLOWLIST if s not in in_list]
+    add_options  = [SENTINEL_ADD]    + not_in_list
+    rem_options  = [SENTINEL_REMOVE] + in_list
+
+    # Reset sentinels after add/remove
+    if st.session_state.pop(ADD_RESET_KEY, False):
+        st.session_state[ADD_KEY] = SENTINEL_ADD
+    if st.session_state.pop(REMOVE_RESET_KEY, False):
+        st.session_state[REMOVE_KEY] = SENTINEL_REMOVE
+
+    if st.session_state.get(ADD_KEY) not in add_options:
+        st.session_state[ADD_KEY] = SENTINEL_ADD
+    if st.session_state.get(REMOVE_KEY) not in rem_options:
+        st.session_state[REMOVE_KEY] = SENTINEL_REMOVE
+
+    add_col, rem_col = st.columns(2)
+    with add_col:
+        st.selectbox(
+            "Add",
+            add_options,
+            key=ADD_KEY,
             format_func=lambda x: label_map.get(x, x),
-            key=f"ll_stat_{i}",
+            on_change=_add_stat_cb,
+            disabled=(len(current_stats) >= MAX_DISPLAY_STATS),
         )
-        new_stats.append(chosen)
+    with rem_col:
+        st.selectbox(
+            "Remove",
+            rem_options,
+            key=REMOVE_KEY,
+            format_func=lambda x: label_map.get(x, x),
+            on_change=_remove_stat_cb,
+        )
 
-    st.session_state["ll_stats"] = new_stats
+    # Re-read after possible add/remove
+    current_stats = list(st.session_state["ll_stats"])
+
+    # Reorder rows
+    hdr_a, hdr_b, hdr_c = st.columns([0.3, 0.3, 1])
+    hdr_a.markdown("**▲**")
+    hdr_b.markdown("**▼**")
+    hdr_c.markdown("**Stat**")
+
+    for i, stat in enumerate(current_stats):
+        up_col, dn_col, nm_col = st.columns([0.3, 0.3, 1])
+        with up_col:
+            st.button("▲", key=f"ll_up_{i}",   disabled=(i == 0),
+                      on_click=_move_stat, args=(i, -1))
+        with dn_col:
+            st.button("▼", key=f"ll_dn_{i}",   disabled=(i == len(current_stats) - 1),
+                      on_click=_move_stat, args=(i,  1))
+        nm_col.write(label_map.get(stat, stat))
+
+    selected_stats = list(st.session_state["ll_stats"])
 
 
 # ─────────────────────────────────────────────
@@ -335,7 +432,6 @@ min_pa_val   = int(st.session_state.get("ll_min_pa", 0))
 position_val = st.session_state.get("ll_position", "all")
 team_val     = "all" if team_disabled else st.session_state.get("ll_team", "all")
 show_worst   = st.session_state.get("ll_show_worst", False)
-selected_stats = st.session_state["ll_stats"]
 
 # ─────────────────────────────────────────────
 #  Load & filter data
@@ -383,10 +479,20 @@ for stat in selected_stats:
     row = get_leader(df, stat, show_worst)
     leader_rows.append((stat, row))
 
+num_stats = len(selected_stats)
 
 # ─────────────────────────────────────────────
-#  Build HTML cards  (5×2 headshot grid)
+#  Build HTML cards  — dynamic grid columns
 # ─────────────────────────────────────────────
+
+# Choose columns: ≤5 → single row; 6-10 → two rows of ceil(n/2)
+if num_stats <= 5:
+    grid_cols = num_stats
+elif num_stats <= 10:
+    grid_cols = (num_stats + 1) // 2  # ceil(n/2), so rows balance nicely
+else:
+    grid_cols = 5
+
 
 def make_card(stat, row):
     stat_label = html.escape(label_map.get(stat, stat))
@@ -425,13 +531,18 @@ cards = [make_card(s, r) for s, r in leader_rows]
 
 span_label  = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
-team_label  = TEAM_OPTIONS.get(team_val, "") if team_val != "all" else ""
+team_label  = f"({TEAM_OPTIONS.get(team_val, "")})" if team_val != "all" else ""
 mode_label  = " Single Season" if mode == MODE_SPLIT else ""
-worst_label = "Worst " if show_worst else ""
+worst_label = "Worst" if show_worst else "Best"
+overall_label = "Hitters of" 
+if preset_index == 3: 
+    overall_label = "Defenders of"
+elif preset_index == 0:
+    overall_label = "Statcast Hitters of"
 
 title = re.sub(
     r"  +", " ",
-    f"{span_label}{mode_label} {team_label} {worst_label}Stat Leaders{pos_suffix}".strip()
+    f"{worst_label} {mode_label} {overall_label} {span_label} {team_label}{pos_suffix}".strip()
 )
 
 min_pa_subtitle = (
@@ -447,7 +558,7 @@ grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
     {min_pa_subtitle}
-    <div class="players-grid">{''.join(cards)}</div>
+    <div class="players-grid" style="grid-template-columns: repeat({grid_cols}, minmax(0, 1fr));">{''.join(cards)}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
         <p></p>
@@ -489,7 +600,6 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 }}
 .players-grid {{
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
     justify-items: center;
     row-gap: 1rem;
     column-gap: 4rem;
@@ -537,4 +647,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 """
 
 with col2:
-    components.html(full_html, height=800)
+    # Height scales with number of rows
+    num_rows = (num_stats + grid_cols - 1) // grid_cols
+    card_height = 220 * num_rows + 250
+    components.html(full_html, height=card_height)
