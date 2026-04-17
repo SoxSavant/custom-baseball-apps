@@ -3,6 +3,8 @@ from pathlib import Path
 
 from p_utils import STAT_ALLOWLIST
 
+keep_cols = ["Name", "PlayerId","MLBAMID","Team"]
+
 LOCAL_BWAR_FILE = Path("war_daily_pitch.txt") 
 
 def load_bwar_master() -> pd.DataFrame:
@@ -27,13 +29,12 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(1990, 2027):
+for year in range(1901, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
         pd.read_csv(f"data/pitching_advanced_{year}.csv"),
         pd.read_csv(f"data/pitching_standard_{year}.csv"),
-        pd.read_csv(f"data/pitching_winprob_{year}.csv"),
     ]
 
     if year>=2015: #statcast data started in 2015
@@ -41,6 +42,8 @@ for year in range(1990, 2027):
 
     if year >=2007: #plate discipline data started in 2007
         pitching_dfs.append(pd.read_csv(f"data/discipline_pitching_{year}.csv"))
+    if year >= 1974: # win prob started in 1974
+        pitching_dfs.append(pd.read_csv(f"data/pitching_winprob_{year}.csv"))
 
     base_cols = {"Name", "Team", "MLBAMID", "NameASCII"}
 
@@ -89,9 +92,9 @@ for year in range(1990, 2027):
     for col in STAT_ALLOWLIST:
         if col not in final.columns:
             final[col] = None
-
-    final = final[STAT_ALLOWLIST]
-
     
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR","vFA (pi)": "vFA"}, inplace=True)
+
+    final = final[keep_cols + [col for col in STAT_ALLOWLIST]] # only drop columns AFTER renaming them to ones in allow list
+    
     final.to_csv(f"data/final/pitching_final_{year}.csv", index=False)

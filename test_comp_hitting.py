@@ -3,6 +3,8 @@ from pathlib import Path
 
 from h_utils import STAT_ALLOWLIST
 
+keep_cols = ["Name", "PlayerId","MLBAMID","Pos","Team"]
+
 # --- Configuration ---
 LOCAL_BWAR_FILE = Path("war_daily_bat.txt") 
 
@@ -120,8 +122,8 @@ for year in range(1901, 2027):
         if col not in final.columns:
             final[col] = None
 
-    final = final[STAT_ALLOWLIST]
-
-
     final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR", "SqUpSw%":"Squared-Up%"}, inplace=True)
+
+    final = final[keep_cols + [col for col in STAT_ALLOWLIST]] # only drop columns AFTER renaming them to ones in allow list
+    
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)

@@ -6,7 +6,7 @@ import requests
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
-start_year = 1990
+start_year = 1901
 
 LOCAL_BWAR_FILE = Path(__file__).with_name("warpitchers.txt")
 
