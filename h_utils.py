@@ -12,7 +12,7 @@ STAT_ALLOWLIST = [
     "wRC+", "wOBA", "xwOBA", "wOBA-xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "Chase%", "Whiff%", "WPA", "Clutch",
+    "K%", "BB%", "BB/K","Chase%", "Whiff%", "WPA", "Clutch",
     "FRV", "OAA", "DRS", "FRM", "TZ","Swing%", "Z-Swing%",
     "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "Squared-Up%", "Inn",
 ]
@@ -42,7 +42,7 @@ EVERY_STAT_PRESET = [
     "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
     "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM", "wOBA",
     "xwOBA", "xBA", "xSLG", "EV", "maxEV", "Barrel%", "HardHit%",
-    "Chase%", "Whiff%", "K%", "BB%", "BB", "IBB", "SO",
+    "Chase%", "Whiff%", "K%", "BB%", "BB/K","BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
     "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%",
     "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "wOBA-xwOBA", "TZ",
@@ -54,7 +54,7 @@ STAT_DEFAULTS = {
     "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
     "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
-    "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450,
+    "EV": 92.0, "BB": 60, "IBB": 10, "SO": 100, "PA": 502, "AB": 450, "BB/K": 1.0,
     "2B": 30, "1B": 100, "3B": 5, "XBH": 50, "TB": 300, "G": 140,
     "Clutch": 1.0, "FRV": 10, "OAA": 10, "DRS": 10,
     "Chase%": 25.0, "Whiff%": 20.0,
@@ -193,7 +193,7 @@ def format_stat(stat: str, val) -> str:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
-    if upper_stat in {"WPA", "CLUTCH"}:
+    if upper_stat in {"WPA", "CLUTCH","BB/K"}:
         return f"{float(val):.2f}"
 
     if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO", "WOBA-XWOBA"}:
@@ -230,7 +230,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
             return f"+{formatted}"
         return f"-{formatted}" if v < 0 else formatted
 
-    if upper_stat in {"WPA", "CLUTCH"}:
+    if upper_stat in {"WPA", "CLUTCH","BB/K"}:
         v = float(val)
         return f"+{v:.2f}" if show_sign and v > 0 else f"{v:.2f}"
 

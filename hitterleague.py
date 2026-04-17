@@ -54,13 +54,15 @@ from utils import get_dynamic_min_pa
 
 PRESETS = {
     "Statcast": [
-        "xwOBA", "EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%", "Chase%", "Whiff%", "K%", "BB%"
+        "xwOBA", "xBA","xSLG","EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%", "Chase%", "Whiff%",
     ],
     "Standard": ["AVG", "OBP", "SLG", "OPS", "HR", "RBI", "R", "SB", "2B", "3B"],
     "Value":    ["fWAR", "bWAR", "Off", "Def", "WPA", "Clutch"],
     "Defense": ["DRS","OAA","FRV","FRM","Def"],
-    "Discipline": ["Chase%","Swing%", "Z-Swing%",
-    "O-Contact%","Z-Contact%","Whiff%","Zone%",]
+    "Discipline": ["Chase%","Swing%", "Z-Swing%", "O-Contact%","Z-Contact%","Whiff%","Zone%","K%","BB%","BB/K"],
+    "Counting Stats": ["G", "PA", "AB", "H","R", "RBI", "HR", "XBH", "TB", "SB"],
+    "Offensive Stats": ["wRC+", "wOBA", "xwOBA", "wOBA-xwOBA",  "AVG", "OBP", "SLG","ISO", "OPS", 
+    "BABIP",]
 }
 
 MAX_DISPLAY_STATS = 10   # grid cap (5 × 2)
@@ -534,11 +536,9 @@ pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" el
 team_label  = f"({TEAM_OPTIONS.get(team_val, "")})" if team_val != "all" else ""
 mode_label  = " Single Season" if mode == MODE_SPLIT else ""
 worst_label = "Worst" if show_worst else "Best"
-overall_label = "Hitters of" 
+overall_label = "Hitters:" 
 if preset_index == 3: 
-    overall_label = "Defenders of"
-elif preset_index == 0:
-    overall_label = "Statcast Hitters of"
+    overall_label = "Defenders:"
 
 title = re.sub(
     r"  +", " ",
@@ -649,5 +649,5 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 with col2:
     # Height scales with number of rows
     num_rows = (num_stats + grid_cols - 1) // grid_cols
-    card_height = 220 * num_rows + 250
+    card_height = 220 * num_rows + 400
     components.html(full_html, height=card_height)
