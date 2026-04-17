@@ -90,6 +90,7 @@ for key, default in [
     ("ps_end_year",    current_year - 1),
     ("ps_min_ip",      162),
     ("ps_show_min_ip", False),
+    ("pc_show_ip",     False),
     ("ps_val_0",       4.00),
     ("ps_val_1",       3.00),
 ]:
@@ -145,6 +146,7 @@ with col1:
                             label_visibility="collapsed", format=fmt)
 
     st.checkbox("Show min IP", key="ps_show_min_ip")
+    st.checkbox("Show player IP",      key="pc_show_ip")
 
 # ─────────────────────────────────────────────
 #  Process Data
@@ -199,6 +201,7 @@ else:
         .agg(
             season_count=("Season", "count"),
             seasons=("Season", lambda x: sorted(x.tolist())),
+            ip_list=("IP", lambda x: x.tolist()),
             unique_team_count=("Team", "nunique")
         )
         .reset_index()
@@ -233,6 +236,12 @@ for _, row in display_df.iterrows():
     
     src      = get_headshot(row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" width="155" height="155" style="object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;background:#f6f6f6;display:block;"/>'
+    ip_list = row.get("ip_list", [])
+    if st.session_state.get("pc_show_ip") and ip_list:
+        ip_str = ", ".join(f"{x:.1f}" for x in ip_list)
+        ip_html = f'<div class="player-ip">{ip_str} IP</div>'
+    else:
+        ip_html = ""
 
     cards.append(f"""
     <div class="player-card">
@@ -241,6 +250,7 @@ for _, row in display_df.iterrows():
       <div class="player-team">{html.escape(team)}</div>
       <div class="season-count">{season_count} {"Season" if season_count == 1 else "Seasons"}</div>
       <div class="season-years">{html.escape(seasons_str)}</div>
+      {ip_html}
     </div>""")
 
 filter_parts  = [format_threshold_label(s, v, op) for s, op, v in active_filters]
@@ -251,6 +261,7 @@ min_ip_subtitle = (
     f'<div class="leaderboard-subtitle">Min {min_ip} IP per season</div>'
     if st.session_state.get("ps_show_min_ip") and min_ip > 0 else ""
 )
+
 
 body = "".join(cards) if cards else '<div style="padding:2rem;color:#999;text-align:center;">No players matched the filter.</div>'
 
@@ -267,6 +278,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .players-grid {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem 1rem; }}
 .player-card {{ flex: 0 0 155px; width: 155px; text-align: center; }}
 .player-name {{ font-weight: 800; font-size: 1rem; margin-top: 0.35rem; line-height: 1.2; }}
+.player-ip {{ color: #aaa; font-size: 0.9rem; margin-top: 0.1rem; }}
 .player-team {{ color: #666; font-size: 0.8rem; margin-bottom: 0.2rem; }}
 .season-count {{ font-weight: 800; font-size: 1.05rem; color: #1a1a1a; margin-top: 0.25rem; }}
 .season-years {{ color: #aaa; font-size: 0.78rem; margin-top: 0.1rem; line-height: 1.3; }}
