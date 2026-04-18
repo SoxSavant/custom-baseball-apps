@@ -21,13 +21,8 @@ HEADSHOT_BASE_67 = (
     "/w_240,q_auto:best,f_auto/v1/people/{mlbam}/headshot/67/current"
 )
 HEADSHOT_PLACEHOLDER = (
-    "data:image/svg+xml;base64,"
-    "PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzI0MCcgdmlld0JveD0nMCAwIDI0MCAyNDAnIHhtbG5zPSdodHRwOi8v"
-    "d3d3LnczLm9yZy8yMDAwL3N2Zyc+CjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJyBmaWxsPScjZWVmJy8+"
-    "CjxjaXJjbGUgY3g9JzEyMCcgY3k9Jzk1JyByPSc1NScgZmlsbD0nI2RkZScvPgo8Y2lyY2xlIGN4PScxMjAnIGN5"
-    "PSc4NScgcj0nNDInIGZpbGw9JyNmZmYnIHN0cm9rZT0nI2NjYycvPgo8cGF0aCBkPSdNMTIwIDE1MGMtMzAgMC01"
-    "NSAyNS01NSA1NXMzNSAxNS41IDU1IDE1LjUgNTUtMTUuNSA1NS0xNS41LTM1LTU1LTU1LTU1eicgZmlsbD0nI2Nj"
-    "YycvPgo8L3N2Zz4="
+    "https://img.mlbstatic.com/mlb-photos/image/upload"
+    "/w_240,q_auto:best,f_auto/people/generic/headshot/67/current.png"
 )
 
 TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
@@ -107,9 +102,8 @@ def get_team_display(team_value: str) -> str:
     return normalize_team(t)
 
 
-def _silo_exists(mlbam: int) -> bool:
+def _url_has_real_image(url: str) -> bool:
     try:
-        url = HEADSHOT_BASE_SILO.format(mlbam=mlbam)
         r = requests.head(url, timeout=3)
         return r.status_code == 200 and int(r.headers.get("content-length", 0)) > 10000
     except Exception:
@@ -119,10 +113,12 @@ def get_headshot(row: pd.Series) -> str:
     val = row.get("MLBAMID")
     if val is not None and pd.notna(val):
         mlbam = int(val)
-        if _silo_exists(mlbam):
-            return HEADSHOT_BASE_SILO.format(mlbam=mlbam)
-        return HEADSHOT_BASE_67.format(mlbam=mlbam)
+        for url_template in (HEADSHOT_BASE_SILO, HEADSHOT_BASE_67):
+            url = url_template.format(mlbam=mlbam)
+            if _url_has_real_image(url):
+                return url
     return HEADSHOT_PLACEHOLDER
+
 TEAM_OPTIONS = {
     "all": "All Teams",
     "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
