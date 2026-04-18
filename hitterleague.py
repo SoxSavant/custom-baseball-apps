@@ -513,8 +513,9 @@ def make_card(stat, row):
     display_val = format_stat(stat, raw_val)
     src = get_headshot(row)
 
+    year_html = ""
     if mode == MODE_SPLIT and "Season" in row.index and pd.notna(row.get("Season")):
-        team = f"{team} ({int(row['Season'])})"
+        year_html = f'<div class="player-season">({int(row["Season"])})</div>'
 
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}"/>'
     return f'''
@@ -522,6 +523,7 @@ def make_card(stat, row):
       {img_html}
       <div class="player-stat-line">{stat_label}: <span class="stat-val">{html.escape(display_val)}</span></div>
       <div class="player-name-team">{html.escape(name)} | {html.escape(team)}</div>
+      {year_html}
     </div>
     '''
 
@@ -593,6 +595,11 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     font-size: 2.4rem;
     margin-bottom: 2rem;
     text-align: center;
+}}
+.player-season {{
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.1rem;
 }}
 .leaderboard-subtitle {{
     text-align: center;
