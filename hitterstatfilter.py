@@ -436,7 +436,8 @@ span_label   = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end
 mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
 pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 team_suffix  = f" ({team_val})" if team_val != "all" else ""
-title = f"{filter_str} in {span_label}{mode_label}{team_suffix}{pos_suffix}"
+middle_label = " in " if mode == MODE_SINGLE else ": "
+title = f"{filter_str}{middle_label}{span_label}{mode_label}{team_suffix}{pos_suffix}"
 
 display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
 overflow_note = (
