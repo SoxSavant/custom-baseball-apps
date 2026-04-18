@@ -36,7 +36,7 @@ STAT_DISPLAY_NAMES = {
 STAT_ALLOWLIST = [
     "fWAR", "bWAR",
     "ERA", "xERA", "FIP", "xFIP", "vFA", "K%", "BB%", "K-BB%", "IP", "G", "GS",
-    "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "Barrel%", "HardHit%", "EV", "GB%", "K/9","BB/9","K/BB","HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
     "Chase%", "Whiff%", "WPA", "Clutch",
     "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER"
@@ -59,9 +59,9 @@ STAT_DEFAULTS = {
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
         "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
-        "SV", "K%", "BB%", "K-BB%", "AVG", "WHIP", "ERA-", "FIP-",
+        "SV", "K%", "BB%", "K-BB%", "BB/9","HR/9","K/BB","AVG", "WHIP", "ERA-", "FIP-",
         "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
-        "Chase%", "Whiff%", "WPA", "Clutch" ]
+        "Chase%", "Whiff%", "WPA", "Clutch", ]
 
 SUM_STATS = {
     "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR"
@@ -70,7 +70,7 @@ RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
-    "ERA-", "FIP-", "vFA",
+    "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB"
 }
 
 PCT_STATS = {
@@ -86,7 +86,7 @@ label_map = {
 lower_better = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
     "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV",
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "HR/9","BB/9"
 }
 
 
