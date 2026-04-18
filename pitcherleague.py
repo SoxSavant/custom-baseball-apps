@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from datetime import date
 
-st.set_page_config(page_title="Hitter Stat League Leaders", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Pitcher Stat League Leaders", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -26,7 +26,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Hitter Stat League Leaders")
+    st.title("Pitcher Stat League Leaders")
 with meta_col:
     st.markdown(
         """
@@ -41,29 +41,23 @@ with meta_col:
 #  Imports from shared utils
 # ─────────────────────────────────────────────
 
-from h_utils import (
-    STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS,
+from p_utils import (
+    STAT_ALLOWLIST, SUM_STATS, RATE_STATS, start_year,
     get_headshot, label_map, lower_better,
-    POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position
+    TEAM_OPTIONS, normalize_team, get_team_display,
+    outs_to_ip, ip_to_outs, format_stat,
 )
-from utils import get_dynamic_min_pa
+from utils import get_dynamic_min_ip
 
 # ─────────────────────────────────────────────
-#  Stat presets  (no longer capped at 10)
+#  Stat presets
 # ─────────────────────────────────────────────
 
 PRESETS = {
     "Statcast": [
-        "xwOBA", "xBA","xSLG","EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%", "Chase%", "Whiff%",
+        "xERA", "xFIP", "vFA", "EV", "Chase%", "Whiff%", "K%","BB%","Barrel%", "HardHit%", 
     ],
-    "Standard": ["AVG", "OBP", "SLG", "OPS", "HR", "RBI", "R", "SB", "2B", "3B"],
-    "Value":    ["fWAR", "bWAR", "Off", "Def", "WPA", "Clutch"],
-    "Defense": ["DRS","OAA","FRV","FRM","Def"],
-    "Discipline": ["Chase%","Swing%", "Z-Swing%", "O-Contact%","Z-Contact%","Whiff%","Zone%","K%","BB%","BB/K"],
-    "Counting Stats": ["G", "PA", "AB", "H","R", "RBI", "HR", "XBH", "TB", "SB"],
-    "Offensive Stats": ["wRC+", "wOBA", "xwOBA", "wOBA-xwOBA",  "AVG", "OBP", "SLG","ISO", "OPS", 
-    "BABIP",],
-    "Empty – Add your own": []
+    "Empty – Add your own": [],
 }
 
 MAX_DISPLAY_STATS = 10   # grid cap (5 × 2)
@@ -84,24 +78,13 @@ current_year = date.today().year
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/hitting_final_{year}.csv"
+    path = f"data/final/pitching_final_{year}.csv"
     try:
         df = pd.read_csv(path)
         df["Season"] = year
         return df
     except Exception:
         return pd.DataFrame()
-
-
-def normalize_name(raw: str) -> str:
-    if not raw or not isinstance(raw, str):
-        return ""
-    cleaned = raw.replace("\xa0", " ").strip()
-    try:
-        cleaned = unicodedata.normalize("NFKD", cleaned).encode("ascii", "ignore").decode()
-    except Exception:
-        pass
-    return " ".join(cleaned.split()).lower()
 
 
 def aggregate_player_group(grp: pd.DataFrame) -> dict:
@@ -127,72 +110,52 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
     else:
         result["Team"] = "N/A"
 
-    pa_weight = pd.to_numeric(grp["PA"], errors="coerce").fillna(0) if "PA" in grp.columns else pd.Series(np.zeros(len(grp)), index=grp.index)
-    pa_total = pa_weight.sum()
+    # IP: sum outs then convert back
+    ip_outs_total = np.nan
+    if "IP" in grp.columns:
+        outs = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).dropna()
+        if not outs.empty:
+            ip_outs_total = outs.sum()
+            result["IP"] = outs_to_ip(ip_outs_total)
+
+    # Weight by IP outs for rate stats
+    if "IP" in grp.columns:
+        weight = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).fillna(0)
+    elif "TBF" in grp.columns:
+        weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
+    else:
+        weight = pd.Series(np.ones(len(grp)), index=grp.index)
+    weight_total = weight.sum()
 
     numeric_cols = [
         col for col in grp.columns
         if pd.api.types.is_numeric_dtype(grp[col])
-        and col not in {"PlayerId", "MLBAMID", "Season"}
+        and col not in {"PlayerId", "MLBAMID", "Season", "IP"}
     ]
 
+    total_er = np.nan
     for col in numeric_cols:
         series = pd.to_numeric(grp[col], errors="coerce")
         if series.isna().all():
             continue
+        if col == "ER":
+            total_er = series.sum(skipna=True)
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS and pa_total > 0:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total
-        elif col in MAX_STATS:
-            result[col] = series.max(skipna=True)
+        elif col in RATE_STATS and weight_total > 0:
+            result[col] = (series * weight).sum(skipna=True) / weight_total
         else:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
+            result[col] = series.mean(skipna=True)
 
-    def to_num(x):
-        try:
-            return float(x)
-        except Exception:
-            return np.nan
-
-    h = to_num(result.get("H"))
-    ab = to_num(result.get("AB"))
-    bb = to_num(result.get("BB"))
-    hbp = to_num(result.get("HBP"))
-    sf = to_num(result.get("SF"))
-    doubles = to_num(result.get("2B"))
-    triples = to_num(result.get("3B"))
-    hr = to_num(result.get("HR"))
-
-    if pd.notna(h) and pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
-        singles = h - doubles - triples - hr
-        result["1B"] = singles if singles >= 0 else np.nan
-        result["XBH"] = doubles + triples + hr
-        tb = singles + 2 * doubles + 3 * triples + 4 * hr
-        result["TB"] = tb
-        if pd.notna(ab) and ab > 0:
-            result["AVG"] = h / ab
-            result["SLG"] = tb / ab
-
-    bb_v = 0 if pd.isna(bb) else bb
-    hbp_v = 0 if pd.isna(hbp) else hbp
-    sf_v = 0 if pd.isna(sf) else sf
-    obp_den = (ab if pd.notna(ab) else 0) + bb_v + hbp_v + sf_v
-    if obp_den > 0 and pd.notna(h):
-        result["OBP"] = (h + bb_v + hbp_v) / obp_den
-    slg = result.get("SLG")
-    obp = result.get("OBP")
-    avg = result.get("AVG")
-    if pd.notna(slg) and pd.notna(obp):
-        result["OPS"] = slg + obp
-    if pd.notna(slg) and pd.notna(avg):
-        result["ISO"] = slg - avg
+    # Recompute ERA from totals
+    if pd.notna(total_er) and not pd.isna(ip_outs_total) and ip_outs_total > 0:
+        result["ERA"] = (total_er / (ip_outs_total / 3)) * 9
 
     return result
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.DataFrame:
+def load_data(s_year: int, e_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SINGLE:
         return load_final_year(s_year)
 
@@ -213,10 +176,6 @@ def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.
     if "PlayerId" not in combined.columns:
         return combined
 
-    combined = filter_by_position(combined, position)
-    if combined.empty:
-        return pd.DataFrame()
-
     grouped_rows = []
     for _, grp in combined.groupby("PlayerId"):
         grouped_rows.append(aggregate_player_group(grp))
@@ -228,19 +187,18 @@ def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.
 #  Session state defaults
 # ─────────────────────────────────────────────
 
-min_pa = get_dynamic_min_pa(current_year)
+min_ip = get_dynamic_min_ip(current_year)
 default_stats = list(PRESETS["Statcast"])
 
 for key, default in [
     ("ll_year",        current_year),
     ("ll_start_year",  current_year - 1),
     ("ll_end_year",    current_year),
-    ("ll_min_pa",      min_pa),
-    ("ll_position",    "all"),
+    ("ll_min_ip",      min_ip),
     ("ll_team",        "all"),
     ("ll_mode",        MODE_SINGLE),
     ("ll_show_worst",  False),
-    ("ll_show_min_pa", True),
+    ("ll_show_min_ip", True),
     ("ll_stats",       default_stats),
     ("ll_preset",      "Statcast"),
 ]:
@@ -248,7 +206,7 @@ for key, default in [
         st.session_state[key] = default
 
 # ─────────────────────────────────────────────
-#  Stat builder callbacks  (mirroring comp app)
+#  Stat builder callbacks
 # ─────────────────────────────────────────────
 
 SENTINEL_ADD    = "Add"
@@ -333,7 +291,7 @@ with col1:
         if "ll_last_year" not in st.session_state:
             st.session_state.ll_last_year = s_year
         if s_year != st.session_state.ll_last_year:
-            st.session_state["ll_min_pa"] = get_dynamic_min_pa(s_year)
+            st.session_state["ll_min_ip"] = get_dynamic_min_ip(s_year)
             st.session_state.ll_last_year = s_year
     else:
         st.selectbox("Start Year", options=list(range(current_year, start_year - 1, -1)), key="ll_start_year")
@@ -341,14 +299,7 @@ with col1:
         s_year = st.session_state["ll_start_year"]
         e_year = max(st.session_state["ll_end_year"], s_year)
 
-    st.number_input("Min PA", min_value=0, max_value=20000, key="ll_min_pa")
-
-    st.selectbox(
-        "Position",
-        options=list(POSITION_OPTIONS.keys()),
-        format_func=lambda x: POSITION_OPTIONS[x],
-        key="ll_position",
-    )
+    st.number_input("Min IP", min_value=0, max_value=5000, key="ll_min_ip")
 
     team_disabled = (mode == MODE_MULTI)
     st.selectbox(
@@ -361,7 +312,7 @@ with col1:
     )
 
     st.checkbox("Show worst",  key="ll_show_worst")
-    st.checkbox("Show min PA", key="ll_show_min_pa")
+    st.checkbox("Show min IP", key="ll_show_min_ip")
 
     # ── Dynamic stat builder ──
     st.markdown("---")
@@ -369,13 +320,11 @@ with col1:
 
     current_stats = list(st.session_state["ll_stats"])
 
-    # Add / Remove dropdowns
     in_list      = current_stats
     not_in_list  = [s for s in STAT_ALLOWLIST if s not in in_list]
     add_options  = [SENTINEL_ADD]    + not_in_list
     rem_options  = [SENTINEL_REMOVE] + in_list
 
-    # Reset sentinels after add/remove
     if st.session_state.pop(ADD_RESET_KEY, False):
         st.session_state[ADD_KEY] = SENTINEL_ADD
     if st.session_state.pop(REMOVE_RESET_KEY, False):
@@ -405,10 +354,8 @@ with col1:
             on_change=_remove_stat_cb,
         )
 
-    # Re-read after possible add/remove
     current_stats = list(st.session_state["ll_stats"])
 
-    # Reorder rows
     hdr_a, hdr_b, hdr_c = st.columns([0.3, 0.3, 1])
     hdr_a.markdown("**▲**")
     hdr_b.markdown("**▼**")
@@ -417,11 +364,11 @@ with col1:
     for i, stat in enumerate(current_stats):
         up_col, dn_col, nm_col = st.columns([0.3, 0.3, 1])
         with up_col:
-            st.button("▲", key=f"ll_up_{i}",   disabled=(i == 0),
+            st.button("▲", key=f"ll_up_{i}", disabled=(i == 0),
                       on_click=_move_stat, args=(i, -1))
         with dn_col:
-            st.button("▼", key=f"ll_dn_{i}",   disabled=(i == len(current_stats) - 1),
-                      on_click=_move_stat, args=(i,  1))
+            st.button("▼", key=f"ll_dn_{i}", disabled=(i == len(current_stats) - 1),
+                      on_click=_move_stat, args=(i, 1))
         nm_col.write(label_map.get(stat, stat))
 
     selected_stats = list(st.session_state["ll_stats"])
@@ -431,8 +378,7 @@ with col1:
 #  Resolve filter values
 # ─────────────────────────────────────────────
 
-min_pa_val   = int(st.session_state.get("ll_min_pa", 0))
-position_val = st.session_state.get("ll_position", "all")
+min_ip_val   = int(st.session_state.get("ll_min_ip", 0))
 team_val     = "all" if team_disabled else st.session_state.get("ll_team", "all")
 show_worst   = st.session_state.get("ll_show_worst", False)
 
@@ -440,16 +386,13 @@ show_worst   = st.session_state.get("ll_show_worst", False)
 #  Load & filter data
 # ─────────────────────────────────────────────
 
-df = load_data(s_year, e_year, mode, position_val)
+df = load_data(s_year, e_year, mode)
 if df is None or df.empty:
     st.error(f"No data found for {s_year}–{e_year}.")
     st.stop()
 
-if min_pa_val > 0 and "PA" in df.columns:
-    df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
-
-if mode != MODE_MULTI:
-    df = filter_by_position(df, position_val)
+if min_ip_val > 0 and "IP" in df.columns:
+    df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip_val]
 
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
@@ -485,14 +428,13 @@ for stat in selected_stats:
 num_stats = len(selected_stats)
 
 # ─────────────────────────────────────────────
-#  Build HTML cards  — dynamic grid columns
+#  Build HTML cards — dynamic grid columns
 # ─────────────────────────────────────────────
 
-# Choose columns: ≤5 → single row; 6-10 → two rows of ceil(n/2)
 if num_stats <= 5:
     grid_cols = num_stats
 elif num_stats <= 10:
-    grid_cols = (num_stats + 1) // 2  # ceil(n/2), so rows balance nicely
+    grid_cols = (num_stats + 1) // 2
 else:
     grid_cols = 5
 
@@ -533,24 +475,19 @@ cards = [make_card(s, r) for s, r in leader_rows]
 # ─────────────────────────────────────────────
 
 span_label  = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
-pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
-team_label  = f"{TEAM_OPTIONS.get(team_val, "")}" if team_val != "all" else ""
+team_label  = f"{TEAM_OPTIONS.get(team_val, '')}" if team_val != "all" else ""
 mode_label  = " (Single Season) " if mode == MODE_SPLIT else ""
 worst_label = "Worst" if show_worst else "Best"
 middle_label = " in " if mode == MODE_SINGLE else ": "
 
-overall_label = "Hitters" 
-if preset_index == 3: 
-    overall_label = "Defenders"
-
 title = re.sub(
     r"  +", " ",
-    f"{worst_label} {team_label} {overall_label}{middle_label} {span_label}{mode_label}{pos_suffix}".strip()
+    f"{worst_label} {team_label} Pitchers{middle_label}{span_label}{mode_label}".strip()
 )
 
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-    if st.session_state.get("ll_show_min_pa") else ""
+min_ip_subtitle = (
+    f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
+    if st.session_state.get("ll_show_min_ip") else ""
 )
 
 # ─────────────────────────────────────────────
@@ -560,7 +497,7 @@ min_pa_subtitle = (
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title)}</div>
-    {min_pa_subtitle}
+    {min_ip_subtitle}
     <div class="players-grid" style="grid-template-columns: repeat({grid_cols}, minmax(0, 1fr));">{''.join(cards)}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
@@ -650,7 +587,6 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 """
 
 with col2:
-    # Height scales with number of rows
     if grid_cols > 0:
         num_rows = (num_stats + grid_cols - 1) // grid_cols
     else:

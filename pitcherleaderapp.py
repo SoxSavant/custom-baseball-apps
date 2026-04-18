@@ -126,13 +126,6 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
         series = pd.to_numeric(grp[col], errors="coerce")
         if series.isna().all():
             continue
-        if col == "Age":
-            age_min = series.min(skipna=True)
-            age_max = series.max(skipna=True)
-            if pd.isna(age_min) or pd.isna(age_max):
-                continue
-            result[col] = float(age_min) if abs(age_min - age_max) < 0.01 else f"{int(round(age_min))}-{int(round(age_max))}"
-            continue
         if col == "ER":
             total_er = series.sum(skipna=True)
         if col in SUM_STATS:

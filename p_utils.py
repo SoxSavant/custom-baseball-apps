@@ -39,7 +39,7 @@ STAT_ALLOWLIST = [
     "Barrel%", "HardHit%", "EV", "GB%", "HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
     "Chase%", "Whiff%", "WPA", "Clutch",
-    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO"
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER"
 ]
 
 STAT_DEFAULTS = {
