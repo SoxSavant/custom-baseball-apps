@@ -62,7 +62,8 @@ PRESETS = {
     "Discipline": ["Chase%","Swing%", "Z-Swing%", "O-Contact%","Z-Contact%","Whiff%","Zone%","K%","BB%","BB/K"],
     "Counting Stats": ["G", "PA", "AB", "H","R", "RBI", "HR", "XBH", "TB", "SB"],
     "Offensive Stats": ["wRC+", "wOBA", "xwOBA", "wOBA-xwOBA",  "AVG", "OBP", "SLG","ISO", "OPS", 
-    "BABIP",]
+    "BABIP",],
+    "Empty – Add your own": []
 }
 
 MAX_DISPLAY_STATS = 10   # grid cap (5 × 2)
@@ -648,6 +649,9 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 
 with col2:
     # Height scales with number of rows
-    num_rows = (num_stats + grid_cols - 1) // grid_cols
+    if grid_cols > 0:
+        num_rows = (num_stats + grid_cols - 1) // grid_cols
+    else:
+        num_rows = 1
     card_height = 220 * num_rows + 400
     components.html(full_html, height=card_height)
