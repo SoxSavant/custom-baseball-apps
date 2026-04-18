@@ -125,7 +125,7 @@ with left_col:
     teams_for_year = get_teams_for_year(year)
     team_options = list(teams_for_year.keys())
     team_select_key = "team_abbr_select"
-    preferred = st.session_state.get(team_select_key, "ARI" if "ARI" in team_options else team_options[0])
+    preferred = st.session_state.get(team_select_key, "LAA" if "LAA" in team_options else team_options[0])
     if preferred not in team_options:
         preferred = team_options[0]
     team_abbr = st.selectbox(

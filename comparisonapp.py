@@ -453,7 +453,7 @@ with left_col:
 current_year = date.today().year
 years_desc = list(range(current_year, start_year-1, -1)) 
 MAX_PLAYERS = 5
-default_names = ["Shohei Ohtani", "Aaron Judge", "", "", ""]
+default_names = ["Yordan Alvarez", "Ben Rice", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
