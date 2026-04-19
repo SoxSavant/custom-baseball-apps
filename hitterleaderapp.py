@@ -201,11 +201,7 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
 
     if mode == MODE_SPLIT:
         return combined
-
-    # MODE_MULTI: aggregate by PlayerId
-    if "PlayerId" not in combined.columns:
-        return combined
-    
+    # mode is #multi 
     combined = filter_by_position(combined, position)
     if combined.empty:
         return pd.DataFrame

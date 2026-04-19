@@ -285,11 +285,29 @@ def apply_dh_override(df):
 def filter_by_position(df, position):
     df["Pos"] = df["Pos"].astype(str).str.strip().str.upper()
     df = apply_dh_override(df)
+    
     if position == "all" or "Pos" not in df.columns:
         return df
-    if position == "OF":
-        return df[df["Pos"].astype(str).str.upper().isin(["LF", "CF", "RF"])]
-    return df[df["Pos"].astype(str).str.upper() == position.upper()]
+    
+    position = position.upper()
+    
+    def player_matches(player_df):
+        if position == "OF":
+            of_positions = {"LF", "CF", "RF"}
+            primary = player_df["Pos"].mode().iloc[0]
+            return primary in of_positions
+        else:
+            primary = player_df["Pos"].mode().iloc[0]
+            return primary == position
+    
+    # Group by player, check if their primary pos matches, return all their rows if so
+    matched_players = (
+        df.groupby("PlayerId")
+        .filter(player_matches)
+    )
+    
+    return matched_players
+
 
 
 
