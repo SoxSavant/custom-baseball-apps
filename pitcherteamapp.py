@@ -41,10 +41,9 @@ with meta_col:
 # ─────────────────────────────────────────────
 #  Constants
 # ─────────────────────────────────────────────
-
 from p_utils import (STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS,
  label_map, lower_better,  EVERY_STAT_PRESET,
-normalize_team, start_year)
+normalize_team, start_year,load_final_year)
 
 STAT_PRESETS = {
     "Statcast": [
@@ -91,22 +90,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/pitching_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
-
 
 current_year = date.today().year
 

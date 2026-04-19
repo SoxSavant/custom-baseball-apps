@@ -39,7 +39,7 @@ MAX_DISPLAY = 30
 
 from h_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
 get_headshot, label_map, lower_better,  start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, 
-get_team_display, filter_by_position)
+get_team_display, filter_by_position, load_final_year)
 
 
 
@@ -60,20 +60,6 @@ def update_stat_default(i):
     st.session_state[f"sc_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"sc_op_{i}"] = "<=" if stat in lower_better else ">="
 
-
-# ─────────────────────────────────────────────
-#  Data loading & aggregation
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/hitting_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 def aggregate_player_group(grp: pd.DataFrame) -> dict:

@@ -38,7 +38,7 @@ with meta_col:
 
 from p_utils import ( STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TEAM_OPTIONS, format_stat,
 get_headshot, label_map, lower_better,  start_year, STAT_DEFAULTS,
-normalize_team, get_team_display, outs_to_ip, ip_to_outs )
+normalize_team, get_team_display, outs_to_ip, ip_to_outs,load_final_year)
 
 MAX_DISPLAY = 30
 
@@ -65,21 +65,6 @@ def update_stat_default(i):
     stat = st.session_state[f"pc_stat_{i}"]
     st.session_state[f"pc_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"pc_op_{i}"] = "<=" if stat in lower_better else ">="
-
-
-# ─────────────────────────────────────────────
-#  Data loading & aggregation
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/pitching_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 def aggregate_player_group(grp: pd.DataFrame) -> dict:

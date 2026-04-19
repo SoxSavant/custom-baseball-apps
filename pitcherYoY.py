@@ -43,30 +43,13 @@ with meta_col:
 
 from p_utils import (STAT_ALLOWLIST, format_stat_yoy, start_year,
 get_headshot, label_map, lower_better, TEAM_OPTIONS,
-normalize_team, get_team_display)
+normalize_team, get_team_display,load_final_year)
 
 current_year = date.today().year
-
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/pitching_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
-
 
 # ─────────────────────────────────────────────
 #  YoY delta builder
 # ─────────────────────────────────────────────
-
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_risers_data(
     start_year: int, end_year: int,

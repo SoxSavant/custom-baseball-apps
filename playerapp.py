@@ -63,7 +63,7 @@ STAT_PRESETS = {
 }
 
 from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat,
-label_map, lower_better, get_team_display, start_year)
+label_map, lower_better, get_team_display, start_year, load_final_year)
 
 
 # ─────────────────────────────────────────────
@@ -79,20 +79,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/hitting_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 current_year = date.today().year

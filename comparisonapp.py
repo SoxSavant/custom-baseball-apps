@@ -157,7 +157,7 @@ with meta_col:
 
 STATCAST_HITTING_START_YEAR = 2015
 
-from h_utils import EVERY_STAT_PRESET
+from h_utils import EVERY_STAT_PRESET, load_final_year
 
 STAT_PRESETS = {
     "Default": [
@@ -213,22 +213,6 @@ def get_team_display_multiseason(teams: list[str]) -> str:
     if len(normalized) > 1:
         return "2+ Teams"
     return normalized.pop() if normalized else "N/A"
-
-
-# ─────────────────────────────────────────────
-#  Data loading — simple CSV reads
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    """Load the pre-merged final CSV for a given year."""
-    path = f"data/final/hitting_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 # ─────────────────────────────────────────────

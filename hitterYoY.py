@@ -40,7 +40,7 @@ with meta_col:
 
 
 from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better, 
-format_stat_yoy, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position)
+format_stat_yoy, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year)
 
 current_year = date.today().year
 
@@ -54,23 +54,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/hitting_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-    
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 

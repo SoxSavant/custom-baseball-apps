@@ -45,7 +45,7 @@ with meta_col:
 
 from h_utils import (EVERY_STAT_PRESET,STAT_ALLOWLIST, TEAMS, 
                      STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat,
-                     label_map, lower_better, normalize_team, start_year)
+                     label_map, lower_better, normalize_team, start_year, load_final_year)
 
 
 STAT_PRESETS = {
@@ -96,17 +96,6 @@ def normalize_name(raw: str) -> str:
 # ─────────────────────────────────────────────
 #  Data loading
 # ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/hitting_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
-
 
 
 current_year = date.today().year

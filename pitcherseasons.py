@@ -38,7 +38,7 @@ with meta_col:
 from p_utils import (
     STAT_ALLOWLIST,  PCT_STATS, format_stat, STAT_DEFAULTS,
     get_headshot, label_map, lower_better, start_year,
-    get_team_display
+    get_team_display,load_final_year
 )
 
 MAX_DISPLAY  = 10
@@ -52,21 +52,6 @@ def update_stat_default(i):
     stat = st.session_state[f"ps_stat_{i}"]
     st.session_state[f"ps_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"ps_op_{i}"]  = "<=" if stat in lower_better else ">="
-
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/pitching_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 @st.cache_data(show_spinner=False, ttl=3600)

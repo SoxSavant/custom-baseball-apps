@@ -43,7 +43,7 @@ with meta_col:
 
 from p_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, start_year,
 get_headshot, label_map, lower_better,  TEAM_OPTIONS, normalize_team, get_team_display, 
-outs_to_ip, ip_to_outs, format_stat)
+outs_to_ip, ip_to_outs, format_stat,load_final_year)
 
 
 MODE_SINGLE = "Single Season"
@@ -51,22 +51,6 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
-
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/pitching_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
-
 
 # ─────────────────────────────────────────────
 #  Aggregation (multi-year span)

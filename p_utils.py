@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
+import boto3
+import os
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
@@ -295,3 +297,35 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
     if show_sign and v > 0:
         return f"+{formatted}"
     return f"-{formatted}" if v < 0 else formatted
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+)
+
+bucket = "sports-analytics-files"
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_final_year(year: int) -> pd.DataFrame:
+    key = f"processed/pitching_final_{year}.csv"
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        df = pd.read_csv(obj["Body"])
+        df["Season"] = year
+        return df
+    except Exception:
+        return pd.DataFrame()
+    
+
+# old loading function
+    """@st.cache_data(show_spinner=False, ttl=3600)
+def load_final_year(year: int) -> pd.DataFrame:
+    path = f"data/final/pitching_final_{year}.csv"
+    try:
+        df = pd.read_csv(path)
+        df["Season"] = year
+    
+        return df
+    except Exception:
+        return pd.DataFrame()"""

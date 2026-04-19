@@ -44,7 +44,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, start_year, EVERY_STAT_PRESET,
-label_map, lower_better, STAT_DISPLAY_NAMES, get_team_display, format_stat)
+label_map, lower_better, STAT_DISPLAY_NAMES, get_team_display, format_stat,load_final_year)
 
 
 STAT_PRESETS = {
@@ -76,23 +76,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-
-
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/pitching_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 current_year = date.today().year
 
