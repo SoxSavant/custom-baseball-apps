@@ -2,6 +2,8 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import requests
+import boto3
+import os
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
@@ -309,5 +311,23 @@ def filter_by_position(df, position):
     return matched_players
 
 
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+)
+
+bucket = "sports-analytics-files"
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_final_year(year: int) -> pd.DataFrame:
+    key = f"processed/hitting_final_{year}.csv"
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        df = pd.read_csv(obj["Body"])
+        df["Season"] = year
+        return df
+    except Exception:
+        return pd.DataFrame()
 
 

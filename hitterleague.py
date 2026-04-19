@@ -44,7 +44,7 @@ with meta_col:
 from h_utils import (
     STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS,
     get_headshot, label_map, lower_better,
-    POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position
+    POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year
 )
 from utils import get_dynamic_min_pa
 
@@ -77,20 +77,6 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_final_year(year: int) -> pd.DataFrame:
-    path = f"data/final/hitting_final_{year}.csv"
-    try:
-        df = pd.read_csv(path)
-        df["Season"] = year
-        return df
-    except Exception:
-        return pd.DataFrame()
 
 
 def normalize_name(raw: str) -> str:
