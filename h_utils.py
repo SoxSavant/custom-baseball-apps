@@ -329,5 +329,17 @@ def load_final_year(year: int) -> pd.DataFrame:
         return df
     except Exception:
         return pd.DataFrame()
+    
+# old loading function
+    """@st.cache_data(show_spinner=False, ttl=3600)
+def load_final_year(year: int) -> pd.DataFrame:
+    path = f"data/final/hitting_final_{year}.csv"
+    try:
+        df = pd.read_csv(path)
+        df["Season"] = year
+    
+        return df
+    except Exception:
+        return pd.DataFrame()"""
 
 
