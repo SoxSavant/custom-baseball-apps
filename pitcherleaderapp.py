@@ -316,7 +316,7 @@ span_label  = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_
 title_label = label_map.get(stat, stat)
 team_label  = TEAM_OPTIONS.get(team_val, "") if team_val != "all" else ""
 mode_label  = " Single Season" if mode == MODE_SPLIT else ""
-worst_label = "Worst " if show_worst else ""
+worst_label = " Worst " if show_worst else ""
 title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label}{worst_label} {title_label} Leaders".strip())
 
 min_pa_subtitle = (
