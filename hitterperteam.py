@@ -644,7 +644,7 @@ html, body {{
 }}
 .leaderboard-title {{
     font-weight: 900;
-    font-size: 2.4rem;
+    font-size: 2rem;
     margin-bottom: 0.4rem;
     text-align: center;
     line-height: 1.2;
