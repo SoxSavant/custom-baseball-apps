@@ -433,9 +433,9 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     border: 1px solid #e0e0e0;
     background: #f6f6f6;
 }}
-.player-name {{ font-weight: 800; margin-top: 0.35rem; font-size: 1.3rem; }}
+.player-name {{ font-weight: 800; margin-top: 0.35rem; font-size: 1.18rem; }}
 .player-team {{ color: #666; font-size: 0.85rem; }}
-.player-stat {{ font-weight: 900; font-size: 1.3rem; margin-top: 0.25rem; }}
+.player-stat {{ font-weight: 900; font-size: 1.5rem; margin-top: 0.25rem; }}
 .player-pa {{ color: #666; font-size: 1rem; }}
 html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
 .footer {{ display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }}
