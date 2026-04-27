@@ -11,12 +11,13 @@ TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 start_year = 1901
 
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR", "Barrel%", "HardHit%", "EV", "maxEV",
+    "fWAR", "bWAR", "Off", "Def", "BsR", "K%", "BB%", "Chase%", "Whiff%","Barrel%", 
+    "HardHit%", "EV", "maxEV", "FRV", "OAA", "DRS",
     "wRC+", "wOBA", "xwOBA", "wOBA-xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
-    "K%", "BB%", "BB/K","Chase%", "Whiff%", "WPA", "Clutch",
-    "FRV", "OAA", "DRS", "FRM", "TZ","Swing%", "Z-Swing%",
+     "BB/K", "WPA", "Clutch",
+     "FRM", "TZ","Swing%", "Z-Swing%",
     "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "Squared-Up%", "Inn",
 ]
 

@@ -37,11 +37,12 @@ STAT_DISPLAY_NAMES = {
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "vFA", "K%", "BB%", "K-BB%", "IP", "G", "GS",
+    "ERA", "xERA", "FIP", "xFIP", "vFA", "K%", "BB%", "K-BB%", "IP", 
+    "Chase%", "Whiff%", "G", "GS",
     "Barrel%", "HardHit%", "EV", "GB%", "K/9","BB/9","K/BB","HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
-    "Chase%", "Whiff%", "WPA", "Clutch",
-    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER"
+     "WPA", "Clutch",
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER", "TBF"
 ]
 
 STAT_DEFAULTS = {
@@ -66,7 +67,7 @@ EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
         "Chase%", "Whiff%", "WPA", "Clutch", ]
 
 SUM_STATS = {
-    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR"
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR", "TBF",
 }
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
