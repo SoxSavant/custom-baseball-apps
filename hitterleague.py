@@ -44,7 +44,7 @@ with meta_col:
 from h_utils import (
     STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS,
     get_headshot, label_map, lower_better,
-    POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year
+    POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year, aggregate_player_group
 )
 from utils import get_dynamic_min_pa
 
@@ -88,93 +88,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-
-def aggregate_player_group(grp: pd.DataFrame) -> dict:
-    result: dict = {}
-
-    if "Name" in grp.columns:
-        result["Name"] = str(grp["Name"].dropna().iloc[0]) if not grp["Name"].dropna().empty else ""
-    if "PlayerId" in grp.columns:
-        ids = grp["PlayerId"].dropna()
-        if not ids.empty:
-            result["PlayerId"] = ids.iloc[0]
-    if "MLBAMID" in grp.columns:
-        ids = grp["MLBAMID"].dropna()
-        if not ids.empty:
-            result["MLBAMID"] = ids.iloc[0]
-
-    if "Team" in grp.columns:
-        teams = grp["Team"].dropna().astype(str).tolist()
-        result["Team"] = "2+ Teams" if any(get_team_display(t) == "2+ Teams" for t in teams) else (
-            "2+ Teams" if len({normalize_team(t) for t in teams if t.strip() and t.strip() != "- - -"}) > 1
-            else (normalize_team(teams[0]) if teams else "N/A")
-        )
-    else:
-        result["Team"] = "N/A"
-
-    pa_weight = pd.to_numeric(grp["PA"], errors="coerce").fillna(0) if "PA" in grp.columns else pd.Series(np.zeros(len(grp)), index=grp.index)
-    pa_total = pa_weight.sum()
-
-    numeric_cols = [
-        col for col in grp.columns
-        if pd.api.types.is_numeric_dtype(grp[col])
-        and col not in {"PlayerId", "MLBAMID", "Season"}
-    ]
-
-    for col in numeric_cols:
-        series = pd.to_numeric(grp[col], errors="coerce")
-        if series.isna().all():
-            continue
-        if col in SUM_STATS:
-            result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS and pa_total > 0:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total
-        elif col in MAX_STATS:
-            result[col] = series.max(skipna=True)
-        else:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
-
-    def to_num(x):
-        try:
-            return float(x)
-        except Exception:
-            return np.nan
-
-    h = to_num(result.get("H"))
-    ab = to_num(result.get("AB"))
-    bb = to_num(result.get("BB"))
-    hbp = to_num(result.get("HBP"))
-    sf = to_num(result.get("SF"))
-    doubles = to_num(result.get("2B"))
-    triples = to_num(result.get("3B"))
-    hr = to_num(result.get("HR"))
-
-    if pd.notna(h) and pd.notna(doubles) and pd.notna(triples) and pd.notna(hr):
-        singles = h - doubles - triples - hr
-        result["1B"] = singles if singles >= 0 else np.nan
-        result["XBH"] = doubles + triples + hr
-        tb = singles + 2 * doubles + 3 * triples + 4 * hr
-        result["TB"] = tb
-        if pd.notna(ab) and ab > 0:
-            result["AVG"] = h / ab
-            result["SLG"] = tb / ab
-
-    bb_v = 0 if pd.isna(bb) else bb
-    hbp_v = 0 if pd.isna(hbp) else hbp
-    sf_v = 0 if pd.isna(sf) else sf
-    obp_den = (ab if pd.notna(ab) else 0) + bb_v + hbp_v + sf_v
-    if obp_den > 0 and pd.notna(h):
-        result["OBP"] = (h + bb_v + hbp_v) / obp_den
-    slg = result.get("SLG")
-    obp = result.get("OBP")
-    avg = result.get("AVG")
-    if pd.notna(slg) and pd.notna(obp):
-        result["OPS"] = slg + obp
-    if pd.notna(slg) and pd.notna(avg):
-        result["ISO"] = slg - avg
-
-    return result
 
 
 @st.cache_data(show_spinner=False, ttl=3600)

@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import boto3
 import os
+import numpy as np
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
@@ -177,6 +178,54 @@ def get_team_display(team_value: str) -> str:
     if t == "- - -":
         return "2+ Teams"
     return normalize_team(t)
+
+def aggregate_player_group(grp: pd.DataFrame) -> dict:
+    result: dict = {}
+
+    result["Name"] = str(grp["Name"].iloc[0])
+    result["PlayerId"] = grp["PlayerId"].iloc[0]
+    result["MLBAMID"] = grp["MLBAMID"].iloc[0]
+
+    teams = grp["Team"].astype(str).tolist()
+    result["Team"] = (
+        "2+ Teams" if any(get_team_display(t) == "2+ Teams" for t in teams)
+        or len({normalize_team(t) for t in teams if t.strip() and t.strip() != "- - -"}) > 1
+        else normalize_team(teams[0]) if teams else "N/A"
+    )
+
+    pa_weight = pd.to_numeric(grp["PA"], errors="coerce").fillna(0)
+    pa_total = pa_weight.sum()
+
+    for col in grp.columns:
+        if not pd.api.types.is_numeric_dtype(grp[col]) or col in {"PlayerId", "MLBAMID", "Season"}:
+            continue
+        series = pd.to_numeric(grp[col], errors="coerce")
+        if series.isna().all():
+            continue
+        if col in SUM_STATS:
+            result[col] = series.sum(skipna=True)
+        elif col in MAX_STATS:
+            result[col] = series.max(skipna=True)
+        else:
+            result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
+
+    h, ab, bb, hbp, sf, tb = (pd.to_numeric(result.get(c), errors="coerce") for c in ("H", "AB", "BB", "HBP", "SF", "TB"))
+
+    if pd.notna(ab) and ab > 0 and pd.notna(h):
+        result["AVG"] = h / ab
+    if pd.notna(ab) and ab > 0 and pd.notna(tb):
+        result["SLG"] = tb / ab
+
+    bb_v, hbp_v, sf_v = (0 if pd.isna(v) else v for v in (bb, hbp, sf))
+    obp_den = (ab if pd.notna(ab) else 0) + bb_v + hbp_v + sf_v
+    if obp_den > 0 and pd.notna(h):
+        result["OBP"] = (h + bb_v + hbp_v) / obp_den
+
+    slg, obp, avg = (result.get(c) for c in ("SLG", "OBP", "AVG"))
+    if pd.notna(slg) and pd.notna(obp): result["OPS"] = slg + obp
+    if pd.notna(slg) and pd.notna(avg): result["ISO"] = slg - avg
+
+    return result
 
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):

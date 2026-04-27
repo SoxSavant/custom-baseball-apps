@@ -142,9 +142,8 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, TRUTHY_STRINGS, EVERY_STAT_PRESET,
-get_headshot, label_map, lower_better, start_year, normalize_team, get_team_display, 
-outs_to_ip, ip_to_outs, format_stat,load_final_year)
+from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, EVERY_STAT_PRESET,
+get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, aggregate_player_group)
 
 
 STAT_PRESETS = {
@@ -169,14 +168,6 @@ STAT_PRESETS = {
 
 
 
-def get_team_display_multiseason(teams: list[str]) -> str:
-    if any(get_team_display(t) == "2+ Teams" for t in teams):
-        return "2+ Teams"
-    normalized = {normalize_team(t) for t in teams if str(t).strip() and str(t).strip() != "- - -"}
-    if len(normalized) > 1:
-        return "2+ Teams"
-    return normalized.pop() if normalized else "N/A"
-
 # ─────────────────────────────────────────────
 #  Name utilities
 # ─────────────────────────────────────────────
@@ -190,92 +181,6 @@ def normalize_name(raw: str) -> str:
     except Exception:
         pass
     return " ".join(cleaned.split()).lower()
-
-
-# ─────────────────────────────────────────────
-#  Aggregation
-# ─────────────────────────────────────────────
-
-def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
-    result: dict = {}
-
-    if "Name" in grp.columns:
-        val = grp["Name"].dropna()
-        if not val.empty:
-            result["Name"] = str(val.iloc[0])
-
-    if "PlayerId" in grp.columns:
-        ids = grp["PlayerId"].dropna()
-        if not ids.empty:
-            result["PlayerId"] = ids.iloc[0]
-
-    if "MLBAMID" in grp.columns:
-        ids = grp["MLBAMID"].dropna()
-        if not ids.empty:
-            result["MLBAMID"] = ids.iloc[0]
-
-    if "Team" in grp.columns:
-        teams = grp["Team"].dropna().astype(str).tolist()
-        result["Team"] = get_team_display_multiseason(teams)
-    else:
-        result["Team"] = "N/A"
-
-    ip_outs_total = np.nan
-    if "IP" in grp.columns:
-        outs_series = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs)
-        valid = outs_series.dropna()
-        if not valid.empty:
-            ip_outs_total = valid.sum()
-            result["IP"] = outs_to_ip(ip_outs_total)
-
-    if "IP" in grp.columns:
-        weight = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).fillna(0)
-    elif "TBF" in grp.columns:
-        weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
-    else:
-        weight = pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
-    weight_total = weight.sum()
-
-    total_bb = np.nan
-    total_so = np.nan
-    total_er = np.nan
-    tbf_total = pd.to_numeric(grp["TBF"], errors="coerce").sum(skipna=True) if "TBF" in grp.columns else np.nan
-
-    numeric_cols = [
-        col for col in grp.columns
-        if pd.api.types.is_numeric_dtype(grp[col])
-        and col not in {"PlayerId", "MLBAMID", "Season", "IP"}
-    ]
-
-    for col in numeric_cols:
-        series = pd.to_numeric(grp[col], errors="coerce")
-        if series.isna().all():
-            continue
-        if col == "BB":   total_bb = series.sum(skipna=True)
-        if col == "SO":   total_so = series.sum(skipna=True)
-        if col == "ER":   total_er = series.sum(skipna=True)
-
-        if col in SUM_STATS:
-            result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS and weight_total > 0:
-            result[col] = (series * weight).sum(skipna=True) / weight_total
-        else:
-            result[col] = series.mean(skipna=True)
-
-    ip_innings = ip_outs_total / 3.0 if not pd.isna(ip_outs_total) else np.nan
-
-    if not pd.isna(total_er) and not pd.isna(ip_innings) and ip_innings > 0:
-        result["ERA"] = (total_er / ip_innings) * 9
-    if not pd.isna(total_bb) and not pd.isna(tbf_total) and tbf_total > 0:
-        result["BB%"] = (total_bb / tbf_total) * 100
-    if not pd.isna(total_so) and not pd.isna(tbf_total) and tbf_total > 0:
-        result["K%"] = (total_so / tbf_total) * 100
-    if not pd.isna(total_bb) and not pd.isna(ip_innings) and ip_innings > 0:
-        result["BB/9"] = (total_bb / ip_innings) * 9
-    if not pd.isna(total_so) and not pd.isna(ip_innings) and ip_innings > 0:
-        result["K/9"] = (total_so / ip_innings) * 9
-
-    return result
 
 
 # ─────────────────────────────────────────────

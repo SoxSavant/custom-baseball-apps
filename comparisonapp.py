@@ -157,7 +157,7 @@ with meta_col:
 
 STATCAST_HITTING_START_YEAR = 2015
 
-from h_utils import EVERY_STAT_PRESET, load_final_year
+from h_utils import EVERY_STAT_PRESET, load_final_year, aggregate_player_group
 
 STAT_PRESETS = {
     "Default": [
@@ -234,117 +234,6 @@ def display_stat_name(stat) -> str:
     if stat is None:
         return ""
     return STAT_DISPLAY_NAMES.get(str(stat), str(stat))
-
-
-# ─────────────────────────────────────────────
-#  Aggregation
-# ─────────────────────────────────────────────
-
-def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
-    result: dict = {}
-
-    if "Name" in grp.columns:
-        val = grp["Name"].dropna()
-        if not val.empty:
-            result["Name"] = str(val.iloc[0])
-
-    if "PlayerId" in grp.columns:
-        ids = grp["PlayerId"].dropna()
-        if not ids.empty:
-            result["PlayerId"] = ids.iloc[0]
-
-    if "MLBAMID" in grp.columns:
-        ids = grp["MLBAMID"].dropna()
-        if not ids.empty:
-            result["MLBAMID"] = ids.iloc[0]
-
-    # Team display
-    if "Team" in grp.columns:
-        teams = grp["Team"].dropna().astype(str).tolist()
-        result["Team"] = get_team_display_multiseason(teams)
-    else:
-        result["Team"] = "N/A"
-
-    numeric_cols = [
-        col for col in grp.columns
-        if pd.api.types.is_numeric_dtype(grp[col]) and col not in {"PlayerId", "MLBAMID", "Season"}
-    ]
-
-    pa_weight = (
-        pd.to_numeric(grp["PA"], errors="coerce").fillna(0)
-        if "PA" in grp.columns
-        else pd.Series(np.zeros(len(grp)), index=grp.index, dtype=float)
-    )
-    pa_total = pa_weight.sum()
-
-    for col in numeric_cols:
-        series = pd.to_numeric(grp[col], errors="coerce")
-        if series.isna().all():
-            continue
-        if col == "Age":
-            age_min = series.min(skipna=True)
-            age_max = series.max(skipna=True)
-            if pd.isna(age_min) or pd.isna(age_max):
-                continue
-            if abs(age_min - age_max) < 0.01:
-                result[col] = float(age_min)
-            else:
-                result[col] = f"{int(round(age_min))}-{int(round(age_max))}"
-            continue
-        if col in SUM_STATS:
-            result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS and pa_total > 0:
-            if col in STATCAST_RATE_STATS:
-                if start_year >= STATCAST_HITTING_START_YEAR and pa_total > 0:
-                    result[col] = (series * pa_weight).sum(skipna=True) / pa_total
-                else:
-                    result[col] = np.nan
-            else:
-                result[col] = (series * pa_weight).sum(skipna=True) / pa_total
-        elif col in MAX_STATS:
-            result[col] = series.max(skipna=True)
-        else:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else np.nan
-
-    def to_num(val) -> float:
-        try:
-            num = float(val)
-        except Exception:
-            return np.nan
-        return num if pd.notna(num) else np.nan
-
-    h = to_num(result.get("H"))
-    ab = to_num(result.get("AB"))
-    bb = to_num(result.get("BB"))
-    hbp = to_num(result.get("HBP"))
-    sf = to_num(result.get("SF"))
- 
- 
-    tb = to_num(result.get("TB"))
-    if pd.notna(ab) and ab > 0 and pd.notna(h):
-        result["AVG"] = h / ab
-    if pd.notna(ab) and ab > 0 and pd.notna(tb):
-        result["SLG"] = tb / ab
-    bb_val = 0 if pd.isna(bb) else bb
-    hbp_val = 0 if pd.isna(hbp) else hbp
-    sf_val = 0 if pd.isna(sf) else sf
-    obp_den = (ab if pd.notna(ab) else 0) + bb_val + hbp_val + sf_val
-    if obp_den > 0:
-        obp_num = (h if pd.notna(h) else 0) + bb_val + hbp_val
-        result["OBP"] = obp_num / obp_den
-    slg_val = result.get("SLG")
-    obp_val = result.get("OBP")
-    if pd.notna(slg_val) and pd.notna(obp_val):
-        result["OPS"] = slg_val + obp_val
-    avg_val = result.get("AVG")
-    if pd.notna(slg_val) and pd.notna(avg_val):
-        result["ISO"] = slg_val - avg_val
-
-    if "wRC+" in grp.columns and pa_total > 0:
-        wrc_series = pd.to_numeric(grp["wRC+"], errors="coerce")
-        result["wRC+"] = (wrc_series * pa_weight).sum(skipna=True) / pa_total
-
-    return result
 
 
 # ─────────────────────────────────────────────

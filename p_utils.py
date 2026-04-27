@@ -181,6 +181,68 @@ def outs_to_ip(outs: float) -> float:
     remainder = int(round(float(outs) % 3))
     return innings + remainder / 10
 
+def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
+    result: dict = {}
+
+    result["Name"] = str(grp["Name"].iloc[0])
+    result["PlayerId"] = grp["PlayerId"].iloc[0]
+    result["MLBAMID"] = grp["MLBAMID"].iloc[0]
+
+    teams = grp["Team"].astype(str).tolist()
+    result["Team"] = get_team_display_multiseason(teams)
+
+    outs_series = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs)
+    ip_outs_total = outs_series.sum(skipna=True)
+    result["IP"] = outs_to_ip(ip_outs_total)
+
+    weight = outs_series.fillna(0)
+    weight_total = weight.sum()
+
+    if "TBF" in grp.columns and not grp["TBF"].isna().all():
+        tbf_total = pd.to_numeric(grp["TBF"], errors="coerce").sum(skipna=True)
+    else:
+        tbf_total = ip_outs_total + sum(
+        pd.to_numeric(grp[c], errors="coerce").sum(skipna=True)
+        for c in ("H", "BB", "HBP") if c in grp.columns
+    )
+
+    for col in grp.columns:
+        if not pd.api.types.is_numeric_dtype(grp[col]) or col in {"PlayerId", "MLBAMID", "Season", "IP"}:
+            continue
+        series = pd.to_numeric(grp[col], errors="coerce")
+        if series.isna().all():
+            continue
+        if col in SUM_STATS:
+            result[col] = series.sum(skipna=True)
+        elif col in RATE_STATS and weight_total > 0:
+            result[col] = (series * weight).sum(skipna=True) / weight_total
+        else:
+            result[col] = series.mean(skipna=True)
+
+    ip_innings = ip_outs_total / 3.0
+    bb, so, er = (pd.to_numeric(result.get(c), errors="coerce") for c in ("BB", "SO", "ER"))
+
+    if pd.notna(er) and ip_innings > 0:
+        result["ERA"] = (er / ip_innings) * 9
+    if pd.notna(bb) and tbf_total > 0:
+        result["BB%"] = (bb / tbf_total) * 100
+    if pd.notna(so) and tbf_total > 0:
+        result["K%"] = (so / tbf_total) * 100
+    if pd.notna(bb) and ip_innings > 0:
+        result["BB/9"] = (bb / ip_innings) * 9
+    if pd.notna(so) and ip_innings > 0:
+        result["K/9"] = (so / ip_innings) * 9
+
+    return result
+
+def get_team_display_multiseason(teams: list[str]) -> str:
+    if any(get_team_display(t) == "2+ Teams" for t in teams):
+        return "2+ Teams"
+    normalized = {normalize_team(t) for t in teams if str(t).strip() and str(t).strip() != "- - -"}
+    if len(normalized) > 1:
+        return "2+ Teams"
+    return normalized.pop() if normalized else "N/A"
+
 def format_stat(stat: str, val) -> str:
     if pd.isna(val):
         return ""

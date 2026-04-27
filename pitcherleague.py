@@ -42,10 +42,10 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import (
-    STAT_ALLOWLIST, SUM_STATS, RATE_STATS, start_year,
+    STAT_ALLOWLIST, start_year,
     get_headshot, label_map, lower_better,
     TEAM_OPTIONS, normalize_team, get_team_display,
-    outs_to_ip, ip_to_outs, format_stat,load_final_year
+    aggregate_player_group, format_stat,load_final_year
 )
 from utils import get_dynamic_min_ip
 
@@ -73,74 +73,6 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
-
-
-def aggregate_player_group(grp: pd.DataFrame) -> dict:
-    result: dict = {}
-
-    if "Name" in grp.columns:
-        result["Name"] = str(grp["Name"].dropna().iloc[0]) if not grp["Name"].dropna().empty else ""
-    if "PlayerId" in grp.columns:
-        ids = grp["PlayerId"].dropna()
-        if not ids.empty:
-            result["PlayerId"] = ids.iloc[0]
-    if "MLBAMID" in grp.columns:
-        ids = grp["MLBAMID"].dropna()
-        if not ids.empty:
-            result["MLBAMID"] = ids.iloc[0]
-
-    if "Team" in grp.columns:
-        teams = grp["Team"].dropna().astype(str).tolist()
-        result["Team"] = "2+ Teams" if any(get_team_display(t) == "2+ Teams" for t in teams) else (
-            "2+ Teams" if len({normalize_team(t) for t in teams if t.strip() and t.strip() != "- - -"}) > 1
-            else (normalize_team(teams[0]) if teams else "N/A")
-        )
-    else:
-        result["Team"] = "N/A"
-
-    # IP: sum outs then convert back
-    ip_outs_total = np.nan
-    if "IP" in grp.columns:
-        outs = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).dropna()
-        if not outs.empty:
-            ip_outs_total = outs.sum()
-            result["IP"] = outs_to_ip(ip_outs_total)
-
-    # Weight by IP outs for rate stats
-    if "IP" in grp.columns:
-        weight = pd.to_numeric(grp["IP"], errors="coerce").apply(ip_to_outs).fillna(0)
-    elif "TBF" in grp.columns:
-        weight = pd.to_numeric(grp["TBF"], errors="coerce").fillna(0)
-    else:
-        weight = pd.Series(np.ones(len(grp)), index=grp.index)
-    weight_total = weight.sum()
-
-    numeric_cols = [
-        col for col in grp.columns
-        if pd.api.types.is_numeric_dtype(grp[col])
-        and col not in {"PlayerId", "MLBAMID", "Season", "IP"}
-    ]
-
-    total_er = np.nan
-    for col in numeric_cols:
-        series = pd.to_numeric(grp[col], errors="coerce")
-        if series.isna().all():
-            continue
-        if col == "ER":
-            total_er = series.sum(skipna=True)
-        if col in SUM_STATS:
-            result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS and weight_total > 0:
-            result[col] = (series * weight).sum(skipna=True) / weight_total
-        else:
-            result[col] = series.mean(skipna=True)
-
-    # Recompute ERA from totals
-    if pd.notna(total_er) and not pd.isna(ip_outs_total) and ip_outs_total > 0:
-        result["ERA"] = (total_er / (ip_outs_total / 3)) * 9
-
-    return result
-
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_data(s_year: int, e_year: int, mode: str) -> pd.DataFrame:
