@@ -242,10 +242,6 @@ def display_stat_name(stat) -> str:
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
-    """
-    Load rows for a PlayerId across the year range from final CSVs,
-    aggregate, then join bWAR + Age from warhitters file.
-    """
     frames = []
     for year in range(start_year, end_year + 1):
         df = load_final_year(year)
@@ -259,7 +255,7 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
         return None
 
     combined = pd.concat(frames, ignore_index=True)
-    agg = aggregate_player_group(combined, start_year=start_year)
+    agg = aggregate_player_group(combined)
     if not agg:
         return None
 
