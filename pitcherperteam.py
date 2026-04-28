@@ -5,7 +5,7 @@ import numpy as np
 import html
 from datetime import date
 
-st.set_page_config(page_title="Hitters Per Team Leaderboard", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Pitcher Per Team Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -23,7 +23,7 @@ st.markdown(
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Hitters Per Team Leaderboard")
+    st.title("Pitchers Per Team Leaderboard")
 with meta_col:
     st.markdown(
         '<div style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
@@ -35,12 +35,12 @@ with meta_col:
 #  Imports from h_utils
 # ─────────────────────────────────────────────
 
-from h_utils import (
+from p_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,
-    label_map, lower_better, start_year, POSITION_OPTIONS,
-    normalize_team, get_team_display, filter_by_position, load_final_year, TEAMS,
+    label_map, lower_better, start_year, 
+    normalize_team, get_team_display, load_final_year, TEAMS,
 )
-from utils import get_dynamic_min_pa
+from utils import get_dynamic_min_ip
 
 # ─────────────────────────────────────────────
 #  MLB team ID map for logos
@@ -128,7 +128,6 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
         return combined
 
     # MODE_MULTI: aggregate each player per team across years
-    combined = filter_by_position(combined, position)
     if combined.empty or "PlayerId" not in combined.columns:
         return combined
 
@@ -153,12 +152,11 @@ for key, default in [
     ("tc_start_year",   current_year - 1),
     ("tc_end_year",     current_year),
     ("tc_mode",         MODE_SINGLE),
-    ("tc_position",     "all"),
-    ("tc_show_min_pa",  True),
-    ("tc_show_player_pa", False),
+    ("tc_show_min_ip",  True),
+    ("tc_show_player_ip", False),
     ("tc_show_all_teams", False),
-    ("tc_val_0",        .350),
-    ("tc_val_1",        125),
+    ("tc_val_0",        3.00),
+    ("tc_val_1",        3.00),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -193,7 +191,7 @@ with col1:
         if "tc_last_year" not in st.session_state:
             st.session_state.tc_last_year = s_year
         if s_year != st.session_state.tc_last_year:
-            st.session_state["tc_min_pa"] = get_dynamic_min_pa(s_year)
+            st.session_state["tc_min_ip"] = get_dynamic_min_ip(s_year)
             st.session_state.tc_last_year = s_year
     else:
         st.selectbox("Start Year", options=list(range(current_year, start_year - 1, -1)), key="tc_start_year")
@@ -201,16 +199,16 @@ with col1:
         s_year = st.session_state["tc_start_year"]
         e_year = max(st.session_state["tc_end_year"], s_year)
 
-    if "tc_min_pa" not in st.session_state:
-        st.session_state["tc_min_pa"] = get_dynamic_min_pa(
+    if "tc_min_ip" not in st.session_state:
+        st.session_state["tc_min_ip"] = get_dynamic_min_ip(
             s_year if mode == MODE_SINGLE else current_year
         )
 
-    st.number_input("Min PA", min_value=0, max_value=20000, key="tc_min_pa")
+    st.number_input("Min IP", min_value=0, max_value=20000, key="tc_min_ip")
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
-        default_stat  = "xwOBA" if i == 0 else "wRC+" if i == 1 else STAT_ALLOWLIST[0]
+        default_stat  = "ERA" if i == 0 else "FIP" if i == 1 else STAT_ALLOWLIST[0]
         default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
 
         new_stat = st.selectbox(
@@ -225,29 +223,23 @@ with col1:
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            st.selectbox("Op", [">=", "<="], key=f"tc_op_{i}", index=0, label_visibility="collapsed")
+            st.selectbox("Op", ["<=", ">="], key=f"tc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
-            RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
-            if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
+            RATE_3DP = {"WHIP", "BABIP"}
+            RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB", "WPA", "Clutch"}
+            if new_stat in RATE_3DP:
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def", "Off"}:
-                step, fmt = 0.1, "%.1f"
-            elif new_stat in {"WPA", "Clutch"}:
+            elif new_stat in RATE_2DP:
                 step, fmt = 0.01, "%.2f"
+            elif "%" in new_stat or new_stat == "EV" or "WAR" in new_stat:
+                step, fmt = 0.1, "%.1f"
             else:
                 step, fmt = 1.0, "%.0f"
-            st.number_input(
-                f"Value {i+1}", step=step, key=f"tc_val_{i}",
-                label_visibility="collapsed", format=fmt,
-            )
+            st.number_input(f"Value {i+1}", step=step, key=f"tc_val_{i}",
+                            label_visibility="collapsed", format=fmt)
 
-    st.selectbox(
-        "Position", options=list(POSITION_OPTIONS.keys()),
-        format_func=lambda x: POSITION_OPTIONS[x], key="tc_position",
-    )
-
-    st.checkbox("Show min PA",      key="tc_show_min_pa")
-    st.checkbox("Show player PA",   key="tc_show_player_pa")
+    st.checkbox("Show min IP",      key="tc_show_min_ip")
+    st.checkbox("Show player IP",   key="tc_show_player_ip")
     st.checkbox("Show all 30 teams", key="tc_show_all_teams")
 
     st.markdown("**Divisions**")
@@ -258,22 +250,17 @@ with col1:
 #  Load & filter data
 # ─────────────────────────────────────────────
 
-min_pa_val   = int(st.session_state["tc_min_pa"])
-position_val = st.session_state["tc_position"]
+min_ip_val   = int(st.session_state["tc_min_ip"])
 
-df = load_data(s_year, e_year, mode, position=position_val)
+df = load_data(s_year, e_year, mode)
 
 if df is None or df.empty:
     st.error(f"No data found for {s_year}–{e_year}.")
     st.stop()
 
-# Min PA
-if min_pa_val > 0 and "PA" in df.columns:
-    df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
-
-# Position filter — skip for MULTI (already applied inside load_data)
-if mode != MODE_MULTI:
-    df = filter_by_position(df, position_val)
+# Min IP
+if min_ip_val > 0 and "IP" in df.columns:
+    df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip_val]
 
 # Team display column
 if "Team" in df.columns:
@@ -436,16 +423,15 @@ filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
-pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 middle_label = " in " if mode == MODE_SINGLE else ": "
-title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+title_text   = f"Most Pitchers with {filter_str}{middle_label}{span_label}{mode_label}"
 
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-    if st.session_state.get("tc_show_min_pa") else ""
+min_ip_subtitle = (
+    f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
+    if st.session_state.get("tc_show_min_ip") else ""
 )
 
-show_player_pa = st.session_state.get("tc_show_player_pa", False)
+show_player_ip = st.session_state.get("tc_show_player_ip", False)
 
 # Build team card blocks
 team_card_html = ""
@@ -486,10 +472,10 @@ else:
                     )
 
             pa_html = ""
-            if show_player_pa:
-                pa_val = prow.get("PA", np.nan)
-                if pd.notna(pa_val):
-                    pa_html = f'<span class="p-pa">{int(pa_val)}</span>'
+            if show_player_ip:
+                ip_val = prow.get("IP", np.nan)
+                if pd.notna(ip_val):
+                    pa_html = f'<span class="p-ip">{int(ip_val)}</span>'
 
             stats_joined = "".join(stat_parts)
             player_rows_html += f"""
@@ -517,7 +503,7 @@ total_players_shown = sum(tg["player_count"] for tg in team_groups)
 grid_html = f"""
 <div class="leaderboard-card">
     <div class="leaderboard-title">{html.escape(title_text)}</div>
-    {min_pa_subtitle}
+    {min_ip_subtitle}
     <div class="teams-grid">{team_card_html}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
@@ -666,7 +652,7 @@ html, body {{
     white-space: nowrap;
     margin-right: 5px;
 }}
-.p-pa {{
+.p-ip {{
     color: #ccc;
     font-size: 0.9rem;
     margin-left: 2px;

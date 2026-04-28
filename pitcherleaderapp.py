@@ -43,7 +43,7 @@ with meta_col:
 
 from p_utils import (STAT_ALLOWLIST, start_year,
 get_headshot, label_map, lower_better,  TEAM_OPTIONS, normalize_team, get_team_display, 
-outs_to_ip, ip_to_outs, format_stat,load_final_year, aggregate_player_group)
+format_stat,load_final_year, aggregate_player_group)
 
 
 MODE_SINGLE = "Single Season"
