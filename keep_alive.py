@@ -19,6 +19,7 @@ APPS = [
     "https://hitter-league-leaders.streamlit.app/",
     "https://pitcher-league-leaders.streamlit.app/",
     "https://hitters-per-team.streamlit.app/",
+    "https://pitchers-per-team.streamlit.app/"
 ]
 
 def wake_app(url):
