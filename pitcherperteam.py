@@ -430,7 +430,7 @@ span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 if mode == MODE_SPLIT and collapse_split:
     mode_label   = " (Single Season)"
 elif mode == MODE_SPLIT:
-     mode_label   = " (Single Season Per Team)"
+     mode_label   = " (Single Year)"
 else:
     mode_label = " "
 middle_label = " in " if mode == MODE_SINGLE else ": "
