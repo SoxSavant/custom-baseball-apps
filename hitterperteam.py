@@ -31,20 +31,12 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Imports from h_utils
-# ─────────────────────────────────────────────
-
 from h_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,
     label_map, lower_better, start_year, POSITION_OPTIONS,
     normalize_team, get_team_display, filter_by_position, load_final_year, TEAMS,
 )
 from utils import get_dynamic_min_pa
-
-# ─────────────────────────────────────────────
-#  MLB team ID map for logos
-# ─────────────────────────────────────────────
 
 TEAM_MLB_IDS = {
     "ARI": 109, "ATL": 144, "BAL": 110, "BOS": 111,
@@ -58,12 +50,12 @@ TEAM_MLB_IDS = {
 }
 
 DIVISION_TEAMS = {
-    "AL East":  {"BAL", "BOS", "NYY", "TBR", "TOR"},
+    "AL East":    {"BAL", "BOS", "NYY", "TBR", "TOR"},
     "AL Central": {"CHW", "CLE", "DET", "KCR", "MIN"},
-    "AL West":  {"HOU", "LAA", "OAK", "SEA", "TEX"},
-    "NL East":  {"ATL", "MIA", "NYM", "PHI", "WSN"},
+    "AL West":    {"HOU", "LAA", "OAK", "SEA", "TEX"},
+    "NL East":    {"ATL", "MIA", "NYM", "PHI", "WSN"},
     "NL Central": {"CHC", "CIN", "MIL", "PIT", "STL"},
-    "NL West":  {"ARI", "COL", "LAD", "SDP", "SFG"},
+    "NL West":    {"ARI", "COL", "LAD", "SDP", "SFG"},
 }
 
 ALL_DIVISIONS = list(DIVISION_TEAMS.keys())
@@ -81,10 +73,6 @@ def get_team_logo_url(abbrev: str) -> str:
         return f"https://www.mlbstatic.com/team-logos/{mlb_id}.svg"
     return ""
 
-# ─────────────────────────────────────────────
-#  Constants / modes
-# ─────────────────────────────────────────────
-
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
@@ -92,21 +80,15 @@ MODE_MULTI  = "Multi-Year Span"
 current_year = date.today().year
 MAX_TEAMS    = 9
 
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
-
 def update_stat_default(i):
     stat = st.session_state[f"tc_stat_{i}"]
     st.session_state[f"tc_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"tc_op_{i}"]  = "<=" if stat in lower_better else ">="
 
-
 def format_threshold(stat: str, val: float, op: str) -> str:
     lbl       = label_map.get(stat, stat)
     formatted = format_stat(stat, val).rstrip("%")
     return f"{formatted}+ {lbl}" if op == ">=" else f"≤ {formatted} {lbl}"
-
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> pd.DataFrame:
@@ -132,7 +114,6 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
     if combined.empty or "PlayerId" not in combined.columns:
         return combined
 
-    # Normalize team first, exclude multi-team season rows
     if "Team" in combined.columns:
         combined["TeamNorm"] = combined["Team"].astype(str).apply(normalize_team)
         combined = combined[combined["Team"].astype(str).str.strip() != "- - -"]
@@ -149,16 +130,17 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
 # ─────────────────────────────────────────────
 
 for key, default in [
-    ("tc_year",         current_year),
-    ("tc_start_year",   current_year - 1),
-    ("tc_end_year",     current_year),
-    ("tc_mode",         MODE_SINGLE),
-    ("tc_position",     "all"),
-    ("tc_show_min_pa",  True),
+    ("tc_year",           current_year),
+    ("tc_start_year",     current_year - 1),
+    ("tc_end_year",       current_year),
+    ("tc_mode",           MODE_SINGLE),
+    ("tc_position",       "all"),
+    ("tc_show_min_pa",    True),
     ("tc_show_player_pa", False),
     ("tc_show_all_teams", False),
-    ("tc_val_0",        .350),
-    ("tc_val_1",        125),
+    ("tc_collapse_split", True),
+    ("tc_val_0",          .350),
+    ("tc_val_1",          125),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -183,7 +165,10 @@ with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="tc_mode")
 
     if mode == MODE_MULTI:
-        st.caption("Multi-year excludes seasons ofplayers who switched teams mid-season in any year of the span.")
+        st.caption("Multi-year excludes seasons of players who switched teams mid-season in any year of the span.")
+
+    if mode == MODE_SPLIT:
+        st.checkbox("One card per team", key="tc_collapse_split")
 
     if mode == MODE_SINGLE:
         st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key="tc_year")
@@ -246,9 +231,9 @@ with col1:
         format_func=lambda x: POSITION_OPTIONS[x], key="tc_position",
     )
 
-    st.checkbox("Show min PA",      key="tc_show_min_pa")
-    st.checkbox("Show player PA",   key="tc_show_player_pa")
-    st.checkbox("Show all 30 teams", key="tc_show_all_teams")
+    st.checkbox("Show min PA",        key="tc_show_min_pa")
+    st.checkbox("Show player PA",     key="tc_show_player_pa")
+    st.checkbox("Show all 30 teams",  key="tc_show_all_teams")
 
     st.markdown("**Divisions**")
     for div in ALL_DIVISIONS:
@@ -267,15 +252,12 @@ if df is None or df.empty:
     st.error(f"No data found for {s_year}–{e_year}.")
     st.stop()
 
-# Min PA
 if min_pa_val > 0 and "PA" in df.columns:
     df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
-# Position filter — skip for MULTI (already applied inside load_data)
 if mode != MODE_MULTI:
     df = filter_by_position(df, position_val)
 
-# Team display column
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
 else:
@@ -293,7 +275,6 @@ for i in range(num_stats):
     if stat:
         active_filters.append((stat, op, val))
 
-# Apply stat filters
 if not df.empty and active_filters:
     mask = pd.Series([True] * len(df), index=df.index)
     for stat, op, val in active_filters:
@@ -307,8 +288,8 @@ if not df.empty and active_filters:
                 compare_val = val / 100
         mask = mask & (col_vals >= compare_val if op == ">=" else col_vals <= compare_val)
     df = df[mask]
+    st.write(df.columns.tolist())
 
-# Exclude multi-team rows
 if "Team" in df.columns:
     df = df[df["TeamDisplay"] != "2+ Teams"]
 
@@ -319,6 +300,7 @@ total_qualified = len(df)
 # ─────────────────────────────────────────────
 
 show_all_teams   = st.session_state.get("tc_show_all_teams", False)
+collapse_split   = st.session_state.get("tc_collapse_split", True)
 active_divisions = [div for div in ALL_DIVISIONS if st.session_state.get(f"tc_div_{div}", True)]
 
 sort_stat = active_filters[0][0] if active_filters else None
@@ -327,104 +309,78 @@ sort_asc_tiebreak = sort_stat in lower_better and sort_op == "<=" if sort_stat e
 
 team_groups = []
 
-if mode == MODE_SPLIT:
-    # One card per team+year combination
+def build_team_group(team_abbrev, grp, year=None, show_year_on_row=False):
+    avg_val = np.nan
+    if sort_stat and sort_stat in grp.columns:
+        avg_val = pd.to_numeric(grp[sort_stat], errors="coerce").mean()
+    player_df = grp.copy()
+    if sort_stat and sort_stat in player_df.columns:
+        asc = sort_stat in lower_better and sort_op == "<="
+        player_df = player_df.sort_values(sort_stat, ascending=asc)
+    norm = normalize_team(team_abbrev)
+    return {
+        "abbrev":           team_abbrev,
+        "full_name":        TEAMS.get(norm, team_abbrev),
+        "player_count":     len(player_df),
+        "avg_val":          avg_val,
+        "players":          player_df,
+        "year":             year,
+        "show_year_on_row": show_year_on_row,
+    }
+
+if mode == MODE_SPLIT and not collapse_split:
+    # One card per team+year
     group_keys = ["TeamDisplay", "Season"] if "Season" in df.columns else ["TeamDisplay"]
     qualifying_by_team_year: dict = {}
     if not df.empty and "TeamDisplay" in df.columns:
         for keys, grp in df.groupby(group_keys):
             team_abbrev = keys[0] if isinstance(keys, tuple) else keys
             year = int(keys[1]) if isinstance(keys, tuple) and len(keys) > 1 else None
-            avg_val = np.nan
-            if sort_stat and sort_stat in grp.columns:
-                avg_val = pd.to_numeric(grp[sort_stat], errors="coerce").mean()
-            player_df = grp.copy()
-            if sort_stat and sort_stat in player_df.columns:
-                asc = sort_stat in lower_better and sort_op == "<="
-                player_df = player_df.sort_values(sort_stat, ascending=asc)
-            key = (normalize_team(team_abbrev), year)
-            qualifying_by_team_year[key] = {
-                "avg_val": avg_val,
-                "players": player_df,
-                "year":    year,
-            }
+            key  = (normalize_team(team_abbrev), year)
+            qualifying_by_team_year[key] = build_team_group(team_abbrev, grp, year=year)
 
     if show_all_teams:
-        years = list(range(s_year, e_year + 1))
-        all_keys = [
-            (a, y) for a in TEAM_MLB_IDS.keys() for y in years
-            if get_team_division(a) in active_divisions
-        ]
+        years    = list(range(s_year, e_year + 1))
+        all_keys = [(a, y) for a in TEAM_MLB_IDS for y in years if get_team_division(a) in active_divisions]
     else:
-        all_keys = [k for k in qualifying_by_team_year.keys()
-                    if get_team_division(k[0]) in active_divisions]
+        all_keys = [k for k in qualifying_by_team_year if get_team_division(k[0]) in active_divisions]
 
     for (abbrev, year) in all_keys:
         norm = normalize_team(abbrev)
-        data = qualifying_by_team_year.get((norm, year), {"avg_val": np.nan, "players": pd.DataFrame(), "year": year})
-        team_groups.append({
-            "abbrev":       abbrev,
-            "full_name":    TEAMS.get(norm, abbrev),
-            "player_count": len(data["players"]),
-            "avg_val":      data["avg_val"],
-            "players":      data["players"],
-            "year":         year,
-        })
+        data = qualifying_by_team_year.get((norm, year), build_team_group(abbrev, pd.DataFrame(), year=year))
+        team_groups.append(data)
 
-    team_groups.sort(
-        key=lambda x: (
-            -x["player_count"],
-            x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
-            x["abbrev"],
-            x["year"] or 0,
-        )
-    )
+    team_groups.sort(key=lambda x: (
+        -x["player_count"],
+        x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
+        x["abbrev"], x["year"] or 0,
+    ))
     if not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
 else:
-    # Single season or multi-year span — one card per team
+    # Single season, multi-year span, OR collapsed split — one card per team
+    show_year_on_row = False
+
     qualifying_by_team: dict = {}
     if not df.empty and "TeamDisplay" in df.columns:
         for team_abbrev, grp in df.groupby("TeamDisplay"):
-            avg_val = np.nan
-            if sort_stat and sort_stat in grp.columns:
-                avg_val = pd.to_numeric(grp[sort_stat], errors="coerce").mean()
-            player_df = grp.copy()
-            if sort_stat and sort_stat in player_df.columns:
-                asc = sort_stat in lower_better and sort_op == "<="
-                player_df = player_df.sort_values(sort_stat, ascending=asc)
-            qualifying_by_team[normalize_team(team_abbrev)] = {
-                "avg_val": avg_val,
-                "players": player_df,
-            }
+            norm = normalize_team(team_abbrev)
+            qualifying_by_team[norm] = build_team_group(team_abbrev, grp, show_year_on_row=show_year_on_row)
 
-    if show_all_teams:
-        all_abbrevs = [a for a in TEAM_MLB_IDS.keys()]
-    else:
-        all_abbrevs = list(qualifying_by_team.keys())
-
+    all_abbrevs = list(TEAM_MLB_IDS) if show_all_teams else list(qualifying_by_team)
     all_abbrevs = [a for a in all_abbrevs if get_team_division(a) in active_divisions]
 
     for abbrev in all_abbrevs:
         norm = normalize_team(abbrev)
-        data = qualifying_by_team.get(norm, {"avg_val": np.nan, "players": pd.DataFrame()})
-        team_groups.append({
-            "abbrev":       abbrev,
-            "full_name":    TEAMS.get(norm, abbrev),
-            "player_count": len(data["players"]),
-            "avg_val":      data["avg_val"],
-            "players":      data["players"],
-            "year":         None,
-        })
+        data = qualifying_by_team.get(norm, build_team_group(abbrev, pd.DataFrame(), show_year_on_row=show_year_on_row))
+        team_groups.append(data)
 
-    team_groups.sort(
-        key=lambda x: (
-            -x["player_count"],
-            x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
-            x["abbrev"],
-        )
-    )
+    team_groups.sort(key=lambda x: (
+        -x["player_count"],
+        x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
+        x["abbrev"],
+    ))
     if not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
@@ -435,10 +391,16 @@ else:
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
-mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
+if mode == MODE_SPLIT and collapse_split:
+    mode_label   = " (Single Season)"
+elif mode == MODE_SPLIT:
+     mode_label   = " (Single Season Per Team)"
+else:
+    mode_label = " "
 pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 middle_label = " in " if mode == MODE_SINGLE else ": "
 title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+
 
 min_pa_subtitle = (
     f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
@@ -447,20 +409,19 @@ min_pa_subtitle = (
 
 show_player_pa = st.session_state.get("tc_show_player_pa", False)
 
-# Build team card blocks
 team_card_html = ""
 if not team_groups:
     team_card_html = '<div style="padding:2rem;color:#999;text-align:center;">No teams matched all filters. Try adjusting your thresholds.</div>'
 else:
     for rank, tg in enumerate(team_groups, start=1):
-        abbrev      = tg["abbrev"]
-        full_name   = tg["full_name"]
-        count       = tg["player_count"]
-        logo_url    = get_team_logo_url(abbrev)
-        player_word = "player" if count == 1 else "players"
-
-        year        = tg.get("year")
-        year_label  = f" – {year}" if year is not None else ""
+        abbrev           = tg["abbrev"]
+        count            = tg["player_count"]
+        logo_url         = get_team_logo_url(abbrev)
+        show_year_on_row = tg.get("show_year_on_row", False)
+        season_word      = "season" if show_year_on_row else "player"
+        player_word      = season_word if count == 1 else f"{season_word}s"
+        year             = tg.get("year")
+        year_label       = f" – {year}" if year is not None else ""
 
         logo_img = (
             f'<img src="{html.escape(logo_url)}" alt="{html.escape(abbrev)}" '
@@ -471,10 +432,15 @@ else:
             f'{html.escape(abbrev)}</div>'
         )
 
-        # Player rows — name on left, stats on right
         player_rows_html = ""
         for _, prow in tg["players"].iterrows():
-            pname = html.escape(str(prow.get("Name", "")).strip())
+            pname = str(prow.get("Name", "")).strip() 
+
+            if collapse_split and mode == MODE_SPLIT and "Season" in prow.index and pd.notna(prow.get("Season")):
+                pname = f'{html.escape(pname)} <span style="color:#aaa;font-weight:400;font-size:0.85rem;">– {int(prow["Season"])}</span>'
+            else:
+                pname = html.escape(pname)
+
             stat_parts = []
             for stat, op, threshold in active_filters:
                 val = prow.get(stat, np.nan)
@@ -498,12 +464,15 @@ else:
                 <span class="p-stats-right">{stats_joined}{pa_html}</span>
             </div>"""
 
+        # Display OAK as ATH in card since that's the current team name
+        display_abbrev = "ATH" if normalize_team(abbrev) == "OAK" else abbrev
+
         team_card_html += f"""
         <div class="team-card">
             <div class="team-header">
                 <div class="team-logo-wrap">{logo_img}</div>
                 <div class="team-meta">
-                    <div class="team-abbrev-label">{html.escape(abbrev)}{html.escape(year_label)}</div>
+                    <div class="team-abbrev-label">{html.escape(display_abbrev)}{html.escape(year_label)}</div>
                     <div class="team-badge">{count} {player_word}</div>
                 </div>
                 <div class="team-rank">#{rank}</div>
@@ -526,9 +495,8 @@ grid_html = f"""
 </div>
 """
 
-# Height: title area + rows of cards (4 per row), each card height depends on player count
 cards_per_row   = 3
-num_rows        = max(1, -(-num_teams_shown // cards_per_row))  # ceiling division
+num_rows        = max(1, -(-num_teams_shown // cards_per_row))
 avg_players     = total_players_shown / max(num_teams_shown, 1)
 card_height_est = 90 + avg_players * 26
 est_height      = 220 + int(num_rows * card_height_est) + 80

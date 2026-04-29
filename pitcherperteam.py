@@ -155,6 +155,7 @@ for key, default in [
     ("tc_show_min_ip",  True),
     ("tc_show_player_ip", False),
     ("tc_show_all_teams", False),
+    ("tc_collapse_split", True),
     ("tc_val_0",        3.00),
     ("tc_val_1",        3.00),
 ]:
@@ -182,6 +183,9 @@ with col1:
 
     if mode == MODE_MULTI:
         st.caption("Multi-year excludes seasons ofplayers who switched teams mid-season in any year of the span.")
+    
+    if mode == MODE_SPLIT:
+        st.checkbox("One card per team", key="tc_collapse_split")
 
     if mode == MODE_SINGLE:
         st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key="tc_year")
@@ -306,6 +310,7 @@ total_qualified = len(df)
 # ─────────────────────────────────────────────
 
 show_all_teams   = st.session_state.get("tc_show_all_teams", False)
+collapse_split   = st.session_state.get("tc_collapse_split", True)
 active_divisions = [div for div in ALL_DIVISIONS if st.session_state.get(f"tc_div_{div}", True)]
 
 sort_stat = active_filters[0][0] if active_filters else None
@@ -314,7 +319,7 @@ sort_asc_tiebreak = sort_stat in lower_better and sort_op == "<=" if sort_stat e
 
 team_groups = []
 
-if mode == MODE_SPLIT:
+if mode == MODE_SPLIT and not collapse_split:
     # One card per team+year combination
     group_keys = ["TeamDisplay", "Season"] if "Season" in df.columns else ["TeamDisplay"]
     qualifying_by_team_year: dict = {}
@@ -422,7 +427,12 @@ else:
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
-mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
+if mode == MODE_SPLIT and collapse_split:
+    mode_label   = " (Single Season)"
+elif mode == MODE_SPLIT:
+     mode_label   = " (Single Season Per Team)"
+else:
+    mode_label = " "
 middle_label = " in " if mode == MODE_SINGLE else ": "
 title_text   = f"Most Pitchers with {filter_str}{middle_label}{span_label}{mode_label}"
 
@@ -460,7 +470,12 @@ else:
         # Player rows — name on left, stats on right
         player_rows_html = ""
         for _, prow in tg["players"].iterrows():
-            pname = html.escape(str(prow.get("Name", "")).strip())
+            pname = str(prow.get("Name", "")).strip() 
+
+            if collapse_split and mode == MODE_SPLIT and "Season" in prow.index and pd.notna(prow.get("Season")):
+                pname = f'{html.escape(pname)} <span style="color:#aaa;font-weight:400;font-size:0.85rem;">– {int(prow["Season"])}</span>'
+            else:
+                pname = html.escape(pname)
             stat_parts = []
             for stat, op, threshold in active_filters:
                 val = prow.get(stat, np.nan)
