@@ -437,16 +437,14 @@ span_label  = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 team_label  = f"{TEAM_OPTIONS.get(team_val, "")}" if team_val != "all" else ""
 mode_label  = " (Single Season) " if mode == MODE_SPLIT else ""
-worst_label = "Worst" if show_worst else "Best"
-middle_label = " in " if mode == MODE_SINGLE else ": "
+worst_label = "(Worst)" if show_worst else ""
 
-overall_label = "Hitters" 
-if preset_index == 3: 
-    overall_label = "Defenders"
+
+overall_label = "Stat Leaders" 
 
 title = re.sub(
     r"  +", " ",
-    f"{worst_label} {team_label} {overall_label}{middle_label} {span_label}{mode_label}{pos_suffix}".strip()
+    f"{team_label}{span_label} {overall_label} {mode_label}{worst_label} {pos_suffix}".strip()
 )
 
 min_pa_subtitle = (

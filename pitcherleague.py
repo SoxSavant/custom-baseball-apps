@@ -399,12 +399,13 @@ cards = [make_card(s, r) for s, r in leader_rows]
 span_label  = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 team_label  = f"{TEAM_OPTIONS.get(team_val, '')}" if team_val != "all" else ""
 mode_label  = " (Single Season) " if mode == MODE_SPLIT else ""
-worst_label = "Worst" if show_worst else "Best"
-middle_label = " in " if mode == MODE_SINGLE else ": "
+worst_label = "(Worst)" if show_worst else ""
+
+overall_label = "Stat Leaders" 
 
 title = re.sub(
     r"  +", " ",
-    f"{worst_label} {team_label} Pitchers{middle_label}{span_label}{mode_label}".strip()
+    f"{team_label}{span_label} {overall_label} {mode_label}{worst_label} ".strip()
 )
 
 min_ip_subtitle = (

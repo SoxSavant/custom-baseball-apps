@@ -392,4 +392,55 @@ def load_final_year(year: int) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()"""
 
+def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
+    """Try each year in range to find the PlayerId for a name."""
+    for year in range(end_year, start_year - 1, -1):
+        pid = get_player_id_by_name(name, year)
+        if pid is not None:
+            return pid
+    return None
+@st.cache_data(show_spinner=False, ttl=3600)
+def get_player_id_by_name(name: str, year: int) -> int | None:
+    """Look up PlayerId for an exact name match in a given year."""
+    df = load_final_year(year)
+    if df is None or df.empty or "Name" not in df.columns:
+        return None
+    # Try exact match first
+    match = df[df["Name"].str.strip() == name.strip()]
+    if match.empty:
+        # Try case-insensitive
+        match = df[df["Name"].str.lower().str.strip() == name.lower().strip()]
+    if match.empty:
+        return None
+    ids = match["PlayerId"].dropna()
+    return int(ids.iloc[0]) if not ids.empty else None
 
+STAT_PRESETS = {
+    "Default": [
+        "fWAR", "bWAR", "G", "PA", "HR", "wRC+", "xwOBA",
+        "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
+    ],
+   
+    "Statcast": [
+        "fWAR", "Off", "BsR", "Def", "wOBA",
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
+        "Chase%", "Whiff%", "K%", "BB%",
+    ],
+    "Standard": [
+        "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
+        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+        "K%", "BB%", "DRS",
+    ],
+    "Fielding": [
+        "DRS", "FRV", "OAA", "FRM"
+    ],
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": [
+        "fWAR",
+    ],
+    "Player A leads": [],
+    "Player B leads": [],
+    "Player C leads": [],
+    "Player D leads": [],
+    "Player E leads": [],
+}

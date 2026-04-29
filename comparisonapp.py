@@ -157,40 +157,11 @@ with meta_col:
 
 STATCAST_HITTING_START_YEAR = 2015
 
-from h_utils import EVERY_STAT_PRESET, load_final_year, aggregate_player_group
+from h_utils import STAT_PRESETS, load_final_year, aggregate_player_group, resolve_player_id
 
-STAT_PRESETS = {
-    "Default": [
-        "bWAR", "fWAR", "G", "PA", "HR", "wRC+", "xwOBA",
-        "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
-    ],
-   
-    "Statcast": [
-        "fWAR", "Off", "BsR", "Def", "wOBA",
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
-        "Chase%", "Whiff%", "K%", "BB%",
-    ],
-    "Standard": [
-        "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
-        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
-        "K%", "BB%", "DRS",
-    ],
-    "Fielding": [
-        "DRS", "FRV", "OAA", "FRM"
-    ],
-    "Every Stat": EVERY_STAT_PRESET,
-    "Blank – Create your own": [
-        "fWAR",
-    ],
-    "Player A leads": [],
-    "Player B leads": [],
-    "Player C leads": [],
-    "Player D leads": [],
-    "Player E leads": [],
-}
 
-from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES, SUM_STATS, 
-                     RATE_STATS, STATCAST_RATE_STATS, format_stat, start_year,
+from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES,  
+                    format_stat, start_year,
                     get_headshot, label_map, lower_better, TRUTHY_STRINGS, 
                     normalize_team, get_team_display, MAX_STATS 
                     )
@@ -272,32 +243,6 @@ def search_players(query: str, year: int) -> pd.DataFrame:
     return df[mask][["Name", "PlayerId"]].drop_duplicates()
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
-def get_player_id_by_name(name: str, year: int) -> int | None:
-    """Look up PlayerId for an exact name match in a given year."""
-    df = load_final_year(year)
-    if df is None or df.empty or "Name" not in df.columns:
-        return None
-    # Try exact match first
-    match = df[df["Name"].str.strip() == name.strip()]
-    if match.empty:
-        # Try case-insensitive
-        match = df[df["Name"].str.lower().str.strip() == name.lower().strip()]
-    if match.empty:
-        return None
-    ids = match["PlayerId"].dropna()
-    return int(ids.iloc[0]) if not ids.empty else None
-
-
-def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
-    """Try each year in range to find the PlayerId for a name."""
-    for year in range(end_year, start_year - 1, -1):
-        pid = get_player_id_by_name(name, year)
-        if pid is not None:
-            return pid
-    return None
-
-
 # ─────────────────────────────────────────────
 #  Layout
 # ─────────────────────────────────────────────
@@ -322,7 +267,7 @@ with left_col:
 current_year = date.today().year
 years_desc = list(range(current_year, start_year-1, -1)) 
 MAX_PLAYERS = 5
-default_names = ["Yordan Alvarez", "Ben Rice", "", "", ""]
+default_names = ["Yordan Alvarez", "Elly De La Cruz", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
