@@ -422,8 +422,8 @@ STAT_PRESETS = {
     ],
    
     "Statcast": [
-        "fWAR", "Off", "BsR", "Def", "wOBA",
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 
+        "BatSpd","Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Standard": [
