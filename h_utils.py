@@ -444,3 +444,30 @@ STAT_PRESETS = {
     "Player D leads": [],
     "Player E leads": [],
 }
+
+STAT_PRESETS_YOY = {
+    "Statcast": [
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 
+        "BatSpd","Squared-Up%",
+        "Chase%", "Whiff%", "K%", "BB%",
+    ],
+    "Stat Mix": [
+        "fWAR", "bWAR", "G", "PA", "HR", "wRC+", "xwOBA",
+        "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
+    ],
+
+    "Standard": [
+        "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
+        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+        "K%", "BB%", "DRS",
+    ],
+    "Fielding": [
+        "DRS", "FRV", "OAA", "FRM"
+    ],
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": [
+        "fWAR",
+    ],
+    "Only Improvements": [],
+    "Only Regressions": [],
+}

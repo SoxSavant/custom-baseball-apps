@@ -38,10 +38,9 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from h_utils import (
-    STAT_ALLOWLIST, STAT_PRESETS, STAT_DISPLAY_NAMES, TRUTHY_STRINGS,
+    STAT_ALLOWLIST, STAT_PRESETS_YOY, STAT_DISPLAY_NAMES, TRUTHY_STRINGS,
     start_year as DATA_START_YEAR, get_headshot, label_map, lower_better,
     format_stat, format_stat_yoy, load_final_year, normalize_team, get_team_display,
-    MAX_STATS,
 )
 
 current_year = date.today().year
@@ -117,7 +116,7 @@ years_desc = list(range(current_year, DATA_START_YEAR - 1, -1))
 # ─────────────────────────────────────────────
 
 for key, default in [
-    ("iyoy_player",         "Yordan Alvarez"),
+    ("iyoy_player",         "Aaron Judge"),
     ("iyoy_player_id",      ""),
     ("iyoy_player_mode",    "Name"),
     ("iyoy_start_year",     current_year - 1),
@@ -139,7 +138,7 @@ REMOVE_SELECT_KEY    = "iyoy_remove_stat_select"
 ADD_RESET_KEY        = "iyoy_reset_add_select"
 REMOVE_RESET_KEY     = "iyoy_reset_remove_select"
 
-DEFAULT_PRESET = "Default"
+DEFAULT_PRESET = "Statcast"
 
 # ─────────────────────────────────────────────
 #  Left column controls
@@ -200,9 +199,6 @@ with left_col:
 
     # ── Build stat options ───────────────────────
     stat_exclusions = {"Season", "PlayerId", "MLBAMID"}
-    numeric_start = {c for c in row_start.index if pd.api.types.is_numeric_dtype(type(row_start[c]))}
-    numeric_end   = {c for c in row_end.index   if pd.api.types.is_numeric_dtype(type(row_end[c]))}
-    # Also check via to_numeric
     numeric_start = {c for c in row_start.index if pd.notna(pd.to_numeric(row_start[c], errors="coerce"))}
     numeric_end   = {c for c in row_end.index   if pd.notna(pd.to_numeric(row_end[c],   errors="coerce"))}
     numeric_stats_set = (numeric_start & numeric_end) - stat_exclusions
@@ -241,11 +237,29 @@ with left_col:
         return cleaned if cleaned else [r.copy() for r in fallback]
 
     def get_preset_base(preset_name):
-        preset_stats = STAT_PRESETS.get(preset_name, [])
+        preset_stats = STAT_PRESETS_YOY.get(preset_name, [])
         filtered = [s for s in preset_stats if s in stat_options]
         if not filtered and stat_options:
             filtered = [stat_options[0]]
         return [{"Stat": s, "Show": True} for s in filtered]
+
+    def compute_direction_preset(want_improvement: bool) -> list[dict]:
+        """Return stat config for all stats that improved (or regressed)."""
+        matched = []
+        for stat in STAT_ALLOWLIST:
+            if stat not in stat_options:
+                continue
+            s_val = pd.to_numeric(row_start.get(stat, np.nan), errors="coerce")
+            e_val = pd.to_numeric(row_end.get(stat,   np.nan), errors="coerce")
+            if pd.isna(s_val) or pd.isna(e_val):
+                continue
+            delta = float(e_val - s_val)
+            if delta == 0:
+                continue
+            is_improvement = (delta < 0) if (stat in lower_better) else (delta > 0)
+            if is_improvement == want_improvement:
+                matched.append(stat)
+        return [{"Stat": s, "Show": True} for s in matched] if matched else get_preset_base(DEFAULT_PRESET)
 
     def add_stat_callback():
         choice = st.session_state.get(ADD_SELECT_KEY)
@@ -274,7 +288,14 @@ with left_col:
 
     def preset_callback():
         preset_name = st.session_state.get(STAT_PRESET_KEY, DEFAULT_PRESET)
-        new_config = get_preset_base(preset_name)
+
+        if preset_name == "Only Improvements":
+            new_config = compute_direction_preset(want_improvement=True)
+        elif preset_name == "Only Regressions":
+            new_config = compute_direction_preset(want_improvement=False)
+        else:
+            new_config = get_preset_base(preset_name)
+
         st.session_state[STAT_STATE_KEY] = new_config
         bump_version()
         st.session_state[MANUAL_UPDATE_KEY] = True
@@ -310,7 +331,7 @@ with left_col:
     )
 
     # ── Stat preset selector ─────────────────────
-    preset_options = list(STAT_PRESETS.keys())
+    preset_options = list(STAT_PRESETS_YOY.keys())
     prior_preset = st.session_state.get(STAT_PRESET_KEY, DEFAULT_PRESET)
     preset_index = preset_options.index(prior_preset) if prior_preset in preset_options else 0
     st.selectbox(
@@ -420,19 +441,58 @@ for stat in stats_order:
     if pd.isna(s_val) and pd.isna(e_val):
         continue
 
-    delta = e_val - s_val if pd.notna(s_val) and pd.notna(e_val) else np.nan
-
     start_display = format_stat(stat, s_val) if pd.notna(s_val) else "—"
     end_display   = format_stat(stat, e_val) if pd.notna(e_val) else "—"
 
-    # Delta display + colour
+    # Compute delta from display-rounded values so "10.1 → 10.1" never shows a non-zero delta.
+    # For % stats format_stat scales raw decimals (0.237) to 23.7%, so we must
+    # subtract the scaled display values and pass the scaled delta to format_stat_yoy.
+    def _parse_display(s):
+        try:
+            return float(s.replace("%", "").replace(",", "").strip())
+        except Exception:
+            return np.nan
+
+    def _is_pct_stat(stat):
+        return (
+            "Barrel" in stat or "Hard" in stat or "K%" in stat
+            or "Swing" in stat or "Whiff" in stat or "%" in stat
+        )
+
+    if pd.notna(s_val) and pd.notna(e_val):
+        s_rounded = _parse_display(start_display)
+        e_rounded = _parse_display(end_display)
+        if not np.isnan(s_rounded) and not np.isnan(e_rounded):
+            raw_delta = e_rounded - s_rounded
+            # If it's a % stat, display values are already in pct-point scale (e.g. 23.7).
+            # Convert back to raw scale so format_stat_yoy formats correctly,
+            # unless format_stat_yoy also expects the scaled value — keep scaled.
+            if _is_pct_stat(stat):
+                delta = raw_delta  # already in display pct-point units; pass directly
+                delta_is_scaled = True
+            else:
+                delta = raw_delta
+                delta_is_scaled = False
+        else:
+            delta = np.nan
+            delta_is_scaled = False
+    else:
+        delta = np.nan
+        delta_is_scaled = False
+
     if pd.isna(delta):
         delta_display = "—"
         delta_class   = ""
     else:
         is_positive = float(delta) > 0
-        delta_display = format_stat_yoy(stat, delta, show_sign=is_positive)
-        # green = improvement, red = got worse
+        # For % stats the delta is already in display pct-point units (e.g. +3.2),
+        # so format it directly instead of through format_stat_yoy which would
+        # re-scale a raw decimal.
+        if delta_is_scaled:
+            sign = "+" if is_positive else ""
+            delta_display = f"{sign}{delta:.1f}%"
+        else:
+            delta_display = format_stat_yoy(stat, delta, show_sign=is_positive)
         if stat in lower_better:
             improvement = float(delta) < 0
         else:
@@ -453,18 +513,34 @@ for stat in stats_order:
 
 headshot_html = f'<img src="{esc(headshot_url)}" class="headshot-img" alt="{esc(display_name)}" />' if headshot_url else ""
 
-tbody_rows = []
-for tr in table_rows:
-    tbody_rows.append(f"""
-      <tr>
-        <td class="stat-col">{esc(tr['stat_label'])}</td>
-        <td class="year-col">{esc(tr['start_display'])}</td>
-        <td class="delta-col {esc(tr['delta_class'])}">{esc(tr['delta_display'])}</td>
-        <td class="year-col">{esc(tr['end_display'])}</td>
-      </tr>
-    """)
+# ── Pair up stats into two-per-row ──────────────
+pairs = []
+for i in range(0, len(table_rows), 2):
+    left = table_rows[i]
+    right = table_rows[i + 1] if i + 1 < len(table_rows) else None
+    pairs.append((left, right))
 
-table_body = "\n".join(tbody_rows)
+def stat_block(tr, side="left"):
+    border_style = "border-right: 2px solid #e8e8e8;" if side == "left" else ""
+    delta_cls = tr["delta_class"]
+    return f"""
+      <div class="stat-block" style="{border_style}">
+        <div class="stat-label">{esc(tr["stat_label"])}</div>
+        <div class="val-start">{esc(tr["start_display"])}</div>
+        <div class="val-delta {esc(delta_cls)}">{esc(tr["delta_display"])}</div>
+        <div class="val-end">{esc(tr["end_display"])}</div>
+      </div>"""
+
+pair_rows_html = []
+for left, right in pairs:
+    right_html = stat_block(right, "right") if right else '<div class="stat-block"></div>'
+    pair_rows_html.append(f"""
+    <div class="stat-row">
+      {stat_block(left, "left")}
+      {right_html}
+    </div>""")
+
+pairs_html = "\n".join(pair_rows_html)
 
 card_html = f"""
 <html>
@@ -473,109 +549,114 @@ card_html = f"""
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   html, body {{
-    margin: 0; padding: 0 0 20px 0;
+    margin: 0; padding: 0 0 24px 0;
     background: transparent;
     font-family: "Source Sans Pro", sans-serif;
-    display: inline-block;
-    width: auto;
   }}
   .card {{
     background: #ffffff;
     border: 1px solid #d0d0d0;
     border-radius: 12px;
-    padding: 1.5rem 1.75rem 2rem;
+    padding: 1.5rem 1.75rem 1.5rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    display: inline-block;
     box-sizing: border-box;
+    width: 680px;
   }}
-  /* ── Player header ── */
   .player-header {{
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 1rem;
-    min-width: 0;
+    margin-bottom: 1.2rem;
   }}
   .headshot-img {{
-    width: 140px;
-    height: 140px;
+    width: 170px;
+    height: 170px;
     object-fit: cover;
     border-radius: 6px;
     border: 1px solid #e0e0e0;
     background: #f6f6f6;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.5rem;
   }}
   .player-name {{
     font-weight: 900;
-    font-size: 1.55rem;
+    font-size: 1.8rem;
     line-height: 1.1;
     margin: 0;
     text-align: center;
   }}
   .player-meta {{
     color: #666;
+    font-size: 1.1rem;
+    margin: 0.2rem 0 0 0;
+    text-align: center;
+  }}
+  .col-header {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 2px solid #c9cdd4;
+    border-bottom: 2px solid #c9cdd4;
+    margin-bottom: 0;
+  }}
+  .col-header-half {{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    padding: 10px 14px;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #590505;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    gap: 0;
+  }}
+  .col-header-half:first-child {{
+    border-right: 2px solid #e8e8e8;
+  }}
+  .col-header-half span {{ text-align: center; }}
+  .col-header-half span:first-child {{ text-align: left; }}
+  .stat-row {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid #efefef;
+  }}
+  .stat-row:last-child {{ border-bottom: none; }}
+  .stat-block {{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    align-items: center;
+    padding: 7px 14px;
+    gap: 6px;
+  }}
+  .stat-label {{
+    font-weight: 800;
     font-size: 1rem;
-    margin: 0.1rem 0 0 0;
-    text-align: center;
+    color: #111;
+    text-align: left;
   }}
-  /* ── Table ── */
-  .yoy-table {{
-    border-collapse: collapse;
-    font-size: 13px;
-    table-layout: auto;
-    width: auto;
-  }}
-  .yoy-table th, .yoy-table td {{
-    border: 1px solid #d0d0d0;
-    padding: 5px 26px;
+  .val-start, .val-end {{
+    font-size: 1.1rem;
+    color: #333;
     text-align: center;
     white-space: nowrap;
   }}
-  .yoy-table thead tr th {{
-    background: #f1f1f1;
+  .val-delta {{
+    font-size: 1.2rem;
     font-weight: 800;
-    font-size: 14px;
-    color: #7b0d0d;
-    line-height: 1.3;
-  }}
-  .stat-col {{
-    text-align: center !important;
-    font-weight: 700;
-    background: #fafafa;
-    color: #111;
+    text-align: center;
     white-space: nowrap;
-    min-width: 70px;
+    color: #555;
   }}
-  thead .stat-col {{
-    text-align: center !important;
-  }}
-  .year-col {{
-    background: #ffffff;
-    color: #111;
-    white-space: nowrap;
-    min-width: 60px;
-  }}
-  .delta-col {{
-    font-weight: 800;
-    background: #ffffff;
-    color: #111;
-    white-space: nowrap;
-    min-width: 70px;
-  }}
-  .delta-good {{
-    color: #1a7a3c;
-  }}
-  .delta-bad {{
-    color: #c0392b;
-  }}
-  /* ── Footer ── */
+  .delta-good {{ color: #1a7a3c; }}
+  .delta-bad  {{ color: #c0392b; }}
   .footer {{
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-top: 0.75rem;
-    color: #888;
-    font-size: 0.85rem;
+    margin-top: 1rem;
+    padding-top: 0.6rem;
+    color: #777;
+    font-size: 0.95rem;
+  }}
+  .signs {{
+    color: #635c5b;
   }}
 </style>
 </head>
@@ -588,19 +669,16 @@ card_html = f"""
     <div class="player-meta">{esc(team_display)} &nbsp;|&nbsp; {int(start_yr)} → {int(end_yr)}</div>
   </div>
 
-  <table class="yoy-table">
-    <thead>
-      <tr>
-        <th class="stat-col">Stat</th>
-        <th>{int(start_yr)}</th>
-        <th>Change</th>
-        <th>{int(end_yr)}</th>
-      </tr>
-    </thead>
-    <tbody>
-      {table_body}
-    </tbody>
-  </table>
+  <div class="col-header">
+    <div class="col-header-half">
+      <span>Stat</span><span>{int(start_yr)}</span><span class = "signs">+/-</span><span>{int(end_yr)}</span>
+    </div>
+    <div class="col-header-half">
+      <span>Stat</span><span>{int(start_yr)}</span><span class = "signs">+/-</span><span>{int(end_yr)}</span>
+    </div>
+  </div>
+
+  {pairs_html}
 
   <div class="footer">
     <div>By: Sox_Savant</div>
@@ -613,8 +691,8 @@ card_html = f"""
 """
 
 with right_col:
-    row_count  = len(table_rows)
-    card_height = max(600, 380 + row_count * 38)
+    row_count = len(pairs)
+    card_height = max(560, 380 + row_count * 62)
     components.html(card_html, height=card_height)
     st.caption("Screenshot to save")
     st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
