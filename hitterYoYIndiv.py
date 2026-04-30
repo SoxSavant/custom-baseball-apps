@@ -692,7 +692,7 @@ card_html = f"""
 
 with right_col:
     row_count = len(pairs)
-    card_height = max(560, 380 + row_count * 62)
+    card_height = max(560, 250 + row_count * 80)
     components.html(card_html, height=card_height)
     st.caption("Screenshot to save")
     st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
