@@ -142,29 +142,9 @@ with meta_col:
 #  Constants
 # ─────────────────────────────────────────────
 
-from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, EVERY_STAT_PRESET,
+from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, STAT_PRESETS,
 get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, aggregate_player_group)
 
-
-STAT_PRESETS = {
-    "Default": [
-        "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
-        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
-    ],
-    "Statcast": [
-        "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
-    ],
-    "Standard": [
-        "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
-    ], 
-    "Every Stat": EVERY_STAT_PRESET,
-    "Blank – Create your own": ["fWAR"],
-    "Player A leads": [],
-    "Player B leads": [],
-    "Player C leads": [],
-    "Player D leads": [],
-    "Player E leads": [],
-}
 
 
 

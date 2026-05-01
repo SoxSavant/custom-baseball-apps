@@ -66,6 +66,8 @@ EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
         "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
         "Chase%", "Whiff%", "WPA", "Clutch", ]
 
+
+
 SUM_STATS = {
     "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR", "TBF",
 }
@@ -392,3 +394,40 @@ def load_final_year(year: int) -> pd.DataFrame:
         return df
     except Exception:
         return pd.DataFrame()"""
+    
+STAT_PRESETS = {
+    "Default": [
+        "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
+    ],
+    "Statcast": [
+        "fWAR", "xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
+    "Standard": [
+        "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
+    ], 
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": ["fWAR"],
+    "Player A leads": [],
+    "Player B leads": [],
+    "Player C leads": [],
+    "Player D leads": [],
+    "Player E leads": [],
+}
+
+STAT_PRESETS_YOY = {
+    "Statcast": [
+         "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
+    "Default": [
+        "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
+    ],
+    "Standard": [
+        "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
+    ], 
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": ["fWAR"],
+    "Only Improvements": [],
+    "Only Regressions": [],
+}
