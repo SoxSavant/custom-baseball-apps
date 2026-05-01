@@ -531,54 +531,58 @@ def stat_block(tr, side="left"):
         <div class="val-end">{esc(tr["end_display"])}</div>
       </div>"""
 
-pair_rows_html = []
-for left, right in pairs:
-    right_html = stat_block(right, "right") if right else '<div class="stat-block"></div>'
-    pair_rows_html.append(f"""
+# Replace the pairs loop entirely:
+rows_html = []
+for tr in table_rows:
+    delta_cls = tr["delta_class"]
+    rows_html.append(f"""
     <div class="stat-row">
-      {stat_block(left, "left")}
-      {right_html}
+      <div class="stat-label">{esc(tr["stat_label"])}</div>
+      <div class="val-start">{esc(tr["start_display"])}</div>
+      <div class="val-delta {esc(delta_cls)}">{esc(tr["delta_display"])}</div>
+      <div class="val-end">{esc(tr["end_display"])}</div>
     </div>""")
 
-pairs_html = "\n".join(pair_rows_html)
+rows_html_str = "\n".join(rows_html)
 
 card_html = f"""
 <html>
 <head>
 <meta charset="utf-8"/>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
   html, body {{
     margin: 0; padding: 0 0 24px 0;
     background: transparent;
-    font-family: "Source Sans Pro", sans-serif;
+    font-family: Source Sans Pro, sans-serif;
   }}
   .card {{
     background: #ffffff;
     border: 1px solid #d0d0d0;
     border-radius: 12px;
-    padding: 1.5rem 1.75rem 1.5rem;
+    padding: 1.5rem 1.5rem 1.5rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     box-sizing: border-box;
-    width: 680px;
+    width: 700px;
   }}
   .player-header {{
     display: flex;
-    flex-direction: column;
     align-items: center;
-    margin-bottom: 1.2rem;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 1rem;
   }}
   .headshot-img {{
-    width: 170px;
-    height: 170px;
+    width: 150px;
+    height: 150px;
     object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid #e0e0e0;
+    border-radius: 100px;
+    border: 2px solid #dedede;
     background: #f6f6f6;
-    margin-bottom: 0.5rem;
   }}
   .player-name {{
-    font-weight: 900;
+    font-weight: 700;
     font-size: 1.8rem;
     line-height: 1.1;
     margin: 0;
@@ -587,53 +591,54 @@ card_html = f"""
   .player-meta {{
     color: #666;
     font-size: 1.1rem;
-    margin: 0.2rem 0 0 0;
+    margin: 0.2rem 0 0 0rem;
     text-align: center;
   }}
-  .col-header {{
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-top: 2px solid #c9cdd4;
-    border-bottom: 2px solid #c9cdd4;
-    margin-bottom: 0;
+  .player-info {{
+    display: block;
+    margin-left: 1rem;
   }}
-  .col-header-half {{
+ .col-header {{
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
-    padding: 10px 14px;
-    font-size: 1.2rem;
+    border-top: 2px solid #c9cdd4;
+    border-bottom: 2px solid #c9cdd4;
+    padding: 8px 14px;
+    font-size: 1.1rem;
     font-weight: 800;
     color: #590505;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    gap: 0;
-  }}
-  .col-header-half:first-child {{
-    border-right: 2px solid #e8e8e8;
-  }}
-  .col-header-half span {{ text-align: center; }}
-  .col-header-half span:first-child {{ text-align: left; }}
-  .stat-row {{
+    text-align: center;
+}}
+.stat-row {{
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     border-bottom: 1px solid #efefef;
-  }}
-  .stat-row:last-child {{ border-bottom: none; }}
+    align-items: center;
+    padding: 5.5px 10px;
+    gap: 6px;
+    
+}}
+  .stat-row:last-child {{ 
+    border-bottom: none; 
+    }}
   .stat-block {{
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
     align-items: center;
-    padding: 7px 14px;
-    gap: 6px;
+    padding: 4px 10px;
+    gap: 2px;
   }}
   .stat-label {{
-    font-weight: 800;
+    font-weight: 900;
     font-size: 1rem;
     color: #111;
-    text-align: left;
+    text-align: center;
   }}
   .val-start, .val-end {{
     font-size: 1.1rem;
+    font-weight: 500;
     color: #333;
     text-align: center;
     white-space: nowrap;
@@ -641,16 +646,20 @@ card_html = f"""
   .val-delta {{
     font-size: 1.2rem;
     font-weight: 800;
-    text-align: center;
     white-space: nowrap;
     color: #555;
+    text-align: center;
   }}
-  .delta-good {{ color: #1a7a3c; }}
-  .delta-bad  {{ color: #c0392b; }}
+  .delta-good {{ 
+    color: #1a7a3c; 
+    }}
+  .delta-bad  {{ 
+    color: #c0392b; 
+    }}
   .footer {{
     display: flex;
     justify-content: space-between;
-    margin-top: 1rem;
+    margin-top: .5rem;
     padding-top: 0.6rem;
     color: #777;
     font-size: 0.95rem;
@@ -665,20 +674,17 @@ card_html = f"""
 
   <div class="player-header">
     {headshot_html}
+    <div class = "player-info">
     <div class="player-name">{esc(display_name)}</div>
     <div class="player-meta">{esc(team_display)} &nbsp;|&nbsp; {int(start_yr)} → {int(end_yr)}</div>
-  </div>
-
-  <div class="col-header">
-    <div class="col-header-half">
-      <span>Stat</span><span>{int(start_yr)}</span><span class = "signs">+/-</span><span>{int(end_yr)}</span>
-    </div>
-    <div class="col-header-half">
-      <span>Stat</span><span>{int(start_yr)}</span><span class = "signs">+/-</span><span>{int(end_yr)}</span>
     </div>
   </div>
 
-  {pairs_html}
+ <div class="col-header">
+  <span>Stat</span><span>{int(start_yr)}</span><span class="signs">+/-</span><span>{int(end_yr)}</span>
+</div>
+
+  {rows_html_str}
 
   <div class="footer">
     <div>By: Sox_Savant</div>
@@ -692,7 +698,7 @@ card_html = f"""
 
 with right_col:
     row_count = len(pairs)
-    card_height = max(560, 250 + row_count * 80)
+    card_height = max(560, 250 + row_count * 100)
     components.html(card_html, height=card_height)
     st.caption("Screenshot to save")
     st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
