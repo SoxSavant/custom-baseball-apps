@@ -146,8 +146,6 @@ from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, STAT_PRESETS,
 get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, aggregate_player_group)
 
 
-
-
 # ─────────────────────────────────────────────
 #  Name utilities
 # ─────────────────────────────────────────────
