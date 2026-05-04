@@ -184,6 +184,19 @@ def outs_to_ip(outs: float) -> float:
     remainder = int(round(float(outs) % 3))
     return innings + remainder / 10
 
+@st.cache_data(show_spinner=False)
+def get_player_id_by_name(name: str, year: int) -> int | None:
+    df = load_final_year(year)
+    if df is None or df.empty or "Name" not in df.columns:
+        return None
+    match = df[df["Name"].str.strip() == name.strip()]
+    if match.empty:
+        match = df[df["Name"].str.lower().str.strip() == name.lower().strip()]
+    if match.empty:
+        return None
+    ids = match["PlayerId"].dropna()
+    return int(ids.iloc[0]) if not ids.empty else None
+
 def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
     result: dict = {}
 
@@ -371,7 +384,7 @@ s3 = boto3.client(
 
 bucket = "sports-analytics-files"
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=900)
 def load_final_year(year: int) -> pd.DataFrame:
     key = f"processed/pitching_final_{year}.csv"
     try:
@@ -384,7 +397,7 @@ def load_final_year(year: int) -> pd.DataFrame:
     
 
 # old loading function
-    """@st.cache_data(show_spinner=False, ttl=3600)
+    """@st.cache_data(show_spinner=False, ttl=900)
 def load_final_year(year: int) -> pd.DataFrame:
     path = f"data/final/pitching_final_{year}.csv"
     try:

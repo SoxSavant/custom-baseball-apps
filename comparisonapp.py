@@ -211,7 +211,7 @@ def display_stat_name(stat) -> str:
 #  Player profile builder — no pybaseball
 # ─────────────────────────────────────────────
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False)
 def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
     frames = []
     for year in range(start_year, end_year + 1):
@@ -231,16 +231,6 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
         return None
 
     return pd.Series(agg)
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def search_players(query: str, year: int) -> pd.DataFrame:
-    """Search players by name in a given year's final CSV."""
-    df = load_final_year(year)
-    if df is None or df.empty or "Name" not in df.columns:
-        return pd.DataFrame()
-    mask = df["Name"].str.contains(query, case=False, na=False)
-    return df[mask][["Name", "PlayerId"]].drop_duplicates()
 
 
 # ─────────────────────────────────────────────

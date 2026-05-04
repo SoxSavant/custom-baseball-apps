@@ -369,7 +369,7 @@ s3 = boto3.client(
 
 bucket = "sports-analytics-files"
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False, ttl=900)
 def load_final_year(year: int) -> pd.DataFrame:
     key = f"processed/hitting_final_{year}.csv"
     try:
@@ -381,7 +381,7 @@ def load_final_year(year: int) -> pd.DataFrame:
         return pd.DataFrame()
     
 # old loading function
-    """@st.cache_data(show_spinner=False, ttl=3600)
+    """@st.cache_data(show_spinner=False, ttl=900)
 def load_final_year(year: int) -> pd.DataFrame:
     path = f"data/final/hitting_final_{year}.csv"
     try:
@@ -399,7 +399,7 @@ def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
         if pid is not None:
             return pid
     return None
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False)
 def get_player_id_by_name(name: str, year: int) -> int | None:
     """Look up PlayerId for an exact name match in a given year."""
     df = load_final_year(year)

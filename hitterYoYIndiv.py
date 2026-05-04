@@ -41,6 +41,7 @@ from h_utils import (
     STAT_ALLOWLIST, STAT_PRESETS_YOY, STAT_DISPLAY_NAMES, TRUTHY_STRINGS,
     start_year as DATA_START_YEAR, get_headshot, label_map, lower_better,
     format_stat, format_stat_yoy, load_final_year, normalize_team, get_team_display,
+    get_player_id_by_name
 )
 
 current_year = date.today().year
@@ -66,24 +67,6 @@ def display_stat_name(stat) -> str:
     return STAT_DISPLAY_NAMES.get(str(stat), str(stat))
 
 
-# ─────────────────────────────────────────────
-#  Player lookup helpers
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def get_player_id_by_name(name: str, year: int) -> int | None:
-    df = load_final_year(year)
-    if df is None or df.empty or "Name" not in df.columns:
-        return None
-    match = df[df["Name"].str.strip() == name.strip()]
-    if match.empty:
-        match = df[df["Name"].str.lower().str.strip() == name.lower().strip()]
-    if match.empty:
-        return None
-    ids = match["PlayerId"].dropna()
-    return int(ids.iloc[0]) if not ids.empty else None
-
-
 def resolve_player_id(name: str, y1: int, y2: int) -> int | None:
     for year in range(y2, y1 - 1, -1):
         pid = get_player_id_by_name(name, year)
@@ -92,7 +75,7 @@ def resolve_player_id(name: str, y1: int, y2: int) -> int | None:
     return None
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False)
 def load_player_year(player_id: int, year: int) -> pd.Series | None:
     df = load_final_year(year)
     if df is None or df.empty:

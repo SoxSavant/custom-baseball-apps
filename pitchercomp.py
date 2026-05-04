@@ -143,7 +143,8 @@ with meta_col:
 # ─────────────────────────────────────────────
 
 from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, STAT_PRESETS,
-get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, aggregate_player_group)
+get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, 
+get_player_id_by_name, aggregate_player_group)
 
 
 # ─────────────────────────────────────────────
@@ -165,7 +166,7 @@ def normalize_name(raw: str) -> str:
 #  Player profile builder
 # ─────────────────────────────────────────────
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False)
 def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
     frames = []
     for year in range(start_year, end_year + 1):
@@ -187,20 +188,6 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
     player_id = agg.get("MLBAMID")
 
     return pd.Series(agg)
-
-
-@st.cache_data(show_spinner=False, ttl=3600)
-def get_player_id_by_name(name: str, year: int) -> int | None:
-    df = load_final_year(year)
-    if df is None or df.empty or "Name" not in df.columns:
-        return None
-    match = df[df["Name"].str.strip() == name.strip()]
-    if match.empty:
-        match = df[df["Name"].str.lower().str.strip() == name.lower().strip()]
-    if match.empty:
-        return None
-    ids = match["PlayerId"].dropna()
-    return int(ids.iloc[0]) if not ids.empty else None
 
 
 def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:

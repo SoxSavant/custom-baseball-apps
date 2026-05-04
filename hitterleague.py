@@ -90,7 +90,7 @@ def normalize_name(raw: str) -> str:
     return " ".join(cleaned.split()).lower()
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
+@st.cache_data(show_spinner=False)
 def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.DataFrame:
     if mode == MODE_SINGLE:
         return load_final_year(s_year)
