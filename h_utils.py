@@ -399,7 +399,7 @@ def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
         if pid is not None:
             return pid
     return None
-@st.cache_data(show_spinner=False)
+
 def get_player_id_by_name(name: str, year: int) -> int | None:
     """Look up PlayerId for an exact name match in a given year."""
     df = load_final_year(year)

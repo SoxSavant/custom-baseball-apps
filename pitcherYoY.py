@@ -47,10 +47,6 @@ normalize_team, get_team_display,load_final_year)
 
 current_year = date.today().year
 
-# ─────────────────────────────────────────────
-#  YoY delta builder
-# ─────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
 def load_risers_data(
     start_year: int, end_year: int,
     min_ip_start: int = 0, min_ip_end: int = 0, team: str = "all"

@@ -166,7 +166,6 @@ def normalize_name(raw: str) -> str:
 #  Player profile builder
 # ─────────────────────────────────────────────
 
-@st.cache_data(show_spinner=False)
 def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
     frames = []
     for year in range(start_year, end_year + 1):

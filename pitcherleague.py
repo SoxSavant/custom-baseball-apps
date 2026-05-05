@@ -74,7 +74,7 @@ MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
 
-@st.cache_data(show_spinner=False)
+
 def load_data(s_year: int, e_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SINGLE:
         return load_final_year(s_year)

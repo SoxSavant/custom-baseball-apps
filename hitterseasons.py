@@ -56,7 +56,6 @@ def update_stat_default(i):
 
 
 
-@st.cache_data(show_spinner=False)
 def load_all_seasons(start: int, end: int) -> pd.DataFrame:
     frames = []
     for year in range(start, end + 1):

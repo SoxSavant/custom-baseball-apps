@@ -66,7 +66,7 @@ def update_stat_default(i):
     st.session_state[f"pc_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"pc_op_{i}"] = "<=" if stat in lower_better else ">="
 
-@st.cache_data(show_spinner=False)
+
 def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SINGLE:
         return load_final_year(start_year)

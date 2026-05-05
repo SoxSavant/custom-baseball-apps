@@ -184,7 +184,7 @@ def outs_to_ip(outs: float) -> float:
     remainder = int(round(float(outs) % 3))
     return innings + remainder / 10
 
-@st.cache_data(show_spinner=False)
+
 def get_player_id_by_name(name: str, year: int) -> int | None:
     df = load_final_year(year)
     if df is None or df.empty or "Name" not in df.columns:

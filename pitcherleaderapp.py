@@ -57,7 +57,6 @@ current_year = date.today().year
 #  Main data builder
 # ─────────────────────────────────────────────
 
-@st.cache_data(show_spinner=False)
 def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SINGLE:
         return load_final_year(start_year)

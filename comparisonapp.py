@@ -6,7 +6,6 @@ import html
 import unicodedata
 from datetime import date
 from pathlib import Path
-from functools import lru_cache
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾")
 
@@ -207,11 +206,6 @@ def display_stat_name(stat) -> str:
     return STAT_DISPLAY_NAMES.get(str(stat), str(stat))
 
 
-# ─────────────────────────────────────────────
-#  Player profile builder — no pybaseball
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False)
 def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
     frames = []
     for year in range(start_year, end_year + 1):

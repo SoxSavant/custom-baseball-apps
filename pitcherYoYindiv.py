@@ -66,11 +66,6 @@ def display_stat_name(stat) -> str:
     return STAT_DISPLAY_NAMES.get(str(stat), str(stat))
 
 
-# ─────────────────────────────────────────────
-#  Player lookup helpers
-# ─────────────────────────────────────────────
-
-@st.cache_data(show_spinner=False)
 def get_player_id_by_name(name: str, year: int) -> int | None:
     df = load_final_year(year)
     if df is None or df.empty or "Name" not in df.columns:

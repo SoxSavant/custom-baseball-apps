@@ -108,7 +108,6 @@ def format_threshold(stat: str, val: float, op: str) -> str:
     return f"{formatted}+ {lbl}" if op == ">=" else f"≤ {formatted} {lbl}"
 
 
-@st.cache_data(show_spinner=False)
 def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> pd.DataFrame:
     if mode == MODE_SINGLE:
         return load_final_year(start_yr)

@@ -75,7 +75,7 @@ def resolve_player_id(name: str, y1: int, y2: int) -> int | None:
     return None
 
 
-@st.cache_data(show_spinner=False)
+
 def load_player_year(player_id: int, year: int) -> pd.Series | None:
     df = load_final_year(year)
     if df is None or df.empty:
