@@ -5,7 +5,6 @@ import numpy as np
 import unicodedata
 import html
 import re
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Hitter League Leaders", layout="wide", page_icon="⚾")

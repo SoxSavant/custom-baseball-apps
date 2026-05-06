@@ -2,10 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
-import unicodedata
 import html
 import re
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Pitcher League Leaders", layout="wide", page_icon="⚾")
@@ -37,10 +35,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Imports from shared utils
-# ─────────────────────────────────────────────
-
 from p_utils import (
     STAT_ALLOWLIST, start_year,
     get_headshot, label_map, lower_better,
@@ -49,9 +43,7 @@ from p_utils import (
 )
 from utils import get_dynamic_min_ip
 
-# ─────────────────────────────────────────────
-#  Stat presets
-# ─────────────────────────────────────────────
+
 
 PRESETS = {
     "Statcast": [
@@ -64,9 +56,6 @@ PRESETS = {
 
 MAX_DISPLAY_STATS = 10   # grid cap (5 × 2)
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
@@ -102,11 +91,6 @@ def load_data(s_year: int, e_year: int, mode: str) -> pd.DataFrame:
 
     return pd.DataFrame(grouped_rows)
 
-
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 min_ip = get_dynamic_min_ip(current_year)
 default_stats = list(PRESETS["Statcast"])
 
@@ -125,9 +109,6 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ─────────────────────────────────────────────
-#  Stat builder callbacks
-# ─────────────────────────────────────────────
 
 SENTINEL_ADD    = "Add"
 SENTINEL_REMOVE = "Remove"
@@ -177,10 +158,6 @@ def _apply_preset_cb():
     st.session_state[ADD_RESET_KEY]    = True
     st.session_state[REMOVE_RESET_KEY] = True
 
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 col1, col2 = st.columns([0.5, 2])
 
@@ -294,17 +271,10 @@ with col1:
     selected_stats = list(st.session_state["ll_stats"])
 
 
-# ─────────────────────────────────────────────
-#  Resolve filter values
-# ─────────────────────────────────────────────
-
 min_ip_val   = int(st.session_state.get("ll_min_ip", 0))
 team_val     = "all" if team_disabled else st.session_state.get("ll_team", "all")
 show_worst   = st.session_state.get("ll_show_worst", False)
 
-# ─────────────────────────────────────────────
-#  Load & filter data
-# ─────────────────────────────────────────────
 
 df = load_data(s_year, e_year, mode)
 if df is None or df.empty:
@@ -323,9 +293,6 @@ if "Team" in df.columns:
 else:
     df["TeamDisplay"] = "N/A"
 
-# ─────────────────────────────────────────────
-#  Build one leader per stat
-# ─────────────────────────────────────────────
 
 def get_leader(df: pd.DataFrame, stat: str, show_worst: bool):
     if stat not in df.columns:
@@ -346,10 +313,6 @@ for stat in selected_stats:
     leader_rows.append((stat, row))
 
 num_stats = len(selected_stats)
-
-# ─────────────────────────────────────────────
-#  Build HTML cards — dynamic grid columns
-# ─────────────────────────────────────────────
 
 if num_stats <= 5:
     grid_cols = num_stats
@@ -392,10 +355,6 @@ def make_card(stat, row):
 
 cards = [make_card(s, r) for s, r in leader_rows]
 
-# ─────────────────────────────────────────────
-#  Title
-# ─────────────────────────────────────────────
-
 span_label  = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 team_label  = f"{TEAM_OPTIONS.get(team_val, '')}" if team_val != "all" else ""
 mode_label  = " (Single Season) " if mode == MODE_SPLIT else ""
@@ -412,10 +371,6 @@ min_ip_subtitle = (
     f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
     if st.session_state.get("ll_show_min_ip") else ""
 )
-
-# ─────────────────────────────────────────────
-#  Render
-# ─────────────────────────────────────────────
 
 grid_html = f"""
 <div class="leaderboard-card">

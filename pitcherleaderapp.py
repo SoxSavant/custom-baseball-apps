@@ -2,10 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
-import unicodedata
 import html
 import re
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Custom Pitching Leaderboard", layout="wide", page_icon="⚾")
@@ -37,10 +35,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
-
 from p_utils import (STAT_ALLOWLIST, start_year,
 get_headshot, label_map, lower_better,  TEAM_OPTIONS, normalize_team, get_team_display, 
 format_stat,load_final_year, aggregate_player_group)
@@ -52,10 +46,6 @@ MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
 
-
-# ─────────────────────────────────────────────
-#  Main data builder
-# ─────────────────────────────────────────────
 
 def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SINGLE:
@@ -76,22 +66,12 @@ def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SPLIT:
         return combined
 
-    # MODE_MULTI: aggregate by PlayerId
-    if "PlayerId" not in combined.columns:
-        return combined
-
     grouped_rows = []
     for _, grp in combined.groupby("PlayerId"):
         grouped_rows.append(aggregate_player_group(grp))
 
     return pd.DataFrame(grouped_rows)
     
-
-
-
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
 
 from utils import get_dynamic_min_ip
 
@@ -111,10 +91,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 stat = st.selectbox(
     "Stat", STAT_ALLOWLIST, key="pl_stat",
@@ -166,9 +142,6 @@ end_year   = int(max(start_year, end_year))
 min_ip_val = int(st.session_state.get("pl_min_ip", 0))
 team_val   = "all" if team_disabled else st.session_state.get("pl_team", "all")
 
-# ─────────────────────────────────────────────
-#  Load & filter
-# ─────────────────────────────────────────────
 
 df = load_data(start_year, end_year, mode)
 
@@ -202,9 +175,6 @@ show_worst = st.session_state.get("pl_sort_worst", False)
 ascending = (is_lower_better and not show_worst) or (not is_lower_better and show_worst)
 df = df.sort_values(by=stat, ascending=ascending).dropna(subset=[stat]).head(10)
 
-# ─────────────────────────────────────────────
-#  Build cards
-# ─────────────────────────────────────────────
 
 cards = []
 for _, row in df.iterrows():
@@ -234,9 +204,6 @@ for _, row in df.iterrows():
     </div>
     """)
 
-# ─────────────────────────────────────────────
-#  Title
-# ─────────────────────────────────────────────
 
 span_label  = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_year}"
 title_label = label_map.get(stat, stat)
@@ -250,9 +217,6 @@ min_pa_subtitle = (
     if st.session_state.get("pl_show_min_ip") else ""
 )
 
-# ─────────────────────────────────────────────
-#  Render HTML
-# ─────────────────────────────────────────────
 
 grid_html = f"""
 <div class="leaderboard-card">

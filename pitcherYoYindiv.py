@@ -33,10 +33,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Imports from shared utilities
-# ─────────────────────────────────────────────
-
 from p_utils import (
     STAT_ALLOWLIST, STAT_PRESETS_YOY, STAT_DISPLAY_NAMES, TRUTHY_STRINGS,
     start_year as DATA_START_YEAR, get_headshot, label_map, lower_better,
@@ -44,10 +40,6 @@ from p_utils import (
 )
 
 current_year = date.today().year
-
-# ─────────────────────────────────────────────
-#  Name utilities
-# ─────────────────────────────────────────────
 
 def normalize_name(raw: str) -> str:
     if not raw or not isinstance(raw, str):
@@ -98,17 +90,10 @@ def load_player_year(player_id: int, year: int) -> pd.Series | None:
     return match.iloc[0]
 
 
-# ─────────────────────────────────────────────
-#  Layout: left controls, right card
-# ─────────────────────────────────────────────
-
 left_col, right_col = st.columns([1, 2])
 
 years_desc = list(range(current_year, DATA_START_YEAR - 1, -1))
 
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
 
 for key, default in [
     ("iyoy_player",         "Mason Miller"),
@@ -120,9 +105,6 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ─────────────────────────────────────────────
-#  Stat builder state keys
-# ─────────────────────────────────────────────
 
 STAT_STATE_KEY       = "iyoy_stat_config"
 STAT_PRESET_KEY      = "iyoy_stat_preset"
@@ -135,9 +117,6 @@ REMOVE_RESET_KEY     = "iyoy_reset_remove_select"
 
 DEFAULT_PRESET = "Statcast"
 
-# ─────────────────────────────────────────────
-#  Left column controls
-# ─────────────────────────────────────────────
 
 with left_col:
     # Player input

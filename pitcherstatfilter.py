@@ -3,7 +3,6 @@ import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import html
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Pitcher Stat Filter Leaderboard", layout="wide", page_icon="⚾")
@@ -32,9 +31,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
 from p_utils import ( STAT_ALLOWLIST,  TEAM_OPTIONS, format_stat,
 get_headshot, label_map, lower_better,  start_year, STAT_DEFAULTS,
@@ -53,13 +49,6 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
-
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
-
-
 
 def update_stat_default(i):
     stat = st.session_state[f"pc_stat_{i}"]
@@ -100,11 +89,6 @@ def format_threshold(stat: str, val: float, op: str) -> str:
     formatted = format_stat(stat, val).rstrip("%")
     return f"{formatted}+ {lbl}" if op == ">=" else f"≤ {formatted} {lbl}"
 
-
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 from utils import get_dynamic_min_ip
 
 for key, default in [
@@ -121,10 +105,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 col1, col2 = st.columns([0.5, 2])
 
@@ -200,10 +180,6 @@ with col1:
     st.checkbox("Show min IP",         key="pc_show_min_ip")
     st.checkbox("Only display top 10", key="pc_top10")
 
-# ─────────────────────────────────────────────
-#  Load & filter
-# ─────────────────────────────────────────────
-
 start_year = int(start_year)
 end_year   = int(max(start_year, end_year))
 min_ip_val = int(st.session_state["pc_min_ip"])
@@ -229,10 +205,6 @@ if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
 else:
     df["TeamDisplay"] = "N/A"
-
-# ─────────────────────────────────────────────
-#  Apply stat filters
-# ─────────────────────────────────────────────
 
 active_filters = []
 for i in range(num_stats):
@@ -270,10 +242,6 @@ if not df.empty:
     if total_qualified > display_limit:
         df = df.head(display_limit)
 
-# ─────────────────────────────────────────────
-#  Build cards
-# ─────────────────────────────────────────────
-
 cards = []
 for _, row in df.iterrows():
     name = str(row.get("Name", "")).strip()
@@ -308,10 +276,6 @@ for _, row in df.iterrows():
       {'<div class="player-stat-line">' + " | ".join(stat_lines) + "</div>" if stat_lines else ""}
       {ip_html}
     </div>""")
-
-# ─────────────────────────────────────────────
-#  Title & layout
-# ─────────────────────────────────────────────
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)

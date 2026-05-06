@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import numpy as np
 import html
 from datetime import date
 
@@ -31,10 +30,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Imports from shared utils
-# ─────────────────────────────────────────────
-
 from h_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS,
     get_headshot, label_map, lower_better, start_year,
@@ -43,11 +38,6 @@ from h_utils import (
 
 MAX_DISPLAY  = 10
 current_year = date.today().year
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
-
 
 def update_stat_default(i):
     stat = st.session_state[f"hs_stat_{i}"]
@@ -66,11 +56,6 @@ def load_all_seasons(start: int, end: int) -> pd.DataFrame:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
 
-
-# ─────────────────────────────────────────────
-#  Session state defaults (no widget keys here)
-# ─────────────────────────────────────────────
-
 for key, default in [
     ("hs_start_year",  current_year - 10),
     ("hs_end_year",    current_year-1),
@@ -82,10 +67,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 col1, col2 = st.columns([0.5, 2])
 
@@ -137,10 +118,6 @@ with col1:
 
     st.checkbox("Show min PA", key="hs_show_min_pa")
 
-# ─────────────────────────────────────────────
-#  Collect active filters
-# ─────────────────────────────────────────────
-
 active_filters = []
 for i in range(num_stats):
     stat = st.session_state.get(f"hs_stat_{i}")
@@ -151,10 +128,6 @@ for i in range(num_stats):
 
 min_pa   = int(st.session_state["hs_min_pa"])
 position = st.session_state["hs_position"]
-
-# ─────────────────────────────────────────────
-#  Load & filter per-season rows
-# ─────────────────────────────────────────────
 
 df_all = load_all_seasons(sel_start, sel_end)
 
@@ -189,10 +162,6 @@ for stat, op, val in active_filters:
 qualifying_rows = df_all[mask]
 
 
-# ─────────────────────────────────────────────
-#  Aggregate: count qualifying seasons AND unique teams per player
-# ─────────────────────────────────────────────
-
 if qualifying_rows.empty:
     display_df = pd.DataFrame()
 else:
@@ -220,7 +189,7 @@ else:
     # 3. Merge them
     display_df = grouped.merge(last_team_meta, on="PlayerId", how="left")
     
-    # 4. Apply your logic: If unique teams > 1, set Team to "2+ Teams"
+    # 4. Apply if unique teams > 1, set Team to "2+ Teams"
     display_df["Team"] = display_df.apply(
         lambda x: "2+ Teams" if x["unique_team_count"] > 1 else x["Team"], 
         axis=1
@@ -228,10 +197,6 @@ else:
     
     # 5. Sort by season count for the leaderboard
     display_df = display_df.sort_values("season_count", ascending=False).head(MAX_DISPLAY)
-
-# ─────────────────────────────────────────────
-#  Build cards
-# ─────────────────────────────────────────────
 
 def format_threshold_label(stat, val, op):
     lbl       = label_map.get(stat, stat)
@@ -265,10 +230,6 @@ for _, row in display_df.iterrows():
       <div class="season-count">{season_count} {season_word}</div>
       <div class="season-years">{html.escape(seasons_str)}</div>
     </div>""")
-
-# ─────────────────────────────────────────────
-#  Title & HTML layout
-# ─────────────────────────────────────────────
 
 filter_parts  = [format_threshold_label(s, v, op) for s, op, v in active_filters]
 threshold_str = ", ".join(filter_parts)

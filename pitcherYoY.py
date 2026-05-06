@@ -2,10 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
-import unicodedata
 import html
-import re
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Pitching Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
@@ -36,10 +33,6 @@ with meta_col:
         """,
         unsafe_allow_html=True,
     )
-
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
 from p_utils import (STAT_ALLOWLIST, format_stat_yoy, start_year,
 get_headshot, label_map, lower_better, TEAM_OPTIONS,
@@ -121,10 +114,6 @@ def load_risers_data(
     return pd.DataFrame(rows)
 
 
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 from utils import get_dynamic_min_ip
 
 min_ip_end = get_dynamic_min_ip(current_year)
@@ -143,10 +132,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 stat = st.selectbox(
     "Stat", STAT_ALLOWLIST, key="pr_stat",
@@ -204,10 +189,6 @@ elif not df.empty:
     st.error(f"Stat '{stat}' not found in dataset.")
     df = pd.DataFrame()
 
-# ─────────────────────────────────────────────
-#  Build cards
-# ─────────────────────────────────────────────
-
 cards = []
 for _, row in df.iterrows():
     name  = str(row.get("Name", "")).strip()
@@ -251,10 +232,6 @@ for _, row in df.iterrows():
     </div>
     """)
 
-# ─────────────────────────────────────────────
-#  Title
-# ─────────────────────────────────────────────
-
 title_stat_label = label_map.get(stat, stat)
 team_prefix  = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
 riser_label  = "Decliners" if show_fallers else "Improvers"
@@ -263,10 +240,6 @@ title = f"Top {team_prefix}{title_stat_label} {riser_label}: {int(start_year)} �
 min_ip_subtitle = ""
 if st.session_state.get("pr_show_min_ip"):
     min_ip_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_start_val} IP → {min_ip_end_val} IP</div>'
-
-# ─────────────────────────────────────────────
-#  Render HTML
-# ─────────────────────────────────────────────
 
 grid_html = f"""
 <div class="leaderboard-card">

@@ -7,7 +7,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from pathlib import Path
 from io import BytesIO
 from datetime import date
@@ -39,9 +38,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
 from h_utils import (EVERY_STAT_PRESET,STAT_ALLOWLIST, TEAMS, 
                      STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat,
@@ -63,8 +59,6 @@ STAT_PRESETS = {
         "fWAR",
     ],
 }
-
-
 
 def get_teams_for_year(season: int) -> dict[str, str]:
     key = "ATH" if season >= 2025 else "OAK"
@@ -92,17 +86,7 @@ def normalize_name(raw: str) -> str:
         pass
     return " ".join(cleaned.split()).lower()
 
-
-# ─────────────────────────────────────────────
-#  Data loading
-# ─────────────────────────────────────────────
-
-
 current_year = date.today().year
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 from utils import get_dynamic_min_pa
 
@@ -144,10 +128,6 @@ with left_col:
 
 stat_builder_container = left_col.container()
 
-# ─────────────────────────────────────────────
-#  Load data
-# ─────────────────────────────────────────────
-
 team_full_name = TEAMS.get(team_abbr, team_abbr)
 nickname = get_team_nickname(team_full_name)
 logo_dir = Path(__file__).parent / "logos"
@@ -170,8 +150,6 @@ df["PA"] = pd.to_numeric(df.get("PA"), errors="coerce")
 # Normalize team column
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
-
-
 
 # League for percentile distribution
 from utils import get_percentile_min_pa
@@ -326,10 +304,6 @@ current_stat_config = normalize_stat_rows(
     st.session_state.get(stat_state_key, preset_base_config), preset_base_config
 )
 
-# ─────────────────────────────────────────────
-#  Stat builder UI
-# ─────────────────────────────────────────────
-
 with stat_builder_container:
     prior_preset = st.session_state.get(stat_preset_key, default_preset_name)
     preset_index = preset_options.index(prior_preset) if prior_preset in preset_options else 0
@@ -411,10 +385,6 @@ with stat_builder_container:
     )
 
 
-# ─────────────────────────────────────────────
-#  Build leader rows
-# ─────────────────────────────────────────────
-
 stats_order = [r["Stat"] for r in st.session_state[stat_state_key] if r.get("Show", True)]
 if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the chart.")
@@ -452,10 +422,6 @@ if lead_df.empty:
     st.stop()
 
 lead_df["Display"] = lead_df.apply(lambda r: format_stat(r["Stat"], r["Value"]), axis=1)
-
-# ─────────────────────────────────────────────
-#  Render chart
-# ─────────────────────────────────────────────
 
 with right_col:
     cmap = LinearSegmentedColormap.from_list(

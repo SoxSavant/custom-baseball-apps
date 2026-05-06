@@ -1,11 +1,10 @@
-import os
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import html
 import unicodedata
 from datetime import date
-from pathlib import Path
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾")
 
@@ -162,8 +161,8 @@ from h_utils import STAT_PRESETS, load_final_year, aggregate_player_group, resol
 from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES,  
                     format_stat, start_year,
                     get_headshot, label_map, lower_better, TRUTHY_STRINGS, 
-                    normalize_team, get_team_display, MAX_STATS 
-                    )
+                    normalize_team, get_team_display)
+                    
 
 # ─────────────────────────────────────────────
 #  Team display helper
@@ -172,32 +171,12 @@ from h_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES,
 
 
 def get_team_display_multiseason(teams: list[str]) -> str:
-    """
-    For multi-year spans: if there are multiple distinct teams → '2+ Teams',
-    otherwise show the single team.
-    OAK and ATH count as the same team.
-    """
     normalized = {normalize_team(t) for t in teams if str(t).strip() and str(t).strip() != "- - -"}
     if "2+ Teams" in {get_team_display(t) for t in teams}:
         return "2+ Teams"
     if len(normalized) > 1:
         return "2+ Teams"
     return normalized.pop() if normalized else "N/A"
-
-
-# ─────────────────────────────────────────────
-#  Name utilities
-# ─────────────────────────────────────────────
-
-def normalize_name(raw: str) -> str:
-    if not raw or not isinstance(raw, str):
-        return ""
-    cleaned = raw.replace("\xa0", " ").strip()
-    try:
-        cleaned = unicodedata.normalize("NFKD", cleaned).encode("ascii", "ignore").decode()
-    except Exception:
-        pass
-    return " ".join(cleaned.split()).lower()
 
 
 def display_stat_name(stat) -> str:
@@ -227,10 +206,7 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
     return pd.Series(agg)
 
 
-# ─────────────────────────────────────────────
-#  Layout
-# ─────────────────────────────────────────────
-
+# layout
 player_mode_options = ["2 players", "3 players", "4 players", "5 players"]
 player_mode = st.radio("", player_mode_options, index=0, horizontal=True)
 player_count = int(player_mode.split()[0])
@@ -251,7 +227,7 @@ with left_col:
 current_year = date.today().year
 years_desc = list(range(current_year, start_year-1, -1)) 
 MAX_PLAYERS = 5
-default_names = ["Yordan Alvarez", "Elly De La Cruz", "", "", ""]
+default_names = ["Yordan Alvarez", "Matt Olson", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
@@ -308,9 +284,6 @@ with controls_container:
             "years": year_ranges[idx],
         })
 
-# ─────────────────────────────────────────────
-#  Load players
-# ─────────────────────────────────────────────
 
 players_data = []
 for idx, cfg in enumerate(player_inputs):
@@ -388,17 +361,12 @@ if len(numeric_sets) == 1:
     numeric_stats = list(numeric_sets[0] - stat_exclusions)
 else:
     numeric_stats = list(set.intersection(*numeric_sets) - stat_exclusions)
-if all("Age" in df.columns for df in dfs) and "Age" not in numeric_stats:
-    numeric_stats.append("Age")
 
 preferred_stats = [stat for stat in STAT_ALLOWLIST if stat in numeric_stats]
 other_stats = [stat for stat in numeric_stats if stat not in preferred_stats]
 stat_options = preferred_stats + other_stats
 allowed_add_stats = preferred_stats if preferred_stats else stat_options.copy()
 
-if not stat_options:
-    st.error("No numeric stats available to display.")
-    st.stop()
 
 # ─────────────────────────────────────────────
 #  Stat builder state
@@ -418,7 +386,6 @@ stat_version_key = "comp_stat_config_version"
 
 def bump_stat_config_version():
     st.session_state[stat_version_key] = st.session_state.get(stat_version_key, 0) + 1
-
 
 def normalize_stat_rows(rows, fallback):
     cleaned = []
@@ -596,9 +563,6 @@ current_stat_config = normalize_stat_rows(
     st.session_state.get(stat_state_key, preset_base_config), preset_base_config
 )
 
-# ─────────────────────────────────────────────
-#  Stat builder UI
-# ─────────────────────────────────────────────
 
 with stat_builder_container:
     prior_preset = st.session_state.get(stat_preset_key, default_preset_name)
@@ -713,7 +677,7 @@ with stat_builder_container:
 
 stats_order = [row["Stat"] for row in st.session_state[stat_state_key] if row.get("Show", True)]
 if not stats_order:
-    st.info("Add at least one stat and mark it as shown to build the comparison.")
+    st.info("Add at least one stat and mark it as shown to show the comparison.")
     st.stop()
 
 comparison_rows = []
@@ -742,7 +706,7 @@ for stat in stats_order:
 
     winners: set[str] = set()
     numeric_candidates = [v for v in numeric_vals if not pd.isna(v)]
-    if numeric_candidates and not has_non_numeric and stat.upper() != "AGE":
+    if numeric_candidates and not has_non_numeric:
         best_val = min(numeric_candidates) if stat in lower_better else max(numeric_candidates)
         winners = {
             col_order[idx]
@@ -758,9 +722,6 @@ for stat in stats_order:
 
 table_df = pd.DataFrame(comparison_rows, columns=["Stat"] + col_order)
 
-# ─────────────────────────────────────────────
-#  Headshots
-# ─────────────────────────────────────────────
 
 for pdata in players_data:
     pdata["headshot"] = get_headshot(pdata["row"])

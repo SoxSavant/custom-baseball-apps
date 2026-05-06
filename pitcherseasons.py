@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import numpy as np
 import html
 from datetime import date
 
@@ -31,9 +30,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Imports from pitcher utils
-# ─────────────────────────────────────────────
 
 from p_utils import (
     STAT_ALLOWLIST,  PCT_STATS, format_stat, STAT_DEFAULTS,
@@ -43,10 +39,6 @@ from p_utils import (
 
 MAX_DISPLAY  = 10
 current_year = date.today().year
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
 
 def update_stat_default(i):
     stat = st.session_state[f"ps_stat_{i}"]
@@ -65,10 +57,6 @@ def load_all_seasons(start: int, end: int) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 for key, default in [
     ("ps_start_year",  current_year - 10),
     ("ps_end_year",    current_year - 1),
@@ -81,9 +69,6 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 col1, col2 = st.columns([0.5, 2])
 
@@ -131,10 +116,6 @@ with col1:
 
     st.checkbox("Show min IP", key="ps_show_min_ip")
     st.checkbox("Show player IP",      key="pc_show_ip")
-
-# ─────────────────────────────────────────────
-#  Process Data
-# ─────────────────────────────────────────────
 
 active_filters = []
 for i in range(num_stats):
@@ -200,10 +181,6 @@ else:
     )
     
     display_df = display_df.sort_values("season_count", ascending=False).head(MAX_DISPLAY)
-
-# ─────────────────────────────────────────────
-#  HTML Rendering
-# ─────────────────────────────────────────────
 
 def format_threshold_label(stat, val, op):
     lbl = label_map.get(stat, stat)

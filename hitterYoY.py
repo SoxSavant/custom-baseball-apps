@@ -4,8 +4,6 @@ import pandas as pd
 import numpy as np
 import unicodedata
 import html
-import re
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Hitting Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
@@ -136,11 +134,6 @@ def load_risers_data(
 
     return pd.DataFrame(rows)
 
-
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 from utils import get_dynamic_min_pa
 
 min_pa_end = get_dynamic_min_pa(current_year)
@@ -161,12 +154,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
-
-
 
 active_allowlist =  STAT_ALLOWLIST
 if st.session_state.get("rf_stat") not in active_allowlist:
@@ -234,14 +221,6 @@ elif not df.empty:
     st.error(f"Stat '{stat}' not found in dataset.")
     df = pd.DataFrame()
 
-
-
-
-
-# ─────────────────────────────────────────────
-#  Build cards
-# ─────────────────────────────────────────────
-
 cards = []
 for _, row in df.iterrows():
     name  = str(row.get("Name", "")).strip()
@@ -285,10 +264,6 @@ for _, row in df.iterrows():
     </div>
     """)
 
-# ─────────────────────────────────────────────
-#  Title
-# ─────────────────────────────────────────────
-
 title_stat_label = label_map.get(stat, stat)
 pos_suffix  = f" ({POSITION_OPTIONS.get(position_val, '')})" if  position_val != "all" else ""
 team_prefix = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
@@ -302,10 +277,6 @@ if st.session_state.get("rf_show_min_pa"):
     display_min_start =  min_pa_start_val
     display_min_end =  min_pa_end_val
     min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min_start} PA → {display_min_end} PA</div>'
-
-# ─────────────────────────────────────────────
-#  Render HTML
-# ─────────────────────────────────────────────
 
 grid_html = f"""
 <div class="leaderboard-card">

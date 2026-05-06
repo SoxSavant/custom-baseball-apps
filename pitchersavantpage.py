@@ -6,7 +6,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from io import BytesIO
-from pathlib import Path
 import unicodedata
 from datetime import date
 
@@ -39,10 +38,6 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
-
 from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, start_year, EVERY_STAT_PRESET,
 label_map, lower_better, STAT_DISPLAY_NAMES, get_team_display, format_stat,load_final_year)
 
@@ -63,10 +58,6 @@ STAT_PRESETS = {
 }
 
 
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
-
 def normalize_name(raw: str) -> str:
     if not raw or not isinstance(raw, str):
         return ""
@@ -79,10 +70,6 @@ def normalize_name(raw: str) -> str:
 
 current_year = date.today().year
 
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 left_col, right_col = st.columns([1, 1.3])
 with left_col:
@@ -97,9 +84,6 @@ with controls_container:
     else:
         player_input = st.text_input("Player FanGraphs ID", value=st.session_state.get("player_fg_id", ""), key="player_fg_id")
 
-# ─────────────────────────────────────────────
-#  Load data
-# ─────────────────────────────────────────────
 
 df = load_final_year(year)
 
@@ -125,9 +109,6 @@ if league_for_pct.empty:
     st.error(f"No pitchers with ≥ {PCT_IP} IP in {year}.")
     st.stop()
 
-# ─────────────────────────────────────────────
-#  Resolve player
-# ─────────────────────────────────────────────
 
 player_row = None
 
@@ -164,9 +145,6 @@ player_name = str(player_row.get("Name", "")).strip()
 team_val = str(player_row.get("Team", "N/A")).strip()
 player_team_display = get_team_display(team_val)
 
-# ─────────────────────────────────────────────
-#  Stat builder setup
-# ─────────────────────────────────────────────
 
 stat_exclusions = {"Season", "PlayerId", "MLBAMID"}
 numeric_stats = [
@@ -298,9 +276,6 @@ current_stat_config = normalize_stat_rows(
     st.session_state.get(stat_state_key, preset_base_config), preset_base_config
 )
 
-# ─────────────────────────────────────────────
-#  Percentile sort helper
-# ─────────────────────────────────────────────
 
 def compute_percentiles() -> dict[str, float]:
     result = {}
@@ -331,9 +306,6 @@ def sort_by_percentile(ascending: bool):
     st.session_state[manual_stat_update_key] = True
     st.rerun()
 
-# ─────────────────────────────────────────────
-#  Stat builder UI
-# ─────────────────────────────────────────────
 
 with stat_builder_container:
     prior_preset = st.session_state.get(stat_preset_key, default_preset_name)
@@ -426,10 +398,6 @@ with stat_builder_container:
     )
 
 
-# ─────────────────────────────────────────────
-#  Build chart rows
-# ─────────────────────────────────────────────
-
 stats_order = [r["Stat"] for r in st.session_state[stat_state_key] if r.get("Show", True)]
 if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the chart.")
@@ -462,9 +430,6 @@ if lead_df.empty:
 
 lead_df["Display"] = lead_df.apply(lambda r: format_stat(r["Stat"], r["Value"]), axis=1)
 
-# ─────────────────────────────────────────────
-#  Render chart
-# ─────────────────────────────────────────────
 
 with right_col:
     cmap = LinearSegmentedColormap.from_list(

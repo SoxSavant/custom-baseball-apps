@@ -1,11 +1,9 @@
-import os
 import streamlit as st
 import pandas as pd
 import numpy as np
 import html
 import unicodedata
 from datetime import date
-from pathlib import Path
 
 st.set_page_config(page_title="Custom Pitcher Comparison", layout="wide", page_icon="⚾")
 
@@ -138,18 +136,12 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
 from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, STAT_PRESETS,
 get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, 
 get_player_id_by_name, aggregate_player_group)
 
 
-# ─────────────────────────────────────────────
-#  Name utilities
-# ─────────────────────────────────────────────
 
 def normalize_name(raw: str) -> str:
     if not raw or not isinstance(raw, str):
@@ -161,10 +153,6 @@ def normalize_name(raw: str) -> str:
         pass
     return " ".join(cleaned.split()).lower()
 
-
-# ─────────────────────────────────────────────
-#  Player profile builder
-# ─────────────────────────────────────────────
 
 def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.Series | None:
     frames = []
@@ -195,13 +183,6 @@ def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
         if pid is not None:
             return pid
     return None
-
-
-
-
-# ─────────────────────────────────────────────
-#  Layout
-# ─────────────────────────────────────────────
 
 player_mode_options = ["2 players", "3 players", "4 players", "5 players"]
 player_mode = st.radio("", player_mode_options, index=0, horizontal=True)
@@ -275,10 +256,6 @@ with controls_container:
             "id_input": str(id_input).strip(),
             "years": year_ranges[idx],
         })
-
-# ─────────────────────────────────────────────
-#  Load players
-# ─────────────────────────────────────────────
 
 players_data = []
 for idx, cfg in enumerate(player_inputs):
@@ -371,10 +348,6 @@ if has_record:
 if not stat_options:
     st.error("No numeric stats available to display.")
     st.stop()
-
-# ─────────────────────────────────────────────
-#  Stat builder state
-# ─────────────────────────────────────────────
 
 default_preset_name = "Default"
 stat_preset_key = "comp_stat_preset_select"
@@ -618,10 +591,6 @@ with stat_builder_container:
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
     )
 
-# ─────────────────────────────────────────────
-#  Build comparison table
-# ─────────────────────────────────────────────
-
 stats_order = [r["Stat"] for r in st.session_state[stat_state_key] if r.get("Show", True)]
 if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the comparison.")
@@ -690,16 +659,9 @@ for stat in stats_order:
 
 table_df = pd.DataFrame(comparison_rows, columns=["Stat"] + col_order)
 
-# ─────────────────────────────────────────────
-#  Headshots
-# ─────────────────────────────────────────────
-
 for pdata in players_data:
     pdata["headshot"] = get_headshot(pdata["row"])
 
-# ─────────────────────────────────────────────
-#  Render comparison card
-# ─────────────────────────────────────────────
 
 esc = html.escape
 

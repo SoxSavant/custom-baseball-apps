@@ -38,11 +38,8 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 from p_utils import (STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS,
- label_map, lower_better,  EVERY_STAT_PRESET,
+ label_map, lower_better,  EVERY_STAT_PRESET, STAT_PRESETS,
 normalize_team, start_year,load_final_year)
 
 STAT_PRESETS = {
@@ -59,13 +56,6 @@ STAT_PRESETS = {
     ],
     "Every Stat": EVERY_STAT_PRESET,
 }
-
-
-
-# ─────────────────────────────────────────────
-#  Team helpers
-# ─────────────────────────────────────────────
-
 
 
 def get_teams_for_year(season: int) -> dict[str, str]:
@@ -135,10 +125,6 @@ with left_col:
     )
 
 stat_builder_container = left_col.container()
-
-# ─────────────────────────────────────────────
-#  Load data
-# ─────────────────────────────────────────────
 
 team_full_name = TEAMS.get(team_abbr, team_abbr)
 nickname = get_team_nickname(team_full_name)
@@ -314,10 +300,6 @@ current_stat_config = normalize_stat_rows(
     st.session_state.get(stat_state_key, preset_base_config), preset_base_config
 )
 
-# ─────────────────────────────────────────────
-#  Stat builder UI
-# ─────────────────────────────────────────────
-
 with stat_builder_container:
     prior_preset = st.session_state.get(stat_preset_key, default_preset_name)
     preset_index = preset_options.index(prior_preset) if prior_preset in preset_options else 0
@@ -398,11 +380,6 @@ with stat_builder_container:
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
     )
 
-
-# ─────────────────────────────────────────────
-#  Build leader rows
-# ─────────────────────────────────────────────
-
 stats_order = [r["Stat"] for r in st.session_state[stat_state_key] if r.get("Show", True)]
 if not stats_order:
     st.info("Add at least one stat and mark it as shown to build the chart.")
@@ -440,10 +417,6 @@ if lead_df.empty:
     st.stop()
 
 lead_df["Display"] = lead_df.apply(lambda r: format_stat(r["Stat"], r["Value"]), axis=1)
-
-# ─────────────────────────────────────────────
-#  Render chart
-# ─────────────────────────────────────────────
 
 with right_col:
     cmap = LinearSegmentedColormap.from_list(

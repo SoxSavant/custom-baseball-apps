@@ -3,7 +3,6 @@ import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import html
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Hitter Stat Filter Leaderboard", layout="wide", page_icon="⚾")
@@ -48,12 +47,6 @@ MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
-
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
-
 
 def update_stat_default(i):
     stat = st.session_state[f"sc_stat_{i}"]
@@ -105,10 +98,6 @@ def format_threshold(stat: str, val: float, op: str) -> str:
     return f"{formatted}+ {lbl}" if op == ">=" else f"≤ {formatted} {lbl}"
 
 
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 from utils import get_dynamic_min_pa
 
 for key, default in [
@@ -126,10 +115,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 col1, col2 = st.columns([0.5, 2])
 
@@ -207,10 +192,6 @@ with col1:
     st.checkbox("Show player PA", key="sc_show_player_pa")
     st.checkbox("Only display top 10", key="sc_top10")
 
-# ─────────────────────────────────────────────
-#  Load & filter
-# ─────────────────────────────────────────────
-
 min_pa_val   = int(st.session_state["sc_min_pa"])
 position_val = st.session_state["sc_position"]
 team_val     = "all" if team_disabled else st.session_state["sc_team"]
@@ -240,11 +221,6 @@ if "Team" in df.columns:
 else:
     df["TeamDisplay"] = "N/A"
 
-
-
-# ─────────────────────────────────────────────
-#  Apply stat filters
-# ─────────────────────────────────────────────
 
 active_filters = []
 for i in range(num_stats):
@@ -282,10 +258,6 @@ if not df.empty:
     if total_qualified > display_limit:
         df = df.head(display_limit)
 
-# ─────────────────────────────────────────────
-#  Build cards
-# ─────────────────────────────────────────────
-
 cards = []
 for _, row in df.iterrows():
     name = str(row.get("Name", "")).strip()
@@ -320,10 +292,6 @@ for _, row in df.iterrows():
       {'<div class="player-stat-line">' + " | ".join(stat_lines) + "</div>" if stat_lines else ""}
       {player_pa_html}
     </div>""")
-
-# ─────────────────────────────────────────────
-#  Title & layout
-# ─────────────────────────────────────────────
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)

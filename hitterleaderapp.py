@@ -5,7 +5,6 @@ import numpy as np
 import unicodedata
 import html
 import re
-from pathlib import Path
 from datetime import date
 
 st.set_page_config(page_title="Custom Hitting Leaderboard", layout="wide", page_icon="⚾")
@@ -37,16 +36,10 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
 
 from h_utils import (STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS,
 get_headshot, label_map, lower_better, load_final_year,
 POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, aggregate_player_group)
-
-
-
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
@@ -101,10 +94,6 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
     return pd.DataFrame(grouped_rows)
     
 
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 from utils import get_dynamic_min_pa
 
 min_pa = get_dynamic_min_pa(current_year)
@@ -125,10 +114,6 @@ for key, default in [
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
-
-# ─────────────────────────────────────────────
-#  Controls
-# ─────────────────────────────────────────────
 
 stat = st.selectbox(
     "Stat", STAT_ALLOWLIST, key="hl_stat",
@@ -251,10 +236,6 @@ for _, row in df.iterrows():
     </div>
     ''')
 
-# ─────────────────────────────────────────────
-#  Title
-# ─────────────────────────────────────────────
-
 span_label = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_year}"
 title_label = label_map.get(stat, stat)
 pos_suffix = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
@@ -270,10 +251,6 @@ min_pa_subtitle = (
     if st.session_state.get("hl_show_min_pa") else ""
 )
 
-
-# ─────────────────────────────────────────────
-#  Render HTML
-# ─────────────────────────────────────────────
 
 grid_html = f"""
 <div class="leaderboard-card">

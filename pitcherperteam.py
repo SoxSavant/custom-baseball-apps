@@ -31,59 +31,13 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-# ─────────────────────────────────────────────
-#  Imports from h_utils
-# ─────────────────────────────────────────────
 
 from p_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,
     label_map, lower_better, start_year, 
     normalize_team, get_team_display, load_final_year, TEAMS,
 )
-from utils import get_dynamic_min_ip
-
-# ─────────────────────────────────────────────
-#  MLB team ID map for logos
-# ─────────────────────────────────────────────
-
-TEAM_MLB_IDS = {
-    "ARI": 109, "ATL": 144, "BAL": 110, "BOS": 111,
-    "CHC": 112, "CIN": 113, "CLE": 114, "COL": 115,
-    "CHW": 145, "DET": 116, "HOU": 117, "KCR": 118,
-    "LAA": 108, "LAD": 119, "MIA": 146, "MIL": 158,
-    "MIN": 142, "NYM": 121, "NYY": 147, "OAK": 133,
-    "PHI": 143, "PIT": 134, "SDP": 135, "SEA": 136,
-    "SFG": 137, "STL": 138, "TBR": 139, "TEX": 140,
-    "TOR": 141, "WSN": 120,
-}
-
-DIVISION_TEAMS = {
-    "AL East":  {"BAL", "BOS", "NYY", "TBR", "TOR"},
-    "AL Central": {"CHW", "CLE", "DET", "KCR", "MIN"},
-    "AL West":  {"HOU", "LAA", "OAK", "SEA", "TEX"},
-    "NL East":  {"ATL", "MIA", "NYM", "PHI", "WSN"},
-    "NL Central": {"CHC", "CIN", "MIL", "PIT", "STL"},
-    "NL West":  {"ARI", "COL", "LAD", "SDP", "SFG"},
-}
-
-ALL_DIVISIONS = list(DIVISION_TEAMS.keys())
-
-def get_team_division(abbrev: str) -> str:
-    a = normalize_team(abbrev)
-    for div, teams in DIVISION_TEAMS.items():
-        if a in teams:
-            return div
-    return ""
-
-def get_team_logo_url(abbrev: str) -> str:
-    mlb_id = TEAM_MLB_IDS.get(normalize_team(abbrev))
-    if mlb_id:
-        return f"https://www.mlbstatic.com/team-logos/{mlb_id}.svg"
-    return ""
-
-# ─────────────────────────────────────────────
-#  Constants / modes
-# ─────────────────────────────────────────────
+from utils import get_dynamic_min_ip, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
@@ -91,10 +45,6 @@ MODE_MULTI  = "Multi-Year Span"
 
 current_year = date.today().year
 MAX_TEAMS    = 9
-
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
 
 def update_stat_default(i):
     stat = st.session_state[f"tc_stat_{i}"]
@@ -142,10 +92,6 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
 
     return pd.DataFrame(grouped_rows)
 
-# ─────────────────────────────────────────────
-#  Session state defaults
-# ─────────────────────────────────────────────
-
 for key, default in [
     ("tc_year",         current_year),
     ("tc_start_year",   current_year - 1),
@@ -165,10 +111,6 @@ for div in ALL_DIVISIONS:
     key = f"tc_div_{div}"
     if key not in st.session_state:
         st.session_state[key] = True
-
-# ─────────────────────────────────────────────
-#  Sidebar controls
-# ─────────────────────────────────────────────
 
 col1, col2 = st.columns([0.5, 2])
 
@@ -249,10 +191,6 @@ with col1:
     for div in ALL_DIVISIONS:
         st.checkbox(div, key=f"tc_div_{div}")
 
-# ─────────────────────────────────────────────
-#  Load & filter data
-# ─────────────────────────────────────────────
-
 min_ip_val   = int(st.session_state["tc_min_ip"])
 
 df = load_data(s_year, e_year, mode)
@@ -270,10 +208,6 @@ if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
 else:
     df["TeamDisplay"] = "N/A"
-
-# ─────────────────────────────────────────────
-#  Active filters
-# ─────────────────────────────────────────────
 
 active_filters = []
 for i in range(num_stats):
@@ -303,10 +237,6 @@ if "Team" in df.columns:
     df = df[df["TeamDisplay"] != "2+ Teams"]
 
 total_qualified = len(df)
-
-# ─────────────────────────────────────────────
-#  Group by team (and year for split mode)
-# ─────────────────────────────────────────────
 
 show_all_teams   = st.session_state.get("tc_show_all_teams", False)
 collapse_split   = st.session_state.get("tc_collapse_split", True)
@@ -419,9 +349,6 @@ else:
     if not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
-# ─────────────────────────────────────────────
-#  Build HTML
-# ─────────────────────────────────────────────
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
@@ -526,7 +453,7 @@ grid_html = f"""
 </div>
 """
 
-# Height: title area + rows of cards (4 per row), each card height depends on player count
+# Height: title area + rows of cards (3 per row), each card height depends on player count
 cards_per_row   = 3
 num_rows        = max(1, -(-num_teams_shown // cards_per_row))  # ceiling division
 avg_players     = total_players_shown / max(num_teams_shown, 1)
