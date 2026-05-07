@@ -29,7 +29,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(1901, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
@@ -93,7 +93,30 @@ for year in range(2026, 2027):
         if col not in final.columns:
             final[col] = None
     
-    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%","WAR":"fWAR","vFA (pi)": "vFA"}, inplace=True)
+    if "fWAR" and "IP" in final.columns:
+        final["fWAR/200"] = final["fWAR"] / final["IP"] * 200
+    if "bWAR" and "IP" in final.columns:
+        final["bWAR/200"] = final["bWAR"] / final["IP"] * 200
+    
+    cols_to_drop = [c for c in ["fWAR", "Chase%", "Whiff%", "vFA"] 
+                if c in final.columns]
+    final = final.drop(columns=cols_to_drop)
+    
+    rename_map = {}
+    if "WAR" in final.columns:
+        rename_map["WAR"] = "fWAR"
+    if "O-Swing%" in final.columns:
+        rename_map["O-Swing%"] = "Chase%"
+    if "Contact%" in final.columns:
+        rename_map["Contact%"] = "Whiff%"
+    if "vFA (pi)" in final.columns:
+        rename_map["vFA (pi)"] = "vFA"
+
+    final.rename(columns=rename_map, inplace=True)
+
+    for col in STAT_ALLOWLIST:
+        if col not in final.columns:
+            final[col] = None
 
     final = final[keep_cols + [col for col in STAT_ALLOWLIST]] # only drop columns AFTER renaming them to ones in allow list
     

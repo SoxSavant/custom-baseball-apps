@@ -42,7 +42,7 @@ STAT_ALLOWLIST = [
     "Barrel%", "HardHit%", "EV", "GB%", "K/9","BB/9","K/BB","HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
      "WPA", "Clutch",
-    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER", "TBF"
+    "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER", "TBF", "fWAR/200", "bWAR/200"
 ]
 
 STAT_DEFAULTS = {
@@ -57,6 +57,8 @@ STAT_DEFAULTS = {
     "GB%": 50.0, "HR/FB": 10.0,
     "BABIP": 0.280, "WPA": 2.0, "Clutch": 1.0,
     "CG": 1.0, "ShO": 1.0,
+    "fWAR/200": 5.0,
+    "bWAR/200": 5.0,
 }
 
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
@@ -64,7 +66,7 @@ EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
         "SV", "K%", "BB%", "K-BB%", "BB/9","HR/9","K/BB","AVG", "WHIP", "ERA-", "FIP-",
         "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
-        "Chase%", "Whiff%", "WPA", "Clutch", ]
+        "Chase%", "Whiff%", "WPA", "Clutch","fWAR/200", "bWAR/200" ]
 
 
 
@@ -75,7 +77,7 @@ RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
-    "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB"
+    "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB","fWAR/200", "bWAR/200"
 }
 
 PCT_STATS = {
@@ -236,7 +238,7 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
             result[col] = series.mean(skipna=True)
 
     ip_innings = ip_outs_total / 3.0
-    bb, so, er = (pd.to_numeric(result.get(c), errors="coerce") for c in ("BB", "SO", "ER"))
+    bb, so, er, fwar, bwar = (pd.to_numeric(result.get(c), errors="coerce") for c in ("BB", "SO", "ER", "fWAR", "bWAR"))
 
     if pd.notna(er) and ip_innings > 0:
         result["ERA"] = (er / ip_innings) * 9
@@ -248,6 +250,10 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         result["BB/9"] = (bb / ip_innings) * 9
     if pd.notna(so) and ip_innings > 0:
         result["K/9"] = (so / ip_innings) * 9
+    if pd.notna(fwar) and ip_innings > 0:
+        result["fWAR/200"] = fwar / ip_innings * 200
+    if pd.notna(bwar) and ip_innings > 0:
+        result["bWAR/200"] = bwar / ip_innings * 200
 
     return result
 
@@ -264,7 +270,7 @@ def format_stat(stat: str, val) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FWAR", "BWAR"}:
+    if upper_stat in {"FWAR", "BWAR","FWAR/200", "BWAR/200"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -308,7 +314,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FWAR", "BWAR"}:
+    if upper_stat in {"FWAR", "BWAR","FWAR/200", "BWAR/200"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:

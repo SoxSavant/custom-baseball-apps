@@ -30,7 +30,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(1901, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -114,16 +114,36 @@ for year in range(2026, 2027):
     
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
+    if "fWAR" and "PA" in final.columns:
+        final["fWAR/650"] = final["WAR"] / final["PA"] * 650
+    if "bWAR" and "PA" in final.columns:
+        final["bWAR/650"] = final["bWAR"] / final["PA"] * 650
     if "wOBA" in final.columns and "xwOBA" in final.columns:
         final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
     if "Contact%" in final.columns:
         final["Contact%"] = 1 - final["Contact%"]
+    
+    cols_to_drop = [c for c in ["fWAR", "Chase%", "Whiff%", "Squared-Up%"] 
+                if c in final.columns]
+    final = final.drop(columns=cols_to_drop)
+    
+    rename_map = {}
+    if "WAR" in final.columns:
+        rename_map["WAR"] = "fWAR"
+    if "O-Swing%" in final.columns:
+        rename_map["O-Swing%"] = "Chase%"
+    if "Contact%" in final.columns:
+        rename_map["Contact%"] = "Whiff%"
+    if "SqUpSw%" in final.columns:
+        rename_map["SqUpSw%"] = "Squared-Up%",
+
+    final.rename(columns=rename_map, inplace=True)
+
     for col in STAT_ALLOWLIST:
         if col not in final.columns:
             final[col] = None
 
-    final.rename(columns={"Contact%":"Whiff%", "O-Swing%":"Chase%", "WAR":"fWAR", "SqUpSw%":"Squared-Up%"}, inplace=True)
-
-    final = final[keep_cols + [col for col in STAT_ALLOWLIST]] # only drop columns AFTER renaming them to ones in allow list
+    
+    final = final[keep_cols + [col for col in STAT_ALLOWLIST]] # drop columns after renaming them to ones in allow list
     
     final.to_csv(f"data/final/hitting_final_{year}.csv", index=False)
