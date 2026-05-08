@@ -464,13 +464,6 @@ for stat in stats_order:
 
 headshot_html = f'<img src="{esc(headshot_url)}" class="headshot-img" alt="{esc(display_name)}" />' if headshot_url else ""
 
-# ── Pair up stats into two-per-row ──────────────
-pairs = []
-for i in range(0, len(table_rows), 2):
-    left = table_rows[i]
-    right = table_rows[i + 1] if i + 1 < len(table_rows) else None
-    pairs.append((left, right))
-
 def stat_block(tr, side="left"):
     border_style = "border-right: 2px solid #e8e8e8;" if side == "left" else ""
     delta_cls = tr["delta_class"]
@@ -482,7 +475,6 @@ def stat_block(tr, side="left"):
         <div class="val-end">{esc(tr["end_display"])}</div>
       </div>"""
 
-# Replace the pairs loop entirely:
 rows_html = []
 for tr in table_rows:
     delta_cls = tr["delta_class"]
@@ -648,8 +640,127 @@ card_html = f"""
 """
 
 with right_col:
-    row_count = len(pairs)
-    card_height = max(560, 250 + row_count * 100)
+    # ── Original card ────────────────────────────────────────────────────
+    row_count = len(rows_html)
+    card_height = 270 + row_count * 40
     components.html(card_html, height=card_height)
     st.caption("Screenshot to save")
     st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
+
+    # ── Leaderboard ──────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### Find Most Improved / Regressed")
+
+    col_btn1, col_btn2, col_btn3, col_btn4 = st.columns([2, 1, 1, 1])
+    with col_btn1:
+        run_leaderboard = st.button(
+            f"Find Players",
+            help="Scans every player present in both years using the current stat preset"
+        )
+    with col_btn2:
+        top_n = st.number_input("Show top N", min_value=5, max_value=50, value=15, step=5)
+    with col_btn3:
+        min_pa_start = st.number_input(f"Min PA ({int(start_yr)})", min_value=0, max_value=700, value=300, step=25)
+    with col_btn4:
+        min_pa_end = st.number_input(f"Min PA ({int(end_yr)})", min_value=0, max_value=700, value=100, step=25)
+
+    if run_leaderboard:
+        scan_stats = [
+            s for s in STAT_PRESETS_YOY.get(
+                st.session_state.get(STAT_PRESET_KEY, DEFAULT_PRESET), []
+            )
+            if s in stat_options
+        ]
+
+        with st.spinner(f"Scanning all players for {int(start_yr)}→{int(end_yr)}..."):
+            df_start = load_final_year(start_yr)
+            df_end   = load_final_year(end_yr)
+
+        if df_start is None or df_end is None:
+            st.error("Could not load data for one or both years.")
+        else:
+            # Apply PA filters before merging
+            if "PA" in df_start.columns:
+                df_start = df_start[pd.to_numeric(df_start["PA"], errors="coerce") >= min_pa_start]
+            if "PA" in df_end.columns:
+                df_end = df_end[pd.to_numeric(df_end["PA"], errors="coerce") >= min_pa_end]
+
+            merged = df_start.merge(df_end, on="PlayerId", suffixes=("_s", "_e"))
+
+            records = []
+            for _, row in merged.iterrows():
+                improved = 0
+                regressed = 0
+                total = 0
+                for stat in scan_stats:
+                    s_col = f"{stat}_s"
+                    e_col = f"{stat}_e"
+                    if s_col not in row or e_col not in row:
+                        continue
+                    s_val = pd.to_numeric(row[s_col], errors="coerce")
+                    e_val = pd.to_numeric(row[e_col], errors="coerce")
+                    if pd.isna(s_val) or pd.isna(e_val):
+                        continue
+                    delta = float(e_val - s_val)
+                    if delta == 0:
+                        continue
+                    total += 1
+                    is_improvement = (delta < 0) if (stat in lower_better) else (delta > 0)
+                    if is_improvement:
+                        improved += 1
+                    else:
+                        regressed += 1
+
+                if total == 0:
+                    continue
+
+                name = str(row.get("Name_e", row.get("Name_s", "Unknown"))).strip()
+                team = str(row.get("Team_e", "N/A"))
+                records.append({
+                    "Name":      name,
+                    "Team":      get_team_display(team),
+                    "Improved":  improved,
+                    "Regressed": regressed,
+                    "Total":     total,
+                    "Pct":       round(improved / total * 100, 1),
+                    "PlayerId":  int(row["PlayerId"]),
+                })
+
+            if not records:
+                st.info("No players matched the PA filters.")
+            else:
+                df_scores = pd.DataFrame(records)
+
+                most_improved  = df_scores.sort_values(["Improved",  "Pct"], ascending=[False, False]).head(int(top_n)).reset_index(drop=True)
+                most_regressed = df_scores.sort_values(["Regressed", "Pct"], ascending=[False, True]).head(int(top_n)).reset_index(drop=True)
+
+                tab1, tab2 = st.tabs(["🟢 Most Improved", "🔴 Most Regressed"])
+
+                with tab1:
+                    display_imp = most_improved[["Name", "Team", "Improved", "Total", "Pct"]].copy()
+                    display_imp.columns = ["Name", "Team", "# Improved", "# Tracked", "% Improved"]
+                    display_imp.index += 1
+                    st.dataframe(
+                        display_imp,
+                        use_container_width=True,
+                        column_config={
+                            "% Improved": st.column_config.ProgressColumn(
+                                "% Improved", min_value=0, max_value=100, format="%.1f%%"
+                            )
+                        }
+                    )
+
+                with tab2:
+                    most_regressed["% Regressed"] = round(most_regressed["Regressed"] / most_regressed["Total"] * 100, 1)
+                    display_reg = most_regressed[["Name", "Team", "Regressed", "Total", "% Regressed"]].copy()
+                    display_reg.columns = ["Name", "Team", "# Regressed", "# Tracked", "% Regressed"]
+                    display_reg.index += 1
+                    st.dataframe(
+                        display_reg,
+                        use_container_width=True,
+                        column_config={
+                            "% Regressed": st.column_config.ProgressColumn(
+                                "% Regressed", min_value=0, max_value=100, format="%.1f%%"
+                            )
+                        }
+                    )

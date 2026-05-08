@@ -96,3 +96,4 @@ def get_team_logo_url(abbrev: str) -> str:
     if mlb_id:
         return f"https://www.mlbstatic.com/team-logos/{mlb_id}.svg"
     return ""
+
