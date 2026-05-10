@@ -94,7 +94,7 @@ label_map = {
 lower_better = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
     "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "HR/9","BB/9"
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "HR/9","BB/9","ERA-xERA"
 }
 
 
