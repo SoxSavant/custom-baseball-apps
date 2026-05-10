@@ -84,7 +84,7 @@ with col1:
     st.number_input("Min IP (per season)", min_value=0, max_value=5000, key="ps_min_ip")
 
     RATE_3DP = {"WHIP", "BABIP"}
-    RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB", "WPA", "Clutch"}
+    RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB", "WPA", "Clutch","ERA-xERA",}
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
