@@ -37,7 +37,7 @@ STAT_DISPLAY_NAMES = {
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR",
-    "ERA", "xERA", "FIP", "xFIP", "vFA", "K%", "BB%", "K-BB%", "IP", 
+    "ERA", "xERA", "FIP", "xFIP", "ERA-xERA","vFA", "K%", "BB%", "K-BB%", "IP", 
     "Chase%", "Whiff%", "G", "GS",
     "Barrel%", "HardHit%", "EV", "GB%", "K/9","BB/9","K/BB","HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
@@ -59,14 +59,15 @@ STAT_DEFAULTS = {
     "CG": 1.0, "ShO": 1.0,
     "fWAR/200": 5.0,
     "bWAR/200": 5.0,
+    "ERA-xERA": 0.5,
 }
 
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
-        "ERA", "xERA", "FIP", "xFIP", "IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
+        "ERA", "xERA", "FIP", "xFIP", "ERA-xERA","IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
         "SV", "K%", "BB%", "K-BB%", "BB/9","HR/9","K/BB","AVG", "WHIP", "ERA-", "FIP-",
         "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
-        "Chase%", "Whiff%", "WPA", "Clutch","fWAR/200", "bWAR/200" ]
+        "Chase%", "Whiff%", "WPA", "Clutch","fWAR/200", "bWAR/200"]
 
 
 
@@ -77,7 +78,7 @@ RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
-    "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB","fWAR/200", "bWAR/200"
+    "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB","fWAR/200", "bWAR/200", "ERA-xERA",
 }
 
 PCT_STATS = {
@@ -280,7 +281,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB", "HR/FB"}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB", "HR/FB","ERA-XERA"}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":
@@ -332,7 +333,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = float(val)
         return f"+{v:.2f}" if show_sign and v > 0 else f"{v:.2f}"
 
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB"}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB","ERA-XERA"}:
         v = float(val)
         formatted = f"{abs(v):.2f}"
         if show_sign and v > 0:

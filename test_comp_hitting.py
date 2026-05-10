@@ -30,7 +30,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(2023, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -123,6 +123,7 @@ for year in range(2026, 2027):
         final["wOBA-xwOBA"] = final["wOBA"] - final["xwOBA"]
     if "Contact%" in final.columns:
         final["Contact%"] = 1 - final["Contact%"]
+    
     
     cols_to_drop = [c for c in ["fWAR", "Chase%", "Whiff%", "Squared-Up%"] 
                 if c in final.columns]

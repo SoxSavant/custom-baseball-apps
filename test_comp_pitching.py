@@ -29,7 +29,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(2015, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
@@ -97,6 +97,8 @@ for year in range(2026, 2027):
         final["fWAR/200"] = final["WAR"] / final["IP"] * 200
     if "bWAR" and "IP" in final.columns:
         final["bWAR/200"] = final["bWAR"] / final["IP"] * 200
+    if "ERA" in final.columns and "xERA" in final.columns:
+        final["ERA-xERA"] = final["ERA"] - final["xERA"]
     
     cols_to_drop = [c for c in ["fWAR", "Chase%", "Whiff%", "vFA"] 
                 if c in final.columns]
@@ -111,6 +113,7 @@ for year in range(2026, 2027):
         rename_map["Contact%"] = "Whiff%"
     if "vFA (pi)" in final.columns:
         rename_map["vFA (pi)"] = "vFA"
+    
 
     final.rename(columns=rename_map, inplace=True)
 
