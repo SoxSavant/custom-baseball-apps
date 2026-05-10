@@ -39,6 +39,7 @@ for year in range(2026, 2027):
     ]
 
     
+    
     if year >=2023: #bat speed data started in 2023
         hitting_dfs.append(pd.read_csv(f"data/batspeed_{year}.csv"))
     if year >=2015: #statcast data started in 2015
@@ -62,7 +63,7 @@ for year in range(2026, 2027):
         # Drop cols already in the merged frame (except the join key)
         duplicate_cols = [
             c for c in df.columns
-            if c != "PlayerId" and c in hitting_merged.columns
+            if c != "PlayerId" and c != "SqUpSw%" and c in hitting_merged.columns
         ]
         df = df.drop(columns=duplicate_cols)
 
@@ -135,7 +136,7 @@ for year in range(2026, 2027):
     if "Contact%" in final.columns:
         rename_map["Contact%"] = "Whiff%"
     if "SqUpSw%" in final.columns:
-        rename_map["SqUpSw%"] = "Squared-Up%",
+        rename_map["SqUpSw%"] = "Squared-Up%"
 
     final.rename(columns=rename_map, inplace=True)
 

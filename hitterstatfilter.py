@@ -168,7 +168,7 @@ with col1:
             RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
             if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or  new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off"}:
+            elif "%" in new_stat or  new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off","BsR"}:
                 step, fmt = 0.1, "%.1f"
             elif  new_stat == "WPA" or new_stat == "Clutch":
                 step, fmt = 0.01, "%.2f"
