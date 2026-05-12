@@ -44,7 +44,7 @@ STAT_PRESETS = {
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
-    "Fielding": ["DRS", "FRV", "OAA", "FRM"],
+    "Fielding": ["DRS", "FRV", "OAA", "Def"],
     "Standard": [
         "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R", "K%", "BB%",
@@ -442,47 +442,63 @@ with right_col:
         [(0, "#335AA1"), (0.5, "#E8E8E8"), (1, "#D92229")],
     )
 
-    fig_height = 1.7 + len(lead_df) * 0.4
+    n = len(lead_df)
+    ROW_H = 0.5          # inches per stat row
+    TITLE_H = 0.55       # inches for title
+    FOOTER_H = 0.45      # inches for footer
+    fig_height = TITLE_H + n * ROW_H + FOOTER_H
+
     fig, ax = plt.subplots(figsize=(7.5, fig_height))
 
-    top_pad = 0.12 if len(lead_df) > 6 else 0.14 if len(lead_df) > 4 else 0.4
-    ax.set_position([0.08, top_pad, 0.8, 0.85 - top_pad])
+    # Axes occupies only the stat rows, sandwiched between title and footer
+    ax_bottom = FOOTER_H / fig_height
+    ax_top    = 1 - TITLE_H / fig_height
+    ax.set_position([0.08, ax_bottom, 0.8, ax_top - ax_bottom])
 
     title = f"{year} {player_name}"
     if player_team_display:
         title += f" | {player_team_display}"
-    fig.text(0.5, 0.885, title, ha="center", va="center", fontsize=22, fontweight="bold")
-    fig.text(0.2, 0.08, "By: Sox_Savant", ha="center", va="center", fontsize=10, color="#555")
-    fig.text(0.75, 0.08, "Data: FanGraphs, Bref", ha="center", va="center", fontsize=10, color="#555")
 
-    y = np.arange(len(lead_df))
-    TRACK_H = 0.82
-    BAR_H = 0.82
-    LEFT_OFFSET = 5
-    BAR_LENGTH = 60
-    VALUE_X = LEFT_OFFSET + BAR_LENGTH + 15
-    BUBBLE_SIZE = 700
+    # Title centered in the title band
+    title_y = 1 - (TITLE_H / 2) / fig_height
+    fig.text(0.5,  title_y,            title,                ha="center", va="center", fontsize=22, fontweight="bold")
+
+    # Footer centered in the footer band
+    footer_y = (FOOTER_H / 2) / fig_height
+    fig.text(0.2,  footer_y,           "By: Sox_Savant",    ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.75, footer_y,           "Data: FanGraphs, Bref", ha="center", va="center", fontsize=10, color="#555")
+
+    y = np.arange(n)
+    TRACK_H    = 0.82
+    BAR_H      = 0.82
+    LEFT_OFFSET = 3
+    BAR_LENGTH  = 60
+    VALUE_X     = LEFT_OFFSET + BAR_LENGTH + 15
+    BUBBLE_SIZE = 1000
 
     ax.barh(y, BAR_LENGTH, left=LEFT_OFFSET, height=TRACK_H, color="#F1F1F1", edgecolor="none")
 
     for i, row in lead_df.iterrows():
-        pct = row["Pct"]
-        color = cmap(pct / 100)
+        pct     = row["Pct"]
+        color   = cmap(pct / 100)
         bar_width = pct / 100 * BAR_LENGTH
-        ax.barh(i, bar_width, left=LEFT_OFFSET, height=BAR_H, color=color, edgecolor="none")
-        bubble_x = LEFT_OFFSET + bar_width
+        bubble_x  = LEFT_OFFSET + bar_width
+        BUBBLE_R  = 4
+        visual_bar_width = np.clip(max(bar_width, BUBBLE_R), 0, BAR_LENGTH - (BUBBLE_R)/2)
+        ax.barh(i, visual_bar_width, left=LEFT_OFFSET, height=BAR_H, color=color, edgecolor="none")
+        bubble_x  = np.clip(bubble_x, LEFT_OFFSET + BUBBLE_R, LEFT_OFFSET + BAR_LENGTH)
         ax.scatter(bubble_x, i, s=BUBBLE_SIZE, color=color, edgecolors="white", linewidth=2.4, zorder=3)
         ax.text(bubble_x, i + 0.04, f"{int(round(pct))}", ha="center", va="center",
-                fontsize=11, fontweight="bold", color="white")
-        ax.text(VALUE_X - 9, i, row["Display"], ha="left", va="center", fontsize=12, color="#111")
-        ax.text(0, i, row["Stat"], ha="right", va="center", fontsize=13)
+                fontsize=12, fontweight="bold", color="white")
+        ax.text(VALUE_X - 10.5, i, row["Display"], ha="left",  va="center", fontsize=12, color="#111")
+        ax.text(0,           i, row["Stat"],    ha="right", va="center", fontsize=13)
 
     for pos in (0.1, 0.5, 0.9):
-        ax.vlines(LEFT_OFFSET + BAR_LENGTH * pos, -0.5, len(lead_df) - 0.5,
+        ax.vlines(LEFT_OFFSET + BAR_LENGTH * pos, -0.5, n - 0.5,
                   colors="white", linewidth=1.2, alpha=0.25, zorder=2.6)
 
     ax.set_xlim(-15, VALUE_X + 5)
-    ax.set_ylim(-0.5, len(lead_df) - 0.5)
+    ax.set_ylim(-0.5, n - 0.5)
     ax.invert_yaxis()
     ax.axis("off")
 

@@ -424,73 +424,86 @@ with right_col:
         [(0, "#335AA1"), (0.5, "#E8E8E8"), (1, "#D92229")],
     )
 
-    fig_height = 1.25 + len(lead_df) * 0.4
+    n = len(lead_df)
+    ROW_H    = 0.5
+    TITLE_H  = 0.75   # taller than player version to fit title + subtitle
+    FOOTER_H = 0.45
+    fig_height = TITLE_H + n * ROW_H + FOOTER_H
+
     fig, ax = plt.subplots(figsize=(7.5, fig_height))
 
-    top_pad = 0.75 / fig_height
-    ax.set_position([0.08, 0.12, 0.8, 1.0 - top_pad - 0.12])
+    ax_bottom = FOOTER_H / fig_height
+    ax_top    = 1 - TITLE_H / fig_height
+    ax.set_position([0.08, ax_bottom, 0.8, ax_top - ax_bottom])
 
-    title_y = 1 - 0.3 / fig_height
-    subtitle_y = 1 - 0.6 / fig_height
+    # Title and subtitle both centered in the title band
+    title_y    = 1 - (TITLE_H * 0.28) / fig_height
+    subtitle_y = 1 - (TITLE_H * 0.72) / fig_height
+    footer_y   = (FOOTER_H / 2) / fig_height
 
-    fig.text(0.5, title_y, f"{year} {team_full_name}",
+    fig.text(0.5, title_y,    f"{year} {team_full_name}",
              ha="center", va="center", fontsize=22, fontweight="bold")
     fig.text(0.5, subtitle_y, f"(min {min_ip} IP)",
              ha="center", va="center", fontsize=13, color="#555")
-    fig.text(0.2, 0.08, "By: Sox_Savant", ha="center", va="center", fontsize=10, color="#555")
-    fig.text(0.7, 0.08, "Data: FanGraphs, Bref", ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.2,  footer_y,  "By: Sox_Savant",       ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.75, footer_y,  "Data: FanGraphs, Bref", ha="center", va="center", fontsize=10, color="#555")
 
-    y = np.arange(len(lead_df))
+    y = np.arange(n)
     TRACK_H     = 0.82
     BAR_H       = 0.82
     LEFT_OFFSET = 3
     BAR_LENGTH  = 45
     VALUE_X     = LEFT_OFFSET + BAR_LENGTH + 12
-    BUBBLE_SIZE = 650
+    BUBBLE_SIZE = 1000
+    BUBBLE_R    = 4
 
     ax.barh(y, BAR_LENGTH, left=LEFT_OFFSET, height=TRACK_H, color="#F1F1F1", edgecolor="none")
 
     for i, row in lead_df.iterrows():
-        pct = row["Pct"]
-        color = cmap(pct / 100)
+        pct      = row["Pct"]
+        color    = cmap(pct / 100)
         bar_width = pct / 100 * BAR_LENGTH
-        ax.barh(i, bar_width, left=LEFT_OFFSET, height=BAR_H, color=color, edgecolor="none")
+        bubble_x  = LEFT_OFFSET + bar_width
+
+        visual_bar_width = np.clip(max(bar_width, BUBBLE_R), 0, BAR_LENGTH - BUBBLE_R/2)
+        ax.barh(i, visual_bar_width, left=LEFT_OFFSET, height=BAR_H, color=color, edgecolor="none")
+
+        bubble_x = np.clip(bubble_x, LEFT_OFFSET + BUBBLE_R, LEFT_OFFSET + BAR_LENGTH-BUBBLE_R/5)
 
         name = row["Leader"]
-        bubble_x = LEFT_OFFSET + bar_width
         needs_shift = pct < len(str(name)) * 3.7
         if needs_shift:
-            name_x = bubble_x + (VALUE_X - bubble_x) * 0.2 - 2
+            name_x  = bubble_x + (VALUE_X - bubble_x) * 0.2 - 1
             name_ha = "left"
         else:
-            name_x = LEFT_OFFSET + bar_width / 2 + 0
+            name_x  = LEFT_OFFSET + bar_width / 2 + 1
             name_ha = "center"
 
-        ax.text(name_x, i, name, ha=name_ha, va="center", fontsize=13, fontweight="bold", color="#111")
+        ax.text(name_x, i, name, ha=name_ha, va="center", fontsize=14, fontweight="bold", color="#111")
         ax.scatter(bubble_x, i, s=BUBBLE_SIZE, color=color, edgecolors="white", linewidth=2.4, zorder=3)
         ax.text(bubble_x, i + 0.04, f"{int(round(pct))}", ha="center", va="center",
-                fontsize=11, fontweight="bold", color="white")
-        ax.text(VALUE_X - 9.5, i, row["Display"], ha="left", va="center", fontsize=12, color="#111")
-        ax.text(0, i, row["Stat"], ha="right", va="center", fontsize=13)
+                fontsize=12, fontweight="bold", color="white")
+        ax.text(VALUE_X - 10, i, row["Display"], ha="left",  va="center", fontsize=12, color="#111")
+        ax.text(0,              i, row["Stat"],     ha="right", va="center", fontsize=13)
 
     for pos in (0.1, 0.5, 0.9):
-        ax.vlines(LEFT_OFFSET + BAR_LENGTH * pos, -0.5, len(lead_df) - 0.5,
+        ax.vlines(LEFT_OFFSET + BAR_LENGTH * pos, -0.5, n - 0.5,
                   colors="white", linewidth=1.2, alpha=0.25, zorder=2.6)
 
     ax.set_xlim(-10, VALUE_X)
-    ax.set_ylim(-0.5, len(lead_df) - 0.5)
+    ax.set_ylim(-0.5, n - 0.5)
     ax.invert_yaxis()
     ax.axis("off")
 
     st.pyplot(fig, use_container_width=True, clear_figure=False)
 
     pdf_buffer = BytesIO()
-    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25)
+    fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25, dpi=300)
     pdf_buffer.seek(0)
     st.download_button(
         "Download as PDF",
         data=pdf_buffer,
-        file_name=f"{team_abbr}_{year}_pitcher_stat_leaders.pdf",
+        file_name=f"{team_abbr}_{year}_stat_leaders.pdf",
         mime="application/pdf",
     )
     plt.close(fig)
