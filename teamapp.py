@@ -407,7 +407,7 @@ for stat in stats_order:
     pct = (league_vals <= leader_val).mean() * 100.0
     if stat in lower_better:
         pct = 100 - pct
-    pct = float(np.clip(pct, 0, 100))
+    pct = float(np.clip(pct, 1, 100))
 
     leaders.append({
         "Stat": label_map.get(stat, stat),
