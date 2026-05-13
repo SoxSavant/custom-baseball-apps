@@ -455,6 +455,25 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
+STAT_PRESETS_SAVANT = {
+     "Statcast": [
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%",
+        "Chase%", "Whiff%", "K%", "BB%",
+    ],
+    "Stat Mix": [
+        "fWAR","bWAR","wRC+","xwOBA","HardHit%","K%","BB%","DRS","FRV","BsR"
+    ],
+    "Fielding": ["DRS", "FRV", "OAA", "Def"],
+    "Standard": [
+        "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
+        "2B", "3B", "HR", "XBH", "RBI", "SB","K%", "BB%",
+    ],
+"Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": [
+        "fWAR",
+    ],
+}
+
 STAT_PRESETS_YOY = {
     "Statcast": [
         "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 

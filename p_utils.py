@@ -435,6 +435,21 @@ STAT_PRESETS = {
     "Player E leads": [],
 }
 
+STAT_PRESETS_SAVANT = {
+    "Default": [
+        "fWAR", "bWAR",  "ERA", "xERA", "FIP", "IP",
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
+    ],
+    "Statcast": [
+        "fWAR", "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
+    "Standard": [
+        "fWAR", "bWAR", "ERA", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
+    ],
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": ["fWAR"],
+}
+
 STAT_PRESETS_YOY = {
     "Statcast": [
          "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",

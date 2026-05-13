@@ -39,23 +39,8 @@ with meta_col:
     )
 
 from p_utils import (STAT_ALLOWLIST, format_stat, TEAMS, TRUTHY_STRINGS,
- label_map, lower_better,  EVERY_STAT_PRESET, STAT_PRESETS,
+ label_map, lower_better, STAT_PRESETS_SAVANT,
 normalize_team, start_year,load_final_year)
-
-STAT_PRESETS = {
-    "Statcast": [
-        "fWAR", "bWAR", "xERA", "EV", "Chase%", "Whiff%",
-        "K%", "BB%", "Barrel%", "HardHit%", "GB%",
-    ],
-    "Standard": [
-        "bWAR", "fWAR", "GS", "IP", "ERA", "FIP", "WHIP",
-        "K/9", "BB/9", "HR/9", "K%", "BB%",
-    ],
-    "Miscellaneous": [
-        "K-BB%", "WPA", "Clutch", "GB%", "HR/FB",
-    ],
-    "Every Stat": EVERY_STAT_PRESET,
-}
 
 
 def get_teams_for_year(season: int) -> dict[str, str]:
@@ -187,7 +172,7 @@ if not stat_options:
 
 default_preset_name = "Statcast"
 stat_preset_key = "stat_preset_select"
-preset_options = list(STAT_PRESETS.keys())
+preset_options = list(STAT_PRESETS_SAVANT.keys())
 stat_state_key = "stat_config"
 manual_stat_update_key = "stat_config_manual_update"
 add_select_key = "add_stat_select"
@@ -224,7 +209,7 @@ def normalize_stat_rows(rows, fallback):
 
 def _preset_base_config():
     preset = st.session_state.get(stat_preset_key, default_preset_name)
-    candidates = [s for s in STAT_PRESETS.get(preset, []) if s in stat_options] or [stat_options[0]]
+    candidates = [s for s in STAT_PRESETS_SAVANT.get(preset, []) if s in stat_options] or [stat_options[0]]
     return [{"Stat": s, "Show": True} for s in candidates]
 
 
@@ -257,7 +242,7 @@ def remove_stat_callback(stat_key, select_key, reset_key, sentinel):
 
 def stat_preset_callback(preset_key, stat_key, available_stats):
     preset_name = st.session_state.get(preset_key, default_preset_name)
-    filtered = [s for s in STAT_PRESETS.get(preset_name, []) if s in available_stats]
+    filtered = [s for s in STAT_PRESETS_SAVANT.get(preset_name, []) if s in available_stats]
     if not filtered and available_stats:
         filtered = [available_stats[0]]
     if not filtered:
