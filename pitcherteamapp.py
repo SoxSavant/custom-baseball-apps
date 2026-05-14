@@ -170,7 +170,7 @@ if not stat_options:
     st.error("No numeric stats available.")
     st.stop()
 
-default_preset_name = "Statcast"
+default_preset_name = "Default"
 stat_preset_key = "stat_preset_select"
 preset_options = list(STAT_PRESETS_SAVANT.keys())
 stat_state_key = "stat_config"
