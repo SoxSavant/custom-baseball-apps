@@ -454,8 +454,8 @@ STAT_PRESETS_YOY = {
     "Statcast": [
          "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
-    "Default": [
-        "fWAR", "bWAR", "GS", "IP", "ERA", "ERA-", "FIP", "FIP-",
+    "Stat Mix": [
+        "fWAR", "bWAR", "GS", "IP", "ERA",  "FIP", 
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Standard": [
