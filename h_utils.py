@@ -491,7 +491,7 @@ STAT_PRESETS_YOY = {
         "K%", "BB%", "DRS",
     ],
     "Fielding": [
-        "DRS", "FRV", "OAA", "FRM"
+        "DRS", "FRV", "OAA", "Def"
     ],
     "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": [
