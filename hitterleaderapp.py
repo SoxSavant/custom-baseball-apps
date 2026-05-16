@@ -37,7 +37,7 @@ with meta_col:
     )
 
 
-from h_utils import (STAT_ALLOWLIST,  SUM_STATS, RATE_STATS, format_stat, start_year, MAX_STATS,
+from h_utils import (STAT_ALLOWLIST, format_stat, start_year, 
 get_headshot, label_map, lower_better, load_final_year,
 POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, aggregate_player_group)
 
