@@ -30,7 +30,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(2015, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -68,6 +68,9 @@ for year in range(2026, 2027):
         df = df.drop(columns=duplicate_cols)
 
         hitting_merged = hitting_merged.merge(df, on="PlayerId", how="left")
+    if year >=2015: #for special baseball savant csv which has player_id, not PlayerId
+        ss_df = pd.read_csv(f"data/sweetspot_{year}.csv")
+        hitting_merged = hitting_merged.merge(ss_df, left_on = "MLBAMID", right_on = "player_id", how = "left").drop(columns=["player_id"], errors="ignore")
 
     # Fielding: aggregate across positions, then drop cols already in hitting
     fielding = pd.read_csv(f"data/fielding_{year}.csv")
@@ -138,6 +141,8 @@ for year in range(2026, 2027):
         rename_map["Contact%"] = "Whiff%"
     if "SqUpSw%" in final.columns:
         rename_map["SqUpSw%"] = "Squared-Up%"
+    if "anglesweetspotpercent" in final.columns:
+        rename_map["anglesweetspotpercent"] = "Sweet-Spot%"
 
     final.rename(columns=rename_map, inplace=True)
 

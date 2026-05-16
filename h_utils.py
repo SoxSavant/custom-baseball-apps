@@ -11,14 +11,17 @@ TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 start_year = 1901
 
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "Off", "Def", "BsR", "K%", "BB%", "Chase%", "Whiff%","Barrel%", 
-    "HardHit%", "EV", "maxEV", "FRV", "OAA", "DRS",
-    "wRC+", "wOBA", "xwOBA", "wOBA-xwOBA", "xBA", "xSLG", "OPS", "SLG", "OBP", "AVG", "ISO",
+    "fWAR", "bWAR", "xwOBA","wOBA",  "wOBA-xwOBA", "xBA", "xSLG",
+    "EV", "Barrel%","HardHit%","Sweet-Spot%",
+    "BatSpd","Squared-Up%", "Chase%", "Whiff%", 
+    "K%", "BB%", "Off", "Def", "BsR", 
+    "FRV", "OAA", "DRS",
+    "wRC+", "maxEV","OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
      "BB/K", "WPA", "Clutch",
      "FRM", "TZ","Swing%", "Z-Swing%",
-    "O-Contact%", "Z-Contact%", "Zone%", "BatSpd", "Squared-Up%", "Inn",
+    "O-Contact%", "Z-Contact%", "Zone%",  "Inn",
     "fWAR/650","bWAR/650"
 ]
 
@@ -37,7 +40,7 @@ RATE_STATS = {
     "EV","BB/K", "ISO", "BatSpd",
     "wRC+", "Clutch", "Chase%", "Swing%", "Z-Swing%",
     "O-Contact%", "Z-Contact%", "Zone%", "wOBA-xwOBA",
-    "Squared-Up%", "fWAR/650","bWAR/650",
+    "Squared-Up%", "fWAR/650","bWAR/650","Sweet-Spot%"
 }
 
 MAX_STATS = {"maxEV"}
@@ -74,6 +77,7 @@ STAT_DEFAULTS = {
     "Squared-Up%": 25.0,
     "fWAR/650": 5.0,
     "bWAR/650": 5.0,
+    "Sweet-Spot%": 34.0
 }
 
 STAT_DISPLAY_NAMES = {
@@ -246,7 +250,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"FRV", "OAA", "DRS","TZ"}:
         return f"{int(round(float(val)))}"
 
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650"}:
+    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","Sweet-Spot%"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -280,7 +284,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650"}:
+    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","Sweet-Spot%"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:
@@ -457,7 +461,7 @@ STAT_PRESETS = {
 
 STAT_PRESETS_SAVANT = {
      "Statcast": [
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "BatSpd", "Squared-Up%",
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "Sweet-Spot%", "BatSpd", "Squared-Up%", 
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Stat Mix": [
@@ -476,7 +480,7 @@ STAT_PRESETS_SAVANT = {
 
 STAT_PRESETS_YOY = {
     "Statcast": [
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "Sweet-Spot%",
         "BatSpd","Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
