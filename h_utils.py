@@ -372,6 +372,8 @@ def filter_by_position(df, position):
     
     if position == "all" or "Pos" not in df.columns:
         return df
+    #if position == "Exclude DH":
+
     
     position = position.upper()
     

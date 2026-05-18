@@ -235,7 +235,7 @@ for _, row in df.iterrows():
 
     src = get_headshot(row)
     pa_val = row.get("PA", np.nan)
-    inn_val = row.get("Inn", np.nan)
+    inn_val = round(row.get("Inn", np.nan), 1)
     if st.session_state.get("hl_show_player_pa"):
         if pd.notna(pa_val) and st.session_state.get("hl_min_type") == "PA":
             player_pa_html = (

@@ -422,7 +422,7 @@ else:
                     if pd.notna(pa_val):
                         pa_html = f'<span class="p-pa">{int(pa_val)}</span>'
                 else:
-                    pa_val = prow.get("Inn", np.nan)
+                    pa_val = round(prow.get("Inn", np.nan), 1)
                     if pd.notna(pa_val):
                         pa_html = f'<span class="p-pa">{pa_val}</span>'
 
