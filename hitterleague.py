@@ -133,7 +133,7 @@ for key, default in [
     ("ll_year",        current_year),
     ("ll_start_year",  current_year - 1),
     ("ll_end_year",    current_year),
-    ("ll_min_pa",      min_pa),
+    ("ll_min_type", "PA"),
     ("ll_position",    "all"),
     ("ll_team",        "all"),
     ("ll_mode",        MODE_SINGLE),
@@ -239,7 +239,12 @@ with col1:
         s_year = st.session_state["ll_start_year"]
         e_year = max(st.session_state["ll_end_year"], s_year)
 
-    st.number_input("Min PA", min_value=0, max_value=20000, key="ll_min_pa")
+    st.selectbox("Min Type", options=["PA", "Inn"], key="ll_min_type")
+
+    if st.session_state["ll_min_type"] == "Inn":
+        st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key="ll_min_inn")
+    else:
+        st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key="ll_min_pa")
 
     st.selectbox(
         "Position",
@@ -259,7 +264,10 @@ with col1:
     )
 
     st.checkbox("Show worst",  key="ll_show_worst")
-    st.checkbox("Show min PA", key="ll_show_min_pa")
+    if st.session_state["ll_min_type"] == "PA":
+        st.checkbox("Show Min PA", key="ll_show_min_pa")
+    else:
+        st.checkbox("Show Min Inn", key="ll_show_min_pa")
 
     # ── Dynamic stat builder ──
     st.markdown("---")
@@ -329,7 +337,10 @@ with col1:
 #  Resolve filter values
 # ─────────────────────────────────────────────
 
-min_pa_val   = int(st.session_state.get("ll_min_pa", 0))
+use_inn     = st.session_state.get("ll_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get("ll_min_pa", 0))
+min_inn_val = int(st.session_state.get("ll_min_inn", 0))
+
 position_val = st.session_state.get("ll_position", "all")
 team_val     = "all" if team_disabled else st.session_state.get("ll_team", "all")
 show_worst   = st.session_state.get("ll_show_worst", False)
@@ -343,8 +354,12 @@ if df is None or df.empty:
     st.error(f"No data found for {s_year}–{e_year}.")
     st.stop()
 
-if min_pa_val > 0 and "PA" in df.columns:
-    df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+if use_inn:
+    if min_inn_val > 0 and "Inn" in df.columns:
+        df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn_val]
+else:
+    if min_pa_val > 0 and "PA" in df.columns:
+        df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
 if mode != MODE_MULTI:
     df = filter_by_position(df, position_val)
@@ -446,10 +461,13 @@ title = re.sub(
     f"{team_label}{span_label} {overall_label} {mode_label}{worst_label} {pos_suffix}".strip()
 )
 
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-    if st.session_state.get("ll_show_min_pa") else ""
-)
+if st.session_state.get("ll_show_min_pa"):
+    if use_inn:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+    else:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+else:
+    min_pa_subtitle = ""
 
 # ─────────────────────────────────────────────
 #  Render

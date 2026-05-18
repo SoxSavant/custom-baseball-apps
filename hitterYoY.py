@@ -35,9 +35,7 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-
-
-from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better, 
+from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better,
 format_stat_yoy, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year)
 
 current_year = date.today().year
@@ -56,7 +54,10 @@ def normalize_name(raw: str) -> str:
 
 def load_risers_data(
     start_year: int, end_year: int,
-    min_pa_start: int = 0, min_pa_end: int = 0, position: str = "all", team: str = "all"
+    min_pa_start: int = 0, min_pa_end: int = 0,
+    min_inn_start: int = 0, min_inn_end: int = 0,
+    use_inn: bool = False,
+    position: str = "all", team: str = "all"
 ) -> pd.DataFrame:
     df_s = load_final_year(start_year)
     df_e = load_final_year(end_year)
@@ -64,24 +65,24 @@ def load_risers_data(
     if df_s is None or df_s.empty or df_e is None or df_e.empty:
         return pd.DataFrame()
 
-    # Min PA filter
-    if min_pa_start > 0:
-        df_s = df_s[pd.to_numeric(df_s.get("PA", 0), errors="coerce").fillna(0) >= min_pa_start]
-    if min_pa_end > 0:
-        df_e = df_e[pd.to_numeric(df_e.get("PA", 0), errors="coerce").fillna(0) >= min_pa_end]
-    # position filter
+    if use_inn:
+        if min_inn_start > 0 and "Inn" in df_s.columns:
+            df_s = df_s[pd.to_numeric(df_s["Inn"], errors="coerce").fillna(0) >= min_inn_start]
+        if min_inn_end > 0 and "Inn" in df_e.columns:
+            df_e = df_e[pd.to_numeric(df_e["Inn"], errors="coerce").fillna(0) >= min_inn_end]
+    else:
+        if min_pa_start > 0:
+            df_s = df_s[pd.to_numeric(df_s.get("PA", 0), errors="coerce").fillna(0) >= min_pa_start]
+        if min_pa_end > 0:
+            df_e = df_e[pd.to_numeric(df_e.get("PA", 0), errors="coerce").fillna(0) >= min_pa_end]
+
     df_s = filter_by_position(df_s, position)
     df_e = filter_by_position(df_e, position)
 
-
-
-
-    # Team filter on end year
     if team != "all" and "Team" in df_e.columns:
         target = normalize_team(team)
         df_e = df_e[df_e["Team"].astype(str).apply(normalize_team) == target]
 
-    # Match on PlayerId
     if "PlayerId" not in df_s.columns or "PlayerId" not in df_e.columns:
         return pd.DataFrame()
 
@@ -113,10 +114,11 @@ def load_risers_data(
             "Name": row_e.get("Name", row_s.get("Name", "")),
             "Team": get_team_display(str(row_e.get("Team", "N/A"))),
             "PA_start": pd.to_numeric(row_s.get("PA", np.nan), errors="coerce"),
-            "PA_end": pd.to_numeric(row_e.get("PA", np.nan), errors="coerce"),
+            "PA_end":   pd.to_numeric(row_e.get("PA", np.nan), errors="coerce"),
+            "Inn_start": pd.to_numeric(row_s.get("Inn", np.nan), errors="coerce"),
+            "Inn_end":   pd.to_numeric(row_e.get("Inn", np.nan), errors="coerce"),
         }
 
-        # Carry MLBAMID from end year
         for col in ["MLBAMID", "mlbamid"]:
             val = row_e.get(col)
             if val is not None and pd.notna(val):
@@ -127,69 +129,81 @@ def load_risers_data(
             s_val = pd.to_numeric(row_s.get(col, np.nan), errors="coerce")
             e_val = pd.to_numeric(row_e.get(col, np.nan), errors="coerce")
             record[f"{col}_start"] = s_val
-            record[f"{col}_end"] = e_val
+            record[f"{col}_end"]   = e_val
             record[col] = e_val - s_val
 
         rows.append(record)
 
     return pd.DataFrame(rows)
 
+
 from utils import get_dynamic_min_pa
 
-min_pa_end = get_dynamic_min_pa(current_year)
+min_pa_end   = get_dynamic_min_pa(current_year)
 min_pa_start = 502
 
 for key, default in [
-    ("rf_start_year",     current_year-1),
+    ("rf_start_year",     current_year - 1),
     ("rf_end_year",       current_year),
     ("rf_stat",           "wRC+"),
-    ("rf_min_pa_start",         min_pa_start),
-    ("rf_min_pa_end",         min_pa_end),
+    ("rf_min_type",       "PA"),
     ("rf_position",       "all"),
     ("rf_team",           "all"),
     ("rf_show_fallers",   False),
     ("rf_show_min_pa",    True),
     ("rf_show_player_pa", False),
-    ("rf_alltime_mode",   False),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
 
-active_allowlist =  STAT_ALLOWLIST
-if st.session_state.get("rf_stat") not in active_allowlist:
+if st.session_state.get("rf_stat") not in STAT_ALLOWLIST:
     st.session_state["rf_stat"] = "wRC+"
 
 stat = st.selectbox(
-    "Stat", active_allowlist, key="rf_stat",
+    "Stat", STAT_ALLOWLIST, key="rf_stat",
     format_func=lambda x: label_map.get(x, x),
 )
 
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
-    st.selectbox("Start Year", options=list(range(current_year-1, start_year-1, -1)), key="rf_start_year")
-    st.selectbox("End Year", options=list(range(current_year, start_year-1, -1)), key="rf_end_year")
+    st.selectbox("Start Year", options=list(range(current_year - 1, start_year - 1, -1)), key="rf_start_year")
+    st.selectbox("End Year",   options=list(range(current_year,     start_year - 1, -1)), key="rf_end_year")
     start_year = st.session_state["rf_start_year"]
     end_year   = st.session_state["rf_end_year"]
     if end_year <= start_year:
         st.warning("End Year must be greater than Start Year.")
 
-    st.number_input("Start Year min PA", min_value=0, max_value=20000, key="rf_min_pa_start")
-    st.number_input("End Year min PA", min_value=0, max_value=20000, key="rf_min_pa_end")
-    st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
-                    format_func=lambda x: POSITION_OPTIONS[x], key="rf_position")
-    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
-                     format_func=lambda x: TEAM_OPTIONS[x], key="rf_team",
-                     help="Filters by team in the end year only")
+    st.selectbox("Min Type", options=["PA", "Inn"], key="rf_min_type")
+    use_inn = st.session_state["rf_min_type"] == "Inn"
 
-    min_pa_start_val   = int(st.session_state.get("rf_min_pa_start", 0))
-    min_pa_end_val   = int(st.session_state.get("rf_min_pa_end", 0))
+    if use_inn:
+        st.number_input("Start Year Min Inn", min_value=0, max_value=20000, value=200, key="rf_min_inn_start")
+        st.number_input("End Year Min Inn",   min_value=0, max_value=20000, value=200, key="rf_min_inn_end")
+    else:
+        st.number_input("Start Year Min PA", min_value=0, max_value=20000, value=min_pa_start, key="rf_min_pa_start")
+        st.number_input("End Year Min PA",   min_value=0, max_value=20000, value=min_pa_end,   key="rf_min_pa_end")
+
+    st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
+                 format_func=lambda x: POSITION_OPTIONS[x], key="rf_position")
+    st.selectbox("Team", options=list(TEAM_OPTIONS.keys()),
+                 format_func=lambda x: TEAM_OPTIONS[x], key="rf_team",
+                 help="Filters by team in the end year only")
+
+    min_pa_start_val  = int(st.session_state.get("rf_min_pa_start", 0))
+    min_pa_end_val    = int(st.session_state.get("rf_min_pa_end",   0))
+    min_inn_start_val = int(st.session_state.get("rf_min_inn_start", 0))
+    min_inn_end_val   = int(st.session_state.get("rf_min_inn_end",   0))
     position_val = st.session_state.get("rf_position", "all")
     team_val     = st.session_state.get("rf_team", "all")
 
-    st.checkbox("Show Decliners",   key="rf_show_fallers")
-    st.checkbox("Show min PA",    key="rf_show_min_pa")
-    st.checkbox("Show player PA", key="rf_show_player_pa")
+    st.checkbox("Show Decliners", key="rf_show_fallers")
+    if use_inn:
+        st.checkbox("Show Min Inn",    key="rf_show_min_pa")
+        st.checkbox("Show Player Inn", key="rf_show_player_pa")
+    else:
+        st.checkbox("Show Min PA",    key="rf_show_min_pa")
+        st.checkbox("Show Player PA", key="rf_show_player_pa")
 
 show_fallers = st.session_state.get("rf_show_fallers", False)
 
@@ -197,14 +211,17 @@ show_fallers = st.session_state.get("rf_show_fallers", False)
 #  Load data
 # ─────────────────────────────────────────────
 
-
 if end_year > start_year:
     with st.spinner("Loading data..."):
-        df = load_risers_data(start_year, end_year, min_pa_start_val, min_pa_end_val, position_val, team_val)
+        df = load_risers_data(
+            start_year, end_year,
+            min_pa_start=min_pa_start_val, min_pa_end=min_pa_end_val,
+            min_inn_start=min_inn_start_val, min_inn_end=min_inn_end_val,
+            use_inn=use_inn,
+            position=position_val, team=team_val,
+        )
 else:
     df = pd.DataFrame()
-
-
 
 # Sort & filter direction
 if not df.empty and stat in df.columns:
@@ -221,6 +238,10 @@ elif not df.empty:
     st.error(f"Stat '{stat}' not found in dataset.")
     df = pd.DataFrame()
 
+# ─────────────────────────────────────────────
+#  Build cards
+# ─────────────────────────────────────────────
+
 cards = []
 for _, row in df.iterrows():
     name  = str(row.get("Name", "")).strip()
@@ -230,19 +251,28 @@ for _, row in df.iterrows():
     is_positive = pd.notna(delta) and float(delta) > 0
     display_val = format_stat_yoy(stat, delta, show_sign=is_positive)
 
-    end_val = row.get(f"{stat}_end", np.nan)
+    end_val     = row.get(f"{stat}_end", np.nan)
     end_display = format_stat_yoy(stat, end_val) if pd.notna(end_val) else ""
-    stat_label = label_map.get(stat, stat)
+    stat_label  = label_map.get(stat, stat)
 
-    pa_start = row.get("PA_start", np.nan)
-    pa_end   = row.get("PA_end",   np.nan)
     player_pa_html = ""
     if st.session_state.get("rf_show_player_pa"):
-        parts = []
-        if pd.notna(pa_start): parts.append(str(int(pa_start)))
-        if pd.notna(pa_end):   parts.append(str(int(pa_end)))
-        if parts:
-            player_pa_html = f'<div class="player-pa">{" → ".join(parts)} PA</div>'
+        if use_inn:
+            inn_s = row.get("Inn_start", np.nan)
+            inn_e = row.get("Inn_end",   np.nan)
+            parts = []
+            if pd.notna(inn_s): parts.append(f"{inn_s:.1f}".rstrip("0").rstrip(".") if inn_s != int(inn_s) else str(int(inn_s)))
+            if pd.notna(inn_e): parts.append(f"{inn_e:.1f}".rstrip("0").rstrip(".") if inn_e != int(inn_e) else str(int(inn_e)))
+            if parts:
+                player_pa_html = f'<div class="player-pa">{" → ".join(parts)} Inn</div>'
+        else:
+            pa_start = row.get("PA_start", np.nan)
+            pa_end   = row.get("PA_end",   np.nan)
+            parts = []
+            if pd.notna(pa_start): parts.append(str(int(pa_start)))
+            if pd.notna(pa_end):   parts.append(str(int(pa_end)))
+            if parts:
+                player_pa_html = f'<div class="player-pa">{" → ".join(parts)} PA</div>'
 
     if stat in lower_better:
         is_improvement = pd.notna(delta) and float(delta) < 0
@@ -251,7 +281,7 @@ for _, row in df.iterrows():
     delta_class = "stat-positive" if is_improvement else "stat-negative"
     end_context = f'<div class="player-endval">{stat_label}: {end_display}</div>' if end_display else ""
 
-    src = get_headshot(row)
+    src      = get_headshot(row)
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}"/>'
     cards.append(f"""
     <div class="player-card">
@@ -264,19 +294,26 @@ for _, row in df.iterrows():
     </div>
     """)
 
+# ─────────────────────────────────────────────
+#  Title & subtitle
+# ─────────────────────────────────────────────
+
 title_stat_label = label_map.get(stat, stat)
-pos_suffix  = f" ({POSITION_OPTIONS.get(position_val, '')})" if  position_val != "all" else ""
+pos_suffix  = f" ({POSITION_OPTIONS.get(position_val, '')})" if position_val != "all" else ""
 team_prefix = f"{TEAM_OPTIONS.get(team_val, '')} " if team_val != "all" else ""
 riser_label = "Decliners" if show_fallers else "Improvers"
-
-
 title = f"Top {team_prefix}{title_stat_label} {riser_label}{pos_suffix}: {int(start_year)} → {int(end_year)}"
 
 min_pa_subtitle = ""
 if st.session_state.get("rf_show_min_pa"):
-    display_min_start =  min_pa_start_val
-    display_min_end =  min_pa_end_val
-    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {display_min_start} PA → {display_min_end} PA</div>'
+    if use_inn:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_start_val} Inn → {min_inn_end_val} Inn</div>'
+    else:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_start_val} PA → {min_pa_end_val} PA</div>'
+
+# ─────────────────────────────────────────────
+#  Render
+# ─────────────────────────────────────────────
 
 grid_html = f"""
 <div class="leaderboard-card">

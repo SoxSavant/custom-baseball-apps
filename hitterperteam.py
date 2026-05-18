@@ -38,6 +38,8 @@ from h_utils import (
 )
 from utils import get_dynamic_min_pa, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url
 
+current_year = date.today().year
+min_pa = get_dynamic_min_pa(current_year)
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
@@ -103,6 +105,7 @@ for key, default in [
     ("tc_collapse_split", True),
     ("tc_val_0",          .350),
     ("tc_val_1",          125),
+    ("tc_min_type", "PA"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -135,21 +138,19 @@ with col1:
 
         if "tc_last_year" not in st.session_state:
             st.session_state.tc_last_year = s_year
-        if s_year != st.session_state.tc_last_year:
-            st.session_state["tc_min_pa"] = get_dynamic_min_pa(s_year)
-            st.session_state.tc_last_year = s_year
     else:
         st.selectbox("Start Year", options=list(range(current_year, start_year - 1, -1)), key="tc_start_year")
         st.selectbox("End Year",   options=list(range(current_year, start_year - 1, -1)), key="tc_end_year")
         s_year = st.session_state["tc_start_year"]
         e_year = max(st.session_state["tc_end_year"], s_year)
 
-    if "tc_min_pa" not in st.session_state:
-        st.session_state["tc_min_pa"] = get_dynamic_min_pa(
-            s_year if mode == MODE_SINGLE else current_year
-        )
+ 
+    st.selectbox("Min Type", options=["PA", "Inn"], key="tc_min_type")
 
-    st.number_input("Min PA", min_value=0, max_value=20000, key="tc_min_pa")
+    if st.session_state["tc_min_type"] == "Inn":
+        st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key="tc_min_inn")
+    else:
+        st.number_input("Min PA", min_value=0, max_value=20000, value = min_pa, key="tc_min_pa")
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
@@ -188,9 +189,17 @@ with col1:
         "Position", options=list(POSITION_OPTIONS.keys()),
         format_func=lambda x: POSITION_OPTIONS[x], key="tc_position",
     )
+    # min type
+    if st.session_state["tc_min_type"] == "PA":
+        st.checkbox("Show Min PA", key="tc_show_min_pa")
+    else:
+        st.checkbox("Show Min Inn", key="tc_show_min_pa")
+    # showing min type
+    if st.session_state["tc_min_type"] == "PA":
+        st.checkbox("Show Player PA", key="tc_show_player_pa")
+    else:
+        st.checkbox("Show Player Inn", key="tc_show_player_pa")
 
-    st.checkbox("Show min PA",        key="tc_show_min_pa")
-    st.checkbox("Show player PA",     key="tc_show_player_pa")
     st.checkbox("Show all 30 teams",  key="tc_show_all_teams")
 
     st.markdown("**Divisions**")
@@ -198,7 +207,10 @@ with col1:
         st.checkbox(div, key=f"tc_div_{div}")
 
 
-min_pa_val   = int(st.session_state["tc_min_pa"])
+use_inn     = st.session_state.get("tc_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get("tc_min_pa", 0))
+min_inn_val = int(st.session_state.get("tc_min_inn", 0))
+
 position_val = st.session_state["tc_position"]
 
 df = load_data(s_year, e_year, mode, position=position_val)
@@ -207,8 +219,12 @@ if df is None or df.empty:
     st.error(f"No data found for {s_year}–{e_year}.")
     st.stop()
 
-if min_pa_val > 0 and "PA" in df.columns:
-    df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+if use_inn:
+    if min_inn_val > 0 and "Inn" in df.columns:
+        df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn_val]
+else:
+    if min_pa_val > 0 and "PA" in df.columns:
+        df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
 if mode != MODE_MULTI:
     df = filter_by_position(df, position_val)
@@ -347,10 +363,13 @@ middle_label = " in " if mode == MODE_SINGLE else ": "
 title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
 
 
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-    if st.session_state.get("tc_show_min_pa") else ""
-)
+if st.session_state.get("tc_show_min_pa"):
+    if use_inn:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+    else:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+else:
+    min_pa_subtitle = ""
 
 show_player_pa = st.session_state.get("tc_show_player_pa", False)
 
@@ -397,10 +416,16 @@ else:
                     )
 
             pa_html = ""
-            if show_player_pa:
-                pa_val = prow.get("PA", np.nan)
-                if pd.notna(pa_val):
-                    pa_html = f'<span class="p-pa">{int(pa_val)}</span>'
+            if show_player_pa: # showing player pa or Inn
+                if st.session_state["tc_min_type"] == "PA":
+                    pa_val = prow.get("PA", np.nan)
+                    if pd.notna(pa_val):
+                        pa_html = f'<span class="p-pa">{int(pa_val)}</span>'
+                else:
+                    pa_val = prow.get("Inn", np.nan)
+                    if pd.notna(pa_val):
+                        pa_html = f'<span class="p-pa">{pa_val}</span>'
+
 
             stats_joined = "".join(stat_parts)
             player_rows_html += f"""

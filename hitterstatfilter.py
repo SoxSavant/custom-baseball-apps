@@ -100,11 +100,14 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 
 from utils import get_dynamic_min_pa
 
+min_pa = get_dynamic_min_pa(current_year)
+
 for key, default in [
     ("sc_year",        current_year),
     ("sc_start_year",  current_year - 1),
     ("sc_end_year",    current_year),
     ("sc_mode",        MODE_SINGLE),
+    ("sc_min_type", "PA"),
     ("sc_position",    "all"),
     ("sc_team",        "all"),
     ("sc_show_min_pa", True),
@@ -139,12 +142,12 @@ with col1:
         start_year = st.session_state["sc_start_year"]
         end_year   = max(st.session_state["sc_end_year"], start_year)
 
-    if "sc_min_pa" not in st.session_state:
-        st.session_state["sc_min_pa"] = get_dynamic_min_pa(
-            start_year if mode == MODE_SINGLE else current_year
-        )
+    st.selectbox("Min Type", options=["PA", "Inn"], key="sc_min_type")
 
-    st.number_input("Min PA", min_value=0, max_value=20000, key="sc_min_pa")
+    if st.session_state["sc_min_type"] == "Inn":
+        st.number_input("Min Inn", min_value=0, max_value=20000, value= 200, key="sc_min_inn")
+    else:
+        st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key="sc_min_pa")
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
@@ -168,7 +171,7 @@ with col1:
             RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
             if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
                 step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or  new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off","BsR"}:
+            elif "%" in new_stat or  new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off","BsR","Inn"}:
                 step, fmt = 0.1, "%.1f"
             elif  new_stat == "WPA" or new_stat == "Clutch":
                 step, fmt = 0.01, "%.2f"
@@ -188,11 +191,22 @@ with col1:
         help="Team filter unavailable for multi-year span" if team_disabled else None,
     )
 
-    st.checkbox("Show min PA",         key="sc_show_min_pa")
-    st.checkbox("Show player PA", key="sc_show_player_pa")
+    if st.session_state["sc_min_type"] == "PA":
+        st.checkbox("Show Min PA", key="sc_show_min_pa")
+    else:
+        st.checkbox("Show Min Inn", key="sc_show_min_pa")
+    if st.session_state["sc_min_type"] == "PA":
+        st.checkbox("Show Player PA", key="sc_show_player_pa")
+    else:
+        st.checkbox("Show Player Inn", key="sc_show_player_pa")
+    
     st.checkbox("Only display top 10", key="sc_top10")
 
-min_pa_val   = int(st.session_state["sc_min_pa"])
+use_inn = st.session_state.get("sc_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get("sc_min_pa", 0))
+min_inn_val = int(st.session_state.get("sc_min_inn", 0))
+
+
 position_val = st.session_state["sc_position"]
 team_val     = "all" if team_disabled else st.session_state["sc_team"]
 
@@ -202,9 +216,12 @@ if df is None or df.empty:
     st.error(f"No data found for {start_year}–{end_year}.")
     st.stop()
 
-# Min PA
-if min_pa_val > 0 and "PA" in df.columns:
-    df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+if use_inn:
+    if min_inn_val > 0 and "Inn" in df.columns:
+        df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn_val]
+else:
+    if min_pa_val > 0 and "PA" in df.columns:
+        df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
 # Position filter — skip for MULTI (already applied pre-aggregation inside load_data)
 if mode != MODE_MULTI:
@@ -279,10 +296,18 @@ for _, row in df.iterrows():
 
     src = get_headshot(row)
     pa_val = row.get("PA", np.nan)
-    player_pa_html = (
-        f'<div class="player-pa">{int(pa_val)} PA</div>'
-        if st.session_state.get("sc_show_player_pa") and pd.notna(pa_val) else ""
-    )
+    inn_val = row.get("Inn", np.nan)
+    if st.session_state.get("sc_show_player_pa"):
+        if pd.notna(pa_val) and st.session_state.get("sc_min_type") == "PA":
+            player_pa_html = (
+            f'<div class="player-pa">{int(pa_val)} PA</div>'
+        )
+        elif pd.notna(inn_val) and st.session_state.get("sc_min_type") == "Inn":
+            player_pa_html = (
+            f'<div class="player-pa">{inn_val} Inn</div>'
+        )
+    else:
+        player_pa_html = ""
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" width="155" height="155" style="object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;background:#f6f6f6;display:block;"/>'
     cards.append(f"""
     <div class="player-card">
@@ -307,10 +332,13 @@ overflow_note = (
     f'<div class="overflow-note">Showing top {display_limit} of {total_qualified} qualifying players</div>'
     if total_qualified > display_limit else ""
 )
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-    if st.session_state.get("sc_show_min_pa") else ""
-)
+if st.session_state.get("sc_show_min_pa"):
+    if use_inn:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+    else:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+else:
+    min_pa_subtitle = ""
 
 body = "".join(cards) if cards else '<div style="padding:2rem;color:#999;text-align:center;">No players matched all filters. Try adjusting your thresholds.</div>'
 

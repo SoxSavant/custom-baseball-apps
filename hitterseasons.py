@@ -36,6 +36,8 @@ from h_utils import (
     POSITION_OPTIONS, get_team_display, filter_by_position, load_final_year
 )
 
+from utils import get_dynamic_min_pa
+
 MAX_DISPLAY  = 10
 current_year = date.today().year
 
@@ -44,7 +46,7 @@ def update_stat_default(i):
     st.session_state[f"hs_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"hs_op_{i}"]  = "<=" if stat in lower_better else ">="
 
-
+min_pa = get_dynamic_min_pa(current_year)
 
 def load_all_seasons(start: int, end: int) -> pd.DataFrame:
     frames = []
@@ -60,8 +62,8 @@ for key, default in [
     ("hs_start_year",  current_year - 10),
     ("hs_end_year",    current_year-1),
     ("hs_position",    "all"),
-    ("hs_min_pa",      300),
-    ("hs_show_min_pa", False),
+    ("hs_min_type","PA"),
+    ("hs_show_min_pa", True),
     ("hs_val_0",       5.0),
     ("hs_val_1",       100),
 ]:
@@ -79,7 +81,12 @@ with col1:
     sel_start = st.session_state["hs_start_year"]
     sel_end   = max(st.session_state["hs_end_year"], sel_start)
 
-    st.number_input("Min PA (per season)", min_value=0, max_value=5000, key="hs_min_pa")
+    st.selectbox("Min Type (per season)", options=["PA", "Inn"], key="hs_min_type")
+
+    if st.session_state["hs_min_type"] == "Inn":
+        st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key="hs_min_inn")
+    else:
+        st.number_input("Min PA", min_value=0, max_value=20000, value = min_pa, key="hs_min_pa")
 
     RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
 
@@ -116,7 +123,10 @@ with col1:
         format_func=lambda x: POSITION_OPTIONS[x], key="hs_position",
     )
 
-    st.checkbox("Show min PA", key="hs_show_min_pa")
+    if st.session_state["hs_min_type"] == "PA":
+        st.checkbox("Show Min PA", key="hs_show_min_pa")
+    else:
+        st.checkbox("Show Min Inn", key="hs_show_min_pa")
 
 active_filters = []
 for i in range(num_stats):
@@ -126,7 +136,9 @@ for i in range(num_stats):
     if stat:
         active_filters.append((stat, op, val))
 
-min_pa   = int(st.session_state["hs_min_pa"])
+use_inn     = st.session_state.get("hs_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get("hs_min_pa", 0))
+min_inn_val = int(st.session_state.get("hs_min_inn", 0))
 position = st.session_state["hs_position"]
 
 df_all = load_all_seasons(sel_start, sel_end)
@@ -135,10 +147,12 @@ if df_all is None or df_all.empty:
     st.error(f"No data found for {sel_start}–{sel_end}.")
     st.stop()
 
-
-# Min PA filter per season row
-if min_pa > 0 and "PA" in df_all.columns:
-    df_all = df_all[pd.to_numeric(df_all["PA"], errors="coerce").fillna(0) >= min_pa]
+if use_inn:
+    if min_inn_val > 0 and "Inn" in df_all.columns:
+        df_all = df_all[pd.to_numeric(df_all["Inn"], errors="coerce").fillna(0) >= min_inn_val]
+else:
+    if min_pa_val > 0 and "PA" in df_all.columns:
+        df_all = df_all[pd.to_numeric(df_all["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
 # Position filter
 df_all = filter_by_position(df_all, position)
@@ -239,10 +253,13 @@ pos_suffix    = f" ({POSITION_OPTIONS[pos_val]})" if pos_val != "all" else ""
 
 page_title = f"Most {threshold_str} Seasons: {span_label}{pos_suffix}"
 
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa} PA per season</div>'
-    if st.session_state.get("hs_show_min_pa") and min_pa > 0 else ""
-)
+if st.session_state.get("hs_show_min_pa"):
+    if use_inn:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+    else:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+else:
+    min_pa_subtitle = ""
 
 body = "".join(cards) if cards else (
     '<div style="padding:2rem;color:#999;text-align:center;">'

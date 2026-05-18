@@ -37,7 +37,7 @@ with meta_col:
     )
 
 
-from h_utils import (STAT_ALLOWLIST, format_stat, start_year, 
+from h_utils import (STAT_ALLOWLIST, format_stat, start_year,
 get_headshot, label_map, lower_better, load_final_year,
 POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, aggregate_player_group)
 
@@ -104,7 +104,7 @@ for key, default in [
     ("hl_start_year", current_year - 1),
     ("hl_end_year", current_year),
     ("hl_stat", "fWAR"),
-    ("hl_min_pa", min_pa),
+    ("hl_min_type", "PA"),
     ("hl_position", "all"),
     ("hl_team", "all"),
     ("hl_mode", MODE_SINGLE),
@@ -142,8 +142,13 @@ with col1:
         st.selectbox("End Year", options=list(range(current_year, start_year-1, -1)), key="hl_end_year")
         start_year = st.session_state["hl_start_year"]
         end_year   = max(st.session_state["hl_end_year"], start_year)
+    
+    st.selectbox("Min Type", options=["PA", "Inn"], key="hl_min_type")
 
-    st.number_input("Min PA", min_value=0, max_value=20000, key="hl_min_pa")
+    if st.session_state["hl_min_type"] == "Inn":
+        st.number_input("Min Inn", min_value=0, max_value=20000, value= 200, key="hl_min_inn")
+    else:
+        st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key="hl_min_pa")
 
     st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
                  format_func=lambda x: POSITION_OPTIONS[x], key="hl_position")
@@ -155,26 +160,36 @@ with col1:
                  help="Team filter unavailable for multi-year span" if team_disabled else None)
 
     st.checkbox("Show worst",     key="hl_sort_worst")
-    st.checkbox("Show min PA",    key="hl_show_min_pa")
-    st.checkbox("Show player PA", key="hl_show_player_pa")
+    if st.session_state["hl_min_type"] == "PA":
+        st.checkbox("Show Min PA", key="hl_show_min_pa")
+    else:
+        st.checkbox("Show Min Inn", key="hl_show_min_pa")
+    if st.session_state["hl_min_type"] == "PA":
+        st.checkbox("Show Player PA", key="hl_show_player_pa")
+    else:
+        st.checkbox("Show Player Inn", key="hl_show_player_pa")
 
-min_pa_val   = int(st.session_state.get("hl_min_pa", 0))
 position_val = st.session_state.get("hl_position", "all")
 team_val     = "all" if team_disabled else st.session_state.get("hl_team", "all")
 
 
-# ─────────────────────────────────────────────
-#  Load & filter data
-# ─────────────────────────────────────────────
+# load data
 
 df = load_data(start_year, end_year, mode, position_val)
 if df is None or df.empty:
     st.error(f"No data found for {start_year}–{end_year}.")
     st.stop()
 
-# Min PA filter
-if min_pa_val > 0 and "PA" in df.columns:
-    df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+use_inn = st.session_state.get("hl_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get("hl_min_pa", 0))
+min_inn_val = int(st.session_state.get("hl_min_inn", 0))
+
+if use_inn:
+    if min_inn_val > 0 and "Inn" in df.columns:
+        df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn_val]
+else:
+    if min_pa_val > 0 and "PA" in df.columns:
+        df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
 # After load_data call:
 if mode != MODE_MULTI:
@@ -220,10 +235,20 @@ for _, row in df.iterrows():
 
     src = get_headshot(row)
     pa_val = row.get("PA", np.nan)
-    player_pa_html = (
-        f'<div class="player-pa">{int(pa_val)} PA</div>'
-        if st.session_state.get("hl_show_player_pa") and pd.notna(pa_val) else ""
-    )
+    inn_val = row.get("Inn", np.nan)
+    if st.session_state.get("hl_show_player_pa"):
+        if pd.notna(pa_val) and st.session_state.get("hl_min_type") == "PA":
+            player_pa_html = (
+            f'<div class="player-pa">{int(pa_val)} PA</div>'
+        )
+        elif pd.notna(inn_val) and st.session_state.get("hl_min_type") == "Inn":
+            player_pa_html = (
+            f'<div class="player-pa">{inn_val} Inn</div>'
+        )
+    else:
+        player_pa_html = ""
+    
+
 
     img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}"/>'
     cards.append(f'''
@@ -246,10 +271,13 @@ worst_label = "Worst " if sort_worst else ""
 title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label} {worst_label}{title_label} Leaders{pos_suffix}".strip())
 
 
-min_pa_subtitle = (
-    f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-    if st.session_state.get("hl_show_min_pa") else ""
-)
+if st.session_state.get("hl_show_min_pa"):
+    if use_inn:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+    else:
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+else:
+    min_pa_subtitle = ""
 
 
 grid_html = f"""

@@ -127,6 +127,7 @@ POSITION_OPTIONS = {
     "all": "All Positions",
     "C": "C", "1B": "1B", "2B": "2B", "3B": "3B", "SS": "SS",
     "LF": "LF", "CF": "CF", "RF": "RF", "OF": "OF", "DH": "DH",
+    "Exclude DH": "Exlcude DH",
 }
 
 TEAM_OPTIONS = {
@@ -265,7 +266,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"FRV", "OAA", "DRS","TZ","DRS/1350", "OAA/1350","FRV/1350",}:
         return f"{int(round(float(val)))}"
 
-    if upper_stat in {"WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350"}:
+    if upper_stat in {"Inn","WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -299,7 +300,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350"}:
+    if upper_stat in {"Inn","BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:
@@ -362,6 +363,8 @@ def apply_dh_override(df):
 
     df.loc[is_dh, "Pos"] = "DH"
     return df
+
+
 
 def filter_by_position(df, position):
     df["Pos"] = df["Pos"].astype(str).str.strip().str.upper()
