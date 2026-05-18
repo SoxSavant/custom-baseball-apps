@@ -30,7 +30,7 @@ SUM_STATS = {
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
     "fWAR", "bWAR", "Off", "Def", "BsR",
     "DRS", "OAA", "FRV",
-    "WPA", "FRM", "TZ",
+    "WPA", "FRM", "TZ", "Inn"
 }
 
 RATE_STATS = {
