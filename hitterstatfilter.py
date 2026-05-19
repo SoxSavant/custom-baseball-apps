@@ -255,7 +255,7 @@ if not df.empty:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
         compare_val = val
-        if stat in RATE_STATS:
+        if stat in RATE_STATS and "1350" not in stat:
             median_col = col_vals.median()
             if pd.notna(median_col) and median_col <= 1:
                 if val > 1:
