@@ -18,6 +18,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
@@ -144,7 +159,7 @@ with title_col:
 with meta_col:
     st.markdown(
         """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
         </div>
         """,

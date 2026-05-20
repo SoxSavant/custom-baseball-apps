@@ -12,6 +12,21 @@ plt.rcdefaults()
 st.set_page_config(page_title="Custom Hitter Savant Page", layout="wide", page_icon="⚾")
 
 st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
     <style>
         [data-testid="stMarkdownContainer"] > div {
             overflow-x: auto;
@@ -40,13 +55,13 @@ with title_col:
     st.title("Custom Hitter Savant Page")
 with meta_col:
     st.markdown(
-        """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
-            Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """
+    <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 from h_utils import STAT_PRESETS_SAVANT

@@ -12,6 +12,10 @@ st.set_page_config(page_title="Custom Hitting Leaderboard", layout="wide", page_
 st.markdown(
     """
     <style>
+    .block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -299,7 +303,15 @@ full_html = f"""
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
 <meta charset="utf-8" />
 <style>
-html, body {{ background: transparent; font-family: "Source Sans Pro", sans-serif; margin:0; padding:0; }}
+html, body {{
+    background: transparent;
+    font-family: "Source Sans Pro", sans-serif;
+    margin: 0;
+    padding: 0;
+}}
+
+/* ───────── DESKTOP ───────── */
+
 .leaderboard-card {{
     background: #ffffff;
     border: 1px solid #d0d0d0;
@@ -311,28 +323,32 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     max-width: 900px;
     box-sizing: border-box;
 }}
+
 .leaderboard-title {{
     font-weight: 900;
     font-size: 2.4rem;
     margin-bottom: 2rem;
     text-align: center;
 }}
-.leaderboard-subtitle{{
+
+.leaderboard-subtitle {{
     text-align: center;
     color: #888;
     font-size: 1.1rem;
     margin-bottom: 1rem;
     margin-top: -1.5rem;
 }}
+
 .players-grid {{
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    justify-content: start;
     justify-items: center;
     row-gap: 1rem;
     column-gap: 4rem;
 }}
+
 .player-card {{ text-align: center; }}
+
 .player-card img {{
     width: 155px;
     height: 155px;
@@ -341,15 +357,71 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     border: 1px solid #e0e0e0;
     background: #f6f6f6;
 }}
+
 .player-name {{ font-weight: 800; margin-top: 0.35rem; font-size: 1.18rem; }}
 .player-team {{ color: #666; font-size: 0.85rem; }}
 .player-stat {{ font-weight: 900; font-size: 1.5rem; margin-top: 0.25rem; }}
 .player-pa {{ color: #666; font-size: 1rem; }}
-html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
-.footer {{ display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }}
-.footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child {{ text-align: right; }}
+
+.footer {{
+    display: flex;
+    justify-content: space-between;
+    margin-top: .5rem;
+}}
+
+.footer p {{
+    margin: 0;
+    font-size: 0.9rem;
+    color: #666;
+    flex: 1;
+    text-align: center;
+}}
+
+/* ───────── MOBILE ───────── */
+
+@media (max-width: 600px) {{
+
+    .leaderboard-card {{
+        padding: 1rem 0.75rem;
+        border-radius: 10px;
+    }}
+
+    .leaderboard-title {{
+        font-size: 1.35rem;
+        margin-bottom: 0.6rem;
+    }}
+
+    .leaderboard-subtitle {{
+        font-size: 0.85rem;
+        margin-top: -0.4rem;
+    }}
+
+    .players-grid {{
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: 0.5rem;
+}}
+
+    .player-card {{
+        min-width: 130px;
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }}
+
+    .player-card img {{
+    width: 90px;
+    height: 90px;
+}}
+
+    .player-name {{ font-size: 0.7rem; }}
+    .player-stat {{ font-size: .9rem; }}
+    .player-pa {{ font-size: 0.75rem; }}
+
+    .footer p {{
+        font-size: 0.7rem;
+    }}
+}}
 </style>
 </head>
 <body>{grid_html}</body>

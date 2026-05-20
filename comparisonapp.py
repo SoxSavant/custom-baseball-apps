@@ -33,6 +33,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
@@ -81,7 +96,6 @@ st.markdown(
         .compare-card .headshot-col {
             flex: 1 1 auto;
             width: auto;
-            max-width: var(--headshot-col-width);
             min-width: 0;
             text-align: center;
             padding-top: .1rem;
@@ -92,7 +106,7 @@ st.markdown(
             border-radius: 4px;
             padding: 4px;
             width: 100%;
-            max-width: var(--headshot-img-width);
+            
             max-height: var(--headshot-img-width);
             height: auto;
             object-fit: contain;
@@ -172,13 +186,13 @@ with title_col:
     st.title("Custom Hitter Comparison")
 with meta_col:
     st.markdown(
-        """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
-            Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """
+    <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ─────────────────────────────────────────────
 #  Constants
