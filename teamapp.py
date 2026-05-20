@@ -13,9 +13,21 @@ from datetime import date
 
 st.set_page_config(page_title="Custom Team Hitting Savant Page", layout="wide", page_icon="⚾")
 
+st.markdown("""
+    <style>
+        [data-testid="stMarkdownContainer"] > div {
+            overflow-x: auto;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -39,10 +51,9 @@ with meta_col:
     )
 
 
-from h_utils import (STAT_PRESETS_SAVANT, STAT_ALLOWLIST, TEAMS, 
+from h_utils import (STAT_PRESETS_SAVANT, STAT_ALLOWLIST, TEAMS,
                      STAT_DISPLAY_NAMES, TRUTHY_STRINGS, format_stat,
                      label_map, lower_better, normalize_team, start_year, load_final_year)
-
 
 
 def get_teams_for_year(season: int) -> dict[str, str]:
@@ -74,7 +85,6 @@ def normalize_name(raw: str) -> str:
 current_year = date.today().year
 
 from utils import get_dynamic_min_pa
-
 min_pa = get_dynamic_min_pa(current_year)
 
 left_col, right_col = st.columns([1, 1.3])
@@ -92,14 +102,11 @@ with left_col:
         index=team_options.index(preferred),
         key=team_select_key,
     )
-    # ── Minimum PA input (with dynamic default)
-    if "team_min_pa" not in st.session_state:
-        st.session_state.team_min_pa = min_pa  # default on first load
 
-# Optional: auto-update for future dynamic defaults per year
+    if "team_min_pa" not in st.session_state:
+        st.session_state.team_min_pa = min_pa
     if "team_last_year" not in st.session_state:
         st.session_state.team_last_year = year
-
     if year != st.session_state.team_last_year:
         st.session_state.team_min_pa = get_dynamic_min_pa(year)
         st.session_state.team_last_year = year
@@ -109,7 +116,7 @@ with left_col:
         min_value=0,
         max_value=800,
         key="team_min_pa"
-)
+    )
 
 stat_builder_container = left_col.container()
 
@@ -132,11 +139,9 @@ if df is None or df.empty:
 
 df["PA"] = pd.to_numeric(df.get("PA"), errors="coerce")
 
-# Normalize team column
 if "Team" in df.columns:
     df["Team"] = df["Team"].astype(str).str.strip()
 
-# League for percentile distribution
 from utils import get_percentile_min_pa
 PCT_PA = get_percentile_min_pa(year)
 league_for_pct = df[df["PA"] >= PCT_PA].copy()
@@ -144,7 +149,6 @@ if league_for_pct.empty:
     st.error(f"No hitters with ≥ {PCT_PA} PA in {year}.")
     st.stop()
 
-# Filter to selected team
 target_team = normalize_team(team_abbr)
 team_df = df[
     df["Team"].astype(str).apply(normalize_team) == target_team
@@ -268,15 +272,6 @@ def move_stat_row(delta, index, fallback):
         st.session_state[manual_stat_update_key] = True
 
 
-def toggle_stat_show(index, state_key, fallback):
-    rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
-    if 0 <= index < len(rows):
-        rows[index]["Show"] = bool(st.session_state.get(state_key, True))
-        st.session_state[stat_state_key] = rows
-        bump_stat_config_version()
-        st.session_state[manual_stat_update_key] = True
-
-
 if stat_state_key not in st.session_state:
     st.session_state[stat_preset_key] = default_preset_name
     st.session_state[stat_state_key] = _preset_base_config()
@@ -301,7 +296,7 @@ with stat_builder_container:
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
-        "Use the drop downs to add or remove stats and the arrows to reorder.</div>",
+        "Use the drop downs to add or remove stats</div>",
         unsafe_allow_html=True,
     )
 
@@ -341,29 +336,48 @@ with stat_builder_container:
         st.session_state.get(stat_state_key, preset_base_config), preset_base_config
     )
 
-    st.markdown("#### Order & visibility")
-    header_cols = st.columns([0.25, 0.25, 0.25, 0.25])
-    header_cols[0].markdown("**Up**")
-    header_cols[1].markdown("**Down**")
-    header_cols[2].markdown("**Stat**")
-    header_cols[3].markdown("**Show**")
+    config_df = pd.DataFrame([
+        {"Stat": STAT_DISPLAY_NAMES.get(row["Stat"], row["Stat"]), "Show": bool(row.get("Show", True))}
+        for row in current_stat_config
+    ])
 
-    for idx, row in enumerate(current_stat_config):
-        up_col, down_col, stat_col, show_col = st.columns([0.25, 0.25, 0.25, 0.25])
-        with up_col:
-            st.button("▲", key=f"stat_up_{idx}", disabled=idx == 0,
-                on_click=move_stat_row, args=(-1, idx, preset_base_config))
-        with down_col:
-            st.button("▼", key=f"stat_down_{idx}", disabled=idx == len(current_stat_config) - 1,
-                on_click=move_stat_row, args=(1, idx, preset_base_config))
-        with stat_col:
-            sn = row.get("Stat", "")
-            st.write(STAT_DISPLAY_NAMES.get(sn, sn))
-        with show_col:
-            ck = f"stat_show_{idx}"
-            st.checkbox("", value=bool(row.get("Show", True)), key=ck,
-                label_visibility="collapsed", on_change=toggle_stat_show,
-                args=(idx, ck, preset_base_config))
+    edited = st.data_editor(
+        config_df,
+        column_config={
+            "Stat": st.column_config.TextColumn("Stat", disabled=True),
+            "Show": st.column_config.CheckboxColumn("Show"),
+        },
+        hide_index=True,
+        width='stretch',
+        num_rows="fixed",
+        key="stat_editor",
+    )
+
+    if edited is not None:
+        new_config = []
+        for i, erow in edited.iterrows():
+            if i < len(current_stat_config):
+                new_config.append({"Stat": current_stat_config[i]["Stat"], "Show": bool(erow["Show"])})
+        if new_config:
+            st.session_state[stat_state_key] = new_config
+            bump_stat_config_version()
+            current_stat_config = normalize_stat_rows(st.session_state[stat_state_key], preset_base_config)
+
+    move_col, up_col, down_col = st.columns([3, 1, 1])
+    with move_col:
+        move_stat = st.selectbox(
+            "Reorder",
+            [""] + [STAT_DISPLAY_NAMES.get(r["Stat"], r["Stat"]) for r in current_stat_config],
+            label_visibility="collapsed",
+            key="stat_reorder_select",
+        )
+    idx = next((i for i, r in enumerate(current_stat_config) if STAT_DISPLAY_NAMES.get(r["Stat"], r["Stat"]) == move_stat), None)
+    with up_col:
+        st.button("▲", key="move_up", disabled=not move_stat or idx == 0,
+                  on_click=move_stat_row, args=(-1, idx if idx is not None else 0, preset_base_config))
+    with down_col:
+        st.button("▼", key="move_down", disabled=not move_stat or idx == len(current_stat_config) - 1,
+                  on_click=move_stat_row, args=(1, idx if idx is not None else 0, preset_base_config))
 
     st.session_state[stat_state_key] = normalize_stat_rows(
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
@@ -416,7 +430,7 @@ with right_col:
 
     n = len(lead_df)
     ROW_H    = 0.5
-    TITLE_H  = 0.75   # taller than player version to fit title + subtitle
+    TITLE_H  = 0.75
     FOOTER_H = 0.45
     fig_height = TITLE_H + n * ROW_H + FOOTER_H
 
@@ -426,7 +440,6 @@ with right_col:
     ax_top    = 1 - TITLE_H / fig_height
     ax.set_position([0.08, ax_bottom, 0.8, ax_top - ax_bottom])
 
-    # Title and subtitle both centered in the title band
     title_y    = 1 - (TITLE_H * 0.28) / fig_height
     subtitle_y = 1 - (TITLE_H * 0.72) / fig_height
     footer_y   = (FOOTER_H / 2) / fig_height
@@ -435,8 +448,8 @@ with right_col:
              ha="center", va="center", fontsize=22, fontweight="bold")
     fig.text(0.5, subtitle_y, f"(min {min_pa} PA)",
              ha="center", va="center", fontsize=13, color="#555")
-    fig.text(0.2,  footer_y,  "By: Sox_Savant",       ha="center", va="center", fontsize=10, color="#555")
-    fig.text(0.75, footer_y,  "Data: FanGraphs, Bref", ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.2,  footer_y,  "By: Sox_Savant",        ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.75, footer_y,  "Data: FanGraphs, Bref",  ha="center", va="center", fontsize=10, color="#555")
 
     y = np.arange(n)
     TRACK_H     = 0.82
@@ -485,7 +498,7 @@ with right_col:
     ax.invert_yaxis()
     ax.axis("off")
 
-    st.pyplot(fig, use_container_width=True, clear_figure=False)
+    st.pyplot(fig, width='stretch', clear_figure=False)
 
     pdf_buffer = BytesIO()
     fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25, dpi=300)
@@ -497,5 +510,3 @@ with right_col:
         mime="application/pdf",
     )
     plt.close(fig)
-
-    

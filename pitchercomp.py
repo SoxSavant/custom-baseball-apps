@@ -7,9 +7,24 @@ from datetime import date
 
 st.set_page_config(page_title="Custom Pitcher Comparison", layout="wide", page_icon="⚾")
 
+st.markdown("""
+    <style>
+        [data-testid="stMarkdownContainer"] > div {
+            overflow-x: auto;
+        }
+        .compare-card {
+            min-width: 320px;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         :root {
             --stat-col-width: 120px;
             --headshot-col-width: 220px;
@@ -138,9 +153,8 @@ with meta_col:
 
 
 from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, STAT_PRESETS,
-get_headshot, label_map, lower_better, start_year, format_stat,load_final_year, 
+get_headshot, label_map, lower_better, start_year, format_stat, load_final_year,
 get_player_id_by_name, aggregate_player_group)
-
 
 
 def normalize_name(raw: str) -> str:
@@ -163,17 +177,12 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
         match = df[df["PlayerId"] == player_id]
         if not match.empty:
             frames.append(match)
-
     if not frames:
         return None
-
     combined = pd.concat(frames, ignore_index=True)
     agg = aggregate_player_group(combined, start_year=start_year)
     if not agg:
         return None
-
-    player_id = agg.get("MLBAMID")
-
     return pd.Series(agg)
 
 
@@ -491,15 +500,6 @@ def move_stat_row(delta, index, fallback):
         st.session_state[manual_stat_update_key] = True
 
 
-def toggle_stat_show(index, state_key, fallback):
-    rows = normalize_stat_rows(st.session_state.get(stat_state_key, fallback), fallback)
-    if 0 <= index < len(rows):
-        rows[index]["Show"] = bool(st.session_state.get(state_key, True))
-        st.session_state[stat_state_key] = rows
-        bump_stat_config_version()
-        st.session_state[manual_stat_update_key] = True
-
-
 if stat_state_key not in st.session_state:
     st.session_state[stat_preset_key] = default_preset_name
     candidates = [s for s in STAT_PRESETS[default_preset_name] if s in stat_options] or [stat_options[0]]
@@ -529,7 +529,7 @@ with stat_builder_container:
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
-        "Use the drop downs to add or remove stats and the arrows to reorder them.</div>",
+        "Use the drop downs to add or remove stats</div>",
         unsafe_allow_html=True,
     )
 
@@ -565,31 +565,56 @@ with stat_builder_container:
         st.session_state.get(stat_state_key, preset_base_config), preset_base_config
     )
 
-    header_cols = st.columns([0.25, 0.25, .25, 1])
-    header_cols[0].markdown("**Up**")
-    header_cols[1].markdown("**Down**")
-    header_cols[2].markdown("**Stat**")
-    header_cols[3].markdown("**Show**")
+    config_df = pd.DataFrame([
+        {"Stat": row["Stat"], "Show": bool(row.get("Show", True))}
+        for row in current_stat_config
+    ])
 
-    for idx, row in enumerate(current_stat_config):
-        up_col, down_col, stat_col, show_col = st.columns([0.25, 0.25, .25, 1])
-        with up_col:
-            st.button("▲", key=f"stat_up_{idx}", disabled=idx == 0,
-                on_click=move_stat_row, args=(-1, idx, preset_base_config))
-        with down_col:
-            st.button("▼", key=f"stat_down_{idx}", disabled=idx == len(current_stat_config) - 1,
-                on_click=move_stat_row, args=(1, idx, preset_base_config))
-        with stat_col:
-            st.write(row.get("Stat", ""))
-        with show_col:
-            ck = f"stat_show_{idx}"
-            st.checkbox("", value=bool(row.get("Show", True)), key=ck,
-                label_visibility="collapsed", on_change=toggle_stat_show,
-                args=(idx, ck, preset_base_config))
+    edited = st.data_editor(
+        config_df,
+        column_config={
+            "Stat": st.column_config.TextColumn("Stat", disabled=True),
+            "Show": st.column_config.CheckboxColumn("Show"),
+        },
+        hide_index=True,
+        width='stretch',
+        num_rows="fixed",
+        key="stat_editor",
+    )
+
+    if edited is not None:
+        new_config = []
+        for i, erow in edited.iterrows():
+            if i < len(current_stat_config):
+                new_config.append({"Stat": current_stat_config[i]["Stat"], "Show": bool(erow["Show"])})
+        if new_config:
+            st.session_state[stat_state_key] = new_config
+            bump_stat_config_version()
+            current_stat_config = normalize_stat_rows(st.session_state[stat_state_key], preset_base_config)
+
+    move_col, up_col, down_col = st.columns([3, 1, 1])
+    with move_col:
+        move_stat = st.selectbox(
+            "Reorder",
+            [""] + [r["Stat"] for r in current_stat_config],
+            label_visibility="collapsed",
+            key="stat_reorder_select",
+        )
+    idx = next((i for i, r in enumerate(current_stat_config) if r["Stat"] == move_stat), None)
+    with up_col:
+        st.button("▲", key="move_up", disabled=not move_stat or idx == 0,
+                  on_click=move_stat_row, args=(-1, idx if idx is not None else 0, preset_base_config))
+    with down_col:
+        st.button("▼", key="move_down", disabled=not move_stat or idx == len(current_stat_config) - 1,
+                  on_click=move_stat_row, args=(1, idx if idx is not None else 0, preset_base_config))
 
     st.session_state[stat_state_key] = normalize_stat_rows(
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
     )
+
+# ─────────────────────────────────────────────
+#  Build comparison table
+# ─────────────────────────────────────────────
 
 stats_order = [r["Stat"] for r in st.session_state[stat_state_key] if r.get("Show", True)]
 if not stats_order:
@@ -661,7 +686,6 @@ table_df = pd.DataFrame(comparison_rows, columns=["Stat"] + col_order)
 
 for pdata in players_data:
     pdata["headshot"] = get_headshot(pdata["row"])
-
 
 esc = html.escape
 

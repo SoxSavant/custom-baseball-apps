@@ -480,7 +480,7 @@ with right_col:
     ax.invert_yaxis()
     ax.axis("off")
 
-    st.pyplot(fig, use_container_width=True, clear_figure=False)
+    st.pyplot(fig, width='stretch', clear_figure=False)
 
     pdf_buffer = BytesIO()
     fig.savefig(pdf_buffer, format="pdf", bbox_inches="tight", pad_inches=0.25, dpi=300)

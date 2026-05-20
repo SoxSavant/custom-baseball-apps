@@ -765,7 +765,7 @@ with right_col:
                     display_imp.index += 1
                     st.dataframe(
                         display_imp,
-                        use_container_width=True,
+                        width='stretch',
                         column_config={
                             "% Improved": st.column_config.ProgressColumn(
                                 "% Improved", min_value=0, max_value=100, format="%.1f%%"
@@ -780,7 +780,7 @@ with right_col:
                     display_reg.index += 1
                     st.dataframe(
                         display_reg,
-                        use_container_width=True,
+                        width='stretch',
                         column_config={
                             "% Regressed": st.column_config.ProgressColumn(
                                 "% Regressed", min_value=0, max_value=100, format="%.1f%%"

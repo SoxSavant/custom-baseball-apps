@@ -8,9 +8,38 @@ from datetime import date
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾")
 
+st.markdown("""
+    <style>
+        /* Make the comparison card scroll horizontally on mobile instead of squishing */
+        [data-testid="stMarkdownContainer"] > div {
+            overflow-x: auto;
+        }
+        
+        /* Prevent Streamlit's column gap from causing overflow */
+        .compare-card {
+            min-width: 320px;
+        }
+        
+        /* Tighten tab padding on mobile */
+        @media only screen and (max-width: 600px) {
+            .stTabs [data-baseweb="tab-list"] {
+                gap: 8px;
+            }
+            .stTabs [data-baseweb="tab"] {
+                padding: 8px 12px;
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     """
     <style>
+    .block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+}
         :root {
             --stat-col-width: 120px;
             --headshot-col-width: 220px;
@@ -22,6 +51,7 @@ st.markdown(
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
         .viewerBadge_link__qRi_k {display: none;}
+    
         .compare-card {
             background: #ffffff;
             border: 1px solid #d0d0d0;
@@ -134,6 +164,8 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
@@ -579,7 +611,7 @@ with stat_builder_container:
     st.markdown("### Customize stats")
     st.markdown(
         "<div style='margin-bottom: -0.25rem; color: inherit; font-size: 0.9rem;'>"
-        "Use the drop downs to add or remove stats and the arrows to reorder them."
+        "Use the drop downs to add or remove stats"
         "</div>",
         unsafe_allow_html=True,
     )
@@ -628,48 +660,53 @@ with stat_builder_container:
         st.session_state.get(stat_state_key, preset_base_config), preset_base_config
     )
 
-    header_cols = st.columns([0.25, 0.25, .25, 1])
-    header_cols[0].markdown("**Up**")
-    header_cols[1].markdown("**Down**")
-    header_cols[2].markdown("**Stat**")
-    header_cols[3].markdown("**Show**")
 
-    for idx, row in enumerate(current_stat_config):
-        up_col, down_col, stat_col, show_col = st.columns([0.25, 0.25, .25, 1])
-        with up_col:
-            st.button(
-                "▲",
-                key=f"stat_up_{idx}",
-                disabled=idx == 0,
-                on_click=move_stat_row,
-                args=(-1, idx, preset_base_config),
-            )
-        with down_col:
-            st.button(
-                "▼",
-                key=f"stat_down_{idx}",
-                disabled=idx == len(current_stat_config) - 1,
-                on_click=move_stat_row,
-                args=(1, idx, preset_base_config),
-            )
-        with stat_col:
-            stat_name = row.get("Stat", "")
-            st.write(STAT_DISPLAY_NAMES.get(stat_name, stat_name))
-        with show_col:
-            checkbox_key = f"stat_show_{idx}"
-            st.checkbox(
-                "",
-                value=bool(row.get("Show", True)),
-                key=checkbox_key,
-                label_visibility="collapsed",
-                on_change=toggle_stat_show,
-                args=(idx, checkbox_key, preset_base_config),
-            )
+    config_df = pd.DataFrame([
+        {"Stat": STAT_DISPLAY_NAMES.get(row["Stat"], row["Stat"]), "Show": bool(row.get("Show", True))}
+        for row in current_stat_config
+    ])
 
-    cleaned_config = normalize_stat_rows(
+    edited = st.data_editor(
+        config_df,
+        column_config={
+            "Stat": st.column_config.TextColumn("Stat", disabled=True),
+            "Show": st.column_config.CheckboxColumn("Show"),
+        },
+        hide_index=True,
+        width='stretch',
+        num_rows="fixed",
+        key="stat_editor",
+    )
+
+    if edited is not None:
+        new_config = []
+        for i, erow in edited.iterrows():
+            if i < len(current_stat_config):
+                new_config.append({"Stat": current_stat_config[i]["Stat"], "Show": bool(erow["Show"])})
+        if new_config:
+            st.session_state[stat_state_key] = new_config
+            bump_stat_config_version()
+            current_stat_config = normalize_stat_rows(st.session_state[stat_state_key], preset_base_config)
+
+    move_col, up_col, down_col = st.columns([3, 1, 1])
+    with move_col:
+        move_stat = st.selectbox(
+            "Reorder",
+            [""] + [STAT_DISPLAY_NAMES.get(r["Stat"], r["Stat"]) for r in current_stat_config],
+            label_visibility="collapsed",
+            key="stat_reorder_select",
+        )
+    idx = next((i for i, r in enumerate(current_stat_config) if STAT_DISPLAY_NAMES.get(r["Stat"], r["Stat"]) == move_stat), None)
+    with up_col:
+        st.button("▲", key="move_up", disabled=not move_stat or idx == 0,
+                  on_click=move_stat_row, args=(-1, idx if idx is not None else 0, preset_base_config))
+    with down_col:
+        st.button("▼", key="move_down", disabled=not move_stat or idx == len(current_stat_config) - 1,
+                  on_click=move_stat_row, args=(1, idx if idx is not None else 0, preset_base_config))
+
+    st.session_state[stat_state_key] = normalize_stat_rows(
         st.session_state.get(stat_state_key, current_stat_config), preset_base_config
     )
-    st.session_state[stat_state_key] = cleaned_config
 
 # ─────────────────────────────────────────────
 #  Build comparison table
@@ -760,6 +797,7 @@ with right_col:
         st.warning("No stats available to compare.")
     else:
         rows = [
+  
             f'<div class="compare-card" style="'
             f'--stat-col-width: {stat_col_width}; '
             f'--headshot-col-width: {headshot_col_width}{"px" if isinstance(headshot_col_width, int) else ""}; '
@@ -849,6 +887,7 @@ with right_col:
             '    <div>Data: FanGraphs, Bref</div>',
             '  </div>',
             '</div>',
+ 
         ])
 
         st.markdown("\n".join(rows), unsafe_allow_html=True)
