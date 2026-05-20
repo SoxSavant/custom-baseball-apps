@@ -26,12 +26,27 @@ with title_col:
 with meta_col:
     st.markdown(
         """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)    
 
 from h_utils import (
     STAT_ALLOWLIST, STAT_PRESETS_YOY, STAT_DISPLAY_NAMES, TRUTHY_STRINGS,
@@ -346,35 +361,52 @@ with left_col:
         st.session_state.get(STAT_STATE_KEY, preset_base_config), preset_base_config
     )
 
-    # ── Reorder / show toggles ───────────────────
-    hdr = st.columns([0.25, 0.25, 0.25, 1])
-    hdr[0].markdown("**Up**")
-    hdr[1].markdown("**Down**")
-    hdr[2].markdown("**Stat**")
-    hdr[3].markdown("**Show**")
+    config_df = pd.DataFrame([
+        {"Stat": STAT_DISPLAY_NAMES.get(row["Stat"], row["Stat"]), "Show": bool(row.get("Show", True))}
+        for row in current_stat_config
+    ])
 
-    for idx, row in enumerate(current_stat_config):
-        uc, dc, sc, shc = st.columns([0.25, 0.25, 0.25, 1])
-        with uc:
-            st.button("▲", key=f"iyoy_up_{idx}", disabled=idx == 0,
-                      on_click=move_stat_row, args=(-1, idx, preset_base_config))
-        with dc:
-            st.button("▼", key=f"iyoy_down_{idx}", disabled=idx == len(current_stat_config) - 1,
-                      on_click=move_stat_row, args=(1, idx, preset_base_config))
-        with sc:
-            sn = row.get("Stat", "")
-            st.write(STAT_DISPLAY_NAMES.get(sn, sn))
-        with shc:
-            ck = f"iyoy_show_{idx}"
-            st.checkbox("", value=bool(row.get("Show", True)), key=ck,
-                        label_visibility="collapsed",
-                        on_change=toggle_stat_show, args=(idx, ck, preset_base_config))
+    edited = st.data_editor(
+        config_df,
+        column_config={
+            "Stat": st.column_config.TextColumn("Stat", disabled=True),
+            "Show": st.column_config.CheckboxColumn("Show"),
+        },
+        hide_index=True,
+        width='stretch',
+        num_rows="fixed",
+        key="stat_editor",
+    )
 
-    cleaned = normalize_stat_rows(
+    if edited is not None:
+        new_config = []
+        for i, erow in edited.iterrows():
+            if i < len(current_stat_config):
+                new_config.append({"Stat": current_stat_config[i]["Stat"], "Show": bool(erow["Show"])})
+        if new_config:
+            st.session_state[STAT_STATE_KEY] = new_config
+            bump_version()
+            current_stat_config = normalize_stat_rows(st.session_state[STAT_STATE_KEY], preset_base_config)
+
+    move_col, up_col, down_col = st.columns([3, 1, 1])
+    with move_col:
+        move_stat = st.selectbox(
+            "Reorder",
+            [""] + [STAT_DISPLAY_NAMES.get(r["Stat"], r["Stat"]) for r in current_stat_config],
+            label_visibility="collapsed",
+            key="stat_reorder_select",
+        )
+    idx = next((i for i, r in enumerate(current_stat_config) if STAT_DISPLAY_NAMES.get(r["Stat"], r["Stat"]) == move_stat), None)
+    with up_col:
+        st.button("▲", key="move_up", disabled=not move_stat or idx == 0,
+                  on_click=move_stat_row, args=(-1, idx if idx is not None else 0, preset_base_config))
+    with down_col:
+        st.button("▼", key="move_down", disabled=not move_stat or idx == len(current_stat_config) - 1,
+                  on_click=move_stat_row, args=(1, idx if idx is not None else 0, preset_base_config))
+
+    st.session_state[STAT_STATE_KEY] = normalize_stat_rows(
         st.session_state.get(STAT_STATE_KEY, current_stat_config), preset_base_config
     )
-    st.session_state[STAT_STATE_KEY] = cleaned
-
 stats_order = [r["Stat"] for r in st.session_state[STAT_STATE_KEY] if r.get("Show", True)]
 if not stats_order:
     with right_col:
@@ -506,9 +538,14 @@ card_html = f"""
     border-radius: 12px;
     padding: 1.5rem 1.5rem 1.5rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+
     box-sizing: border-box;
-    width: 700px;
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+
   }}
+
   .player-header {{
     display: flex;
     align-items: center;

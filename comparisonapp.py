@@ -48,6 +48,19 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+title_col, meta_col = st.columns([3, 1])
+with title_col:
+    st.title("Custom Hitter Comparison")
+with meta_col:
+    st.markdown(
+    """
+    <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.markdown(
     """
     <style>
@@ -179,20 +192,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-
-title_col, meta_col = st.columns([3, 1])
-with title_col:
-    st.title("Custom Hitter Comparison")
-with meta_col:
-    st.markdown(
-    """
-    <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
-        Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
 
 # ─────────────────────────────────────────────
 #  Constants
