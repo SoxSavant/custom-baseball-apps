@@ -660,12 +660,15 @@ html, body {{
         padding: 4px 4px 3px;
         gap: 4px;
     }}
-    .team-logo-wrap {{
-        width: 20px; 
-        max-width: 100%;
-        height: auto !important;
-        object-fit: contain;
-    }}
+   .team-logo-wrap {{
+            width: 18px !important; 
+            height: 18px !important;
+        }}
+    .team-logo-wrap img {{
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+        }}
     .team-abbrev-label {{
         font-size: 0.7rem; /* Scales text down dynamically */
     }}
