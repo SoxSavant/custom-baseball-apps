@@ -473,7 +473,7 @@ overall_label = "Stat Leaders"
 
 title = re.sub(
     r"  +", " ",
-    f"{team_label}{span_label} {overall_label} {mode_label}{worst_label} {pos_suffix}".strip()
+    f"{team_label} {span_label} {overall_label} {mode_label}{worst_label} {pos_suffix}".strip()
 )
 
 if st.session_state.get("ll_show_min_pa"):

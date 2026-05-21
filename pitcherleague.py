@@ -379,7 +379,7 @@ overall_label = "Stat Leaders"
 
 title = re.sub(
     r"  +", " ",
-    f"{team_label}{span_label} {overall_label} {mode_label}{worst_label} ".strip()
+    f"{team_label} {span_label} {overall_label} {mode_label}{worst_label} ".strip()
 )
 
 min_ip_subtitle = (
