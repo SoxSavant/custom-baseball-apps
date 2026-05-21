@@ -658,6 +658,7 @@ html, body {{
             width: 100% !important;
             height: 100% !important;
             object-fit: contain !important;
+    }}
     .team-abbrev-label {{
         font-size: 0.7rem; /* Scales text down dynamically */
     }}
