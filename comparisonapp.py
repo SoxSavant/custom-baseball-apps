@@ -65,128 +65,163 @@ st.markdown(
     """
     <style>
     .block-container {
-    padding-top: 1rem !important;
-    padding-bottom: 1rem !important;
-}
-        :root {
-            --stat-col-width: 120px;
-            --headshot-col-width: 220px;
-            --headshot-img-width: 200px;
-            --player-name-size: 1.35rem;
-            --player-meta-size: 1.3rem;
-        }
-        [data-testid="stToolbar"] {visibility: hidden;}
-        [data-testid="stDecoration"] {display: none;}
-        [data-testid="stStatusWidget"] {display: none;}
-        .viewerBadge_link__qRi_k {display: none;}
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
     
+    /* 1. ASSIGN BASIC DEFAULT LAYOUT VARIABLE VALUES HERE */
+    :root {
+        --stat-col-width: 120px;
+        --headshot-col-width: 220px;
+        --headshot-img-width: 200px;
+        --player-meta-size: 1.3rem;
+    }
+    
+    [data-testid="stToolbar"] {visibility: hidden;}
+    [data-testid="stDecoration"] {display: none;}
+    [data-testid="stStatusWidget"] {display: none;}
+    .viewerBadge_link__qRi_k {display: none;}
+
+    .compare-card {
+        background: #ffffff;
+        border: 1px solid #d0d0d0;
+        border-radius: 10px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        color: #111111;
+        max-width: 100%;
+        margin: 0 auto;
+        box-sizing: border-box;
+    }
+    .compare-card .headshot-row {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        grid-template-columns: var(--stat-col-width) 1fr 1fr;
+        align-items: center;
+        justify-items: center;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
+        margin-bottom: .2rem;
+        gap: 0;
+    }
+    .compare-card .headshot-spacer {
+        width: var(--stat-col-width);
+    }
+    .compare-card .headshot-col {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+        text-align: center;
+        padding-top: .1rem;
+    }
+    .compare-card .headshot-col img {
+        border: 1px solid #d0d0d0;
+        background: #f2f2f2;
+        border-radius: 4px;
+        padding: 4px;
+        width: 100%;
+        max-height: var(--headshot-img-width);
+        height: auto;
+        object-fit: contain;
+        box-sizing: border-box;
+    }
+    .compare-card .player-name {
+        font-size: var(--player-name-size);
+        font-weight: 800;
+        line-height: 1.2;
+        margin: .2rem 0 0 0;
+    }
+    .compare-card .player-meta {
+        color: #555;
+        margin: 0 0 0.3rem 0;
+        font-size: 1.3rem;
+    }
+    .compare-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        table-layout: fixed;
+        line-height: 1.5;
+    }
+    .compare-table th, .compare-table td {
+        border: 1px solid #d0d0d0;
+        padding: 3px 3px;
+        text-align: center;
+        background: #ffffff;
+        color: #111111;
+        word-wrap: break-word;
+    }
+    .compare-table th {
+        background: #f1f1f1;
+        font-weight: 800;
+        color: #7b0d0d;
+        font-size: 15px;
+        line-height: 1.2;
+    }
+    .compare-table .overall-row th {
+        background: #f1f1f1;
+        color: #7b0d0d;
+        font-weight: 800;
+        font-size: 15px;
+        padding: 5px 0 3px 0;
+        border: 1px solid #d0d0d0;
+    }
+    .compare-table .stat-col {
+        font-weight: 700;
+        background: #fafafa;
+        color: #111;
+        width: var(--stat-col-width);
+    }
+    .compare-table col.col-stat {
+        width: var(--stat-col-width);
+    }
+    .compare-table col.col-player {
+        width: auto;
+    }
+    .compare-table .best {
+        background: #E5F1E4;
+        font-weight: 800;
+        color: #111111;
+    }
+
+    /* 2. THE MEDIA QUERY OVERRIDES CAN WORK WITHOUT INLINE CONFLICTS NOW */
+    @media (max-width: 600px) {
+        :root {
+            --stat-col-width: 65px;
+            --headshot-img-width: 90px;
+            --player-name-size: 0.7rem;
+            --player-meta-size: 0.5rem;
+        }
         .compare-card {
-            background: #ffffff;
-            border: 1px solid #d0d0d0;
-            border-radius: 10px;
-            padding: 1.25rem 1.5rem;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
-            color: #111111;
-            max-width: 100%;
-            margin: 0 auto;
+            padding: 0.5rem 0.25rem;
         }
-        .compare-card .headshot-row {
-            display: grid;
-            grid-auto-flow: column;
-            grid-auto-columns: 1fr;
-            grid-template-columns: var(--stat-col-width) 1fr 1fr;
-            align-items: center;
-            justify-items: center;
-            width: 100%;
-            max-width: 100%;
-            overflow: hidden;
-            margin-bottom: .2rem;
-            gap: 0;
-        }
-        .compare-card .headshot-spacer {
-            width: var(--stat-col-width);
-        }
-        .compare-card .headshot-col {
-            flex: 1 1 auto;
-            width: auto;
-            min-width: 0;
-            text-align: center;
-            padding-top: .1rem;
-        }
-        .compare-card .headshot-col img {
-            border: 1px solid #d0d0d0;
-            background: #f2f2f2;
-            border-radius: 4px;
-            padding: 4px;
-            width: 100%;
-            
-            max-height: var(--headshot-img-width);
-            height: auto;
-            object-fit: contain;
-        }
-        .compare-card .player-name {
-            font-size: var(--player-name-size);
-            font-weight: 800;
-            line-height: 1.2;
-            margin: .2rem 0 0 0;
-        }
-        .compare-card .player-meta {
-            color: #555;
-            margin: 0 0 0.3rem 0;
-            font-size: var(--player-meta-size);
-        }
+
+        .compare-card img {
+        width: 50px;}
         .compare-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            table-layout: fixed;
-            line-height: 1.5;
-        }
-        .compare-table td {
-            width: auto;
+            font-size: 10px;
         }
         .compare-table th, .compare-table td {
-            border: 1px solid #d0d0d0;
-            padding: 3px 3px;
-            text-align: center;
-            background: #ffffff;
-            color: #111111;
+            padding: 2px 1px;
         }
-        .compare-table th {
-            background: #f1f1f1;
-            font-weight: 800;
-            color: #7b0d0d;
-            font-size: 15px;
-            line-height: 1.2;
+        .compare-table th, .compare-table .overall-row th {
+            font-size: 10px;
         }
-        .compare-table .overall-row th {
-            background: #f1f1f1;
-            color: #7b0d0d;
-            font-weight: 800;
-            font-size: 15px;
-            padding: 5px 0 3px 0;
-            border-top: 1px solid #d0d0d0;
-            border-bottom: 1px solid #d0d0d0;
-            border-left: 1px solid #d0d0d0;
-            border-right: 1px solid #d0d0d0;
+        .compare-card .player-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
         }
-        .compare-table .stat-col {
-            font-weight: 700;
-            background: #fafafa;
-            color: #111;
-            width: var(--stat-col-width);
-        }
-        .compare-table col.col-stat {
-            width: var(--stat-col-width);
-        }
-        .compare-table col.col-player {
-            width: auto;
-        }
-        .compare-table .best {
-            background: #E5F1E4;
-            font-weight: 800;
-            color: #111111;
-        }
+
+         .compare-card .player-meta {
+        font-size: 1rem;
+    }
+    .footer {
+    font-size: 0.7rem;}
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -814,8 +849,8 @@ with right_col:
             f'<div class="compare-card" style="'
             f'--stat-col-width: {stat_col_width}; '
             f'--headshot-col-width: {headshot_col_width}{"px" if isinstance(headshot_col_width, int) else ""}; '
-            f'--headshot-img-width: {headshot_width}{"px" if isinstance(headshot_width, int) else ""}; '
-            f'--player-name-size: {player_name_size}; '
+            
+           
             f'--player-meta-size: {player_meta_size};">',
             f'  <div class="headshot-row" style="grid-template-columns: {grid_template};">',
         ]
@@ -895,7 +930,7 @@ with right_col:
         rows.extend([
             '    </tbody>',
             '  </table>',
-            '  <div style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555; font-size:0.9rem;">',
+            '  <div class = "footer" style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555;">',
             '    <div>By: Sox_Savant</div>',
             '    <div>Data: FanGraphs, Bref</div>',
             '  </div>',

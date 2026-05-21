@@ -22,13 +22,28 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Pitcher Leaderboard")
 with meta_col:
     st.markdown(
         """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        <div class = "mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
         </div>
         """,
@@ -287,6 +302,50 @@ html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
 .footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}
 .footer p:first-child {{ text-align: left; }}
 .footer p:last-child {{ text-align: right; }}
+
+@media (max-width: 600px) {{
+
+    .leaderboard-card {{
+        padding: 1rem 0.75rem;
+        border-radius: 10px;
+    }}
+
+    .leaderboard-title {{
+        font-size: 1.35rem;
+        margin-bottom: 0.6rem;
+    }}
+
+    .leaderboard-subtitle {{
+        font-size: 0.85rem;
+        margin-top: -0.4rem;
+    }}
+
+    .players-grid {{
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: 0.5rem;
+}}
+
+    .player-card {{
+        min-width: 130px;
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+    }}
+
+    .player-card img {{
+    width: 80px;
+    height: 80px;
+}}
+
+    .player-name {{ font-size: 0.7rem; }}
+    .player-team {{ font-size: 0.7rem; }}
+    .player-stat {{ font-size: .9rem; }}
+    .player-pa {{ font-size: 0.75rem; }}
+
+    .footer p {{
+        font-size: 0.7rem;
+    }}
 </style>
 </head>
 <body>{grid_html}</body>

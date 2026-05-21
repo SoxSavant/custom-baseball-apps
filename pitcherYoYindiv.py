@@ -20,6 +20,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+
 st.markdown("""
 <style>
     @media only screen and (max-width: 600px) {
@@ -663,6 +665,50 @@ card_html = f"""
   }}
   .signs {{
     color: #635c5b;
+  }}
+  @media (max-width: 600px) {{
+    .card {{
+        padding: 1rem; /* Tightens inner frame spacing */
+    }}
+    .player-header {{
+        gap: 10px;
+        margin-bottom: 0.75rem;
+    }}
+    .headshot-img {{
+        width: 75px; /* Cut photo dimension in half */
+        height: 75px;
+        border-width: 1px;
+    }}
+    .player-info {{
+        margin-left: 0.25rem;
+    }}
+    .player-name {{
+        font-size: 1.3rem; /* Brings down name scaling */
+    }}
+    .player-meta {{
+        font-size: 0.85rem;
+    }}
+    .col-header {{
+        padding: 5px 6px;
+        font-size: 0.8rem; /* Keeps label line clean without stacking */
+    }}
+    .stat-row {{
+        padding: 4px 4px;
+        gap: 2px;
+    }}
+    .stat-label {{
+        font-size: 0.8rem;
+    }}
+    .val-start, .val-end {{
+        font-size: 0.85rem;
+    }}
+    .val-delta {{
+        font-size: 0.9rem;
+    }}
+    .footer {{
+        font-size: 0.75rem;
+        margin-top: 0.4rem;
+    }}
   }}
 </style>
 </head>

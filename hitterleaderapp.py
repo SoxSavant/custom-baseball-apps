@@ -27,13 +27,28 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Custom Hitter Leaderboard")
 with meta_col:
     st.markdown(
         """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        <div class = "mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
         </div>
         """,
@@ -410,11 +425,12 @@ html, body {{
     }}
 
     .player-card img {{
-    width: 90px;
-    height: 90px;
+    width: 80px;
+    height: 80px;
 }}
 
     .player-name {{ font-size: 0.7rem; }}
+    .player-team {{ font-size: 0.7rem; }}
     .player-stat {{ font-size: .9rem; }}
     .player-pa {{ font-size: 0.75rem; }}
 

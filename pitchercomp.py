@@ -148,6 +148,41 @@ st.markdown(
             font-weight: 800;
             color: #111111;
         }
+        @media (max-width: 600px) {
+        :root {
+            --stat-col-width: 65px;
+            --headshot-img-width: 90px;
+            --player-name-size: 0.7rem;
+            --player-meta-size: 0.5rem;
+        }
+        .compare-card {
+            padding: 0.5rem 0.25rem;
+        }
+
+        .compare-card img {
+        width: 50px;}
+        .compare-table {
+            font-size: 10px;
+        }
+        .compare-table th, .compare-table td {
+            padding: 2px 1px;
+        }
+        .compare-table th, .compare-table .overall-row th {
+            font-size: 10px;
+        }
+        .compare-card .player-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+         .compare-card .player-meta {
+        font-size: 1rem;
+    }
+
+    .footer {
+    font-size: 0.7rem;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -732,9 +767,7 @@ with right_col:
         rows = [
             f'<div class="compare-card" style="'
             f'--stat-col-width: {stat_col_width}; '
-            f'--headshot-col-width: {headshot_col_width}{hcw_suffix}; '
-            f'--headshot-img-width: {headshot_width}{hw_suffix}; '
-            f'--player-name-size: {player_name_size}; '
+        
             f'--player-meta-size: {player_meta_size};">',
             f'  <div class="headshot-row" style="grid-template-columns: {grid_template};">',
         ]
@@ -800,8 +833,8 @@ with right_col:
 
         rows += [
             '    </tbody>', '  </table>',
-            '  <div style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555; font-size:0.9rem;">',
-            '    <div>By: Sox_Savant</div>',
+            '  <div class = "footer" style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555;">',
+            '    <div >By: Sox_Savant</div>',
             '    <div>Data: FanGraphs, Bref</div>',
             '  </div>',
             '</div>',

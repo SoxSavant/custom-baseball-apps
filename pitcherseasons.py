@@ -20,12 +20,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Pitcher Season Counter Leaderboard")
 with meta_col:
     st.markdown(
-        '<div style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
+        '<div class = "mobile-meta" style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
         'Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a></div>',
         unsafe_allow_html=True,
     )
@@ -196,7 +211,7 @@ for _, row in display_df.iterrows():
     seasons_str  = ", ".join(str(y) for y in seasons_list)
     
     src      = get_headshot(row)
-    img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" width="155" height="155" style="object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;background:#f6f6f6;display:block;"/>'
+    img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" style="object-fit:cover;border-radius:6px;border:1px solid #e0e0e0;background:#f6f6f6;display:block;"/>'
     ip_list = row.get("ip_list", [])
     if st.session_state.get("pc_show_ip") and ip_list:
         ip_str = ", ".join(f"{x:.1f}" for x in ip_list)
@@ -230,16 +245,63 @@ full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 html, body {{ background: transparent; font-family: "Source Sans Pro", sans-serif; margin:0; padding:0; }}
-.leaderboard-card {{ background: #fff; border: 1px solid #d0d0d0; border-radius: 12px; padding: 3rem 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin: 0 auto; width: 100%; max-width: 900px; }}
-.leaderboard-title {{ font-weight: 900; font-size: 2.25rem; margin-bottom: 1.2rem; text-align: center; line-height: 1.2; }}
-.leaderboard-subtitle {{ text-align: center; color: #888; font-size: 1.1rem; margin-bottom: 1rem; margin-top: -0.5rem; }}
-.players-grid {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem 1rem; }}
-.player-card {{ flex: 0 0 155px; width: 155px; text-align: center; }}
+.leaderboard-card {{
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 12px;
+    padding: 3rem 1rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    margin: 0 auto;
+    width: 100%;
+    max-width: 900px;
+    box-sizing: border-box;
+}}
+.leaderboard-title {{
+    font-weight: 900;
+    font-size: 2.25rem;
+    margin-bottom: 1.2rem;
+    text-align: center;
+    line-height: 1.2;
+}}
+.leaderboard-subtitle {{
+    text-align: center;
+    color: #888;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    margin-top: -0.5rem;
+}}
+
+/* FIXED: Changed from grid to flex framework to handle centered trailing items */
+.players-grid {{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2rem 1rem;
+}}
+
+/* FIXED: Explicit card baseline sizing for centered desktop flow */
+.player-card {{ 
+    flex: 0 0 155px;
+    width: 155px; 
+    text-align: center; 
+    min-width: 0;
+}}
+.player-card img {{
+    width: 100%; 
+    max-width: 155px;
+    aspect-ratio: 1 / 1; 
+    object-fit: cover; 
+    border-radius: 6px;
+    border: 1px solid #e0e0e0; 
+    background: #f6f6f6;
+    display: block;
+    margin: 0 auto;
+}}
 .player-name {{ font-weight: 800; font-size: 1rem; margin-top: 0.35rem; line-height: 1.2; }}
-.player-ip {{ color: #aaa; font-size: 0.9rem; margin-top: 0.1rem; }}
 .player-team {{ color: #666; font-size: 0.8rem; margin-bottom: 0.2rem; }}
 .season-count {{ font-weight: 800; font-size: 1.05rem; color: #1a1a1a; margin-top: 0.25rem; }}
 .season-years {{ color: #aaa; font-size: 0.78rem; margin-top: 0.1rem; line-height: 1.3; }}
@@ -247,6 +309,47 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .footer p {{ margin: 0; font-size: 1rem; color: #888; flex: 1; text-align: center; }}
 .footer p:first-child {{ text-align: left; }}
 .footer p:last-child {{ text-align: right; }}
+
+/* Compact Screenshot Overrides for Mobile Screens */
+@media (max-width: 600px) {{
+    .leaderboard-card {{
+        padding: 1.5rem 0.5rem;
+    }}
+    .leaderboard-title {{
+        font-size: 1.4rem;
+        margin-bottom: 0.6rem;
+    }}
+    .leaderboard-subtitle {{
+        font-size: 0.9rem;
+        margin-bottom: 0.8rem;
+    }}
+    .players-grid {{
+        gap: 1rem 0.35rem; /* Tighter column gutters */
+    }}
+    
+    /* FIXED: Forces clean 5-across columns scaling dynamically on phone frames */
+    .player-card {{
+        flex: 0 0 calc(20% - 0.3rem);
+        width: calc(20% - 0.3rem);
+    }}
+
+    .player-name {{ 
+        font-size: 0.65rem; 
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis; 
+    }}
+    .player-team {{ font-size: 0.55rem; }}
+    .season-count {{ font-size: 0.75rem; }}
+    .season-years {{ font-size: 0.55rem; }}
+    .footer {{
+        padding: 0 0.5rem;
+        margin-top: 1rem;
+    }}
+    .footer p {{
+        font-size: 0.65rem;
+    }}
+}}
 </style>
 </head>
 <body>

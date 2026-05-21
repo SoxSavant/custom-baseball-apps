@@ -22,13 +22,28 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Hitting Year-over-Year Improvers & Decliners")
 with meta_col:
     st.markdown(
         """
-        <div style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+        <div class = "mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
             Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
         </div>
         """,
@@ -334,6 +349,7 @@ full_html = f"""
 <head>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800&display=swap" rel="stylesheet">
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 .leaderboard-card {{
     background: #ffffff;
@@ -391,6 +407,49 @@ html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
 .footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}
 .footer p:first-child {{ text-align: left; }}
 .footer p:last-child  {{ text-align: right; }}
+
+/* Compact Screenshot Overrides for Mobile Screens */
+@media (max-width: 600px) {{
+    .leaderboard-card {{
+        width: 100% !important;
+        padding: 1.5rem 0.5rem;
+    }}
+    .leaderboard-title {{
+        font-size: 1.4rem;
+        margin-bottom: 0.6rem;
+    }}
+    .leaderboard-subtitle {{
+        font-size: 0.9rem;
+        margin-bottom: 0.8rem;
+    }}
+    .players-grid {{
+        gap: 1rem 0.35rem; /* Tighter item gutters */
+    }}
+    .player-card {{
+        flex: 0 0 calc(20% - 0.3rem); /* Forces the clean 5x2 rows */
+        width: calc(20% - 0.3rem);
+    }}
+    .player-card img {{
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1;
+    }}
+    .player-name {{ 
+        font-size: 0.65rem; 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+    }}
+    .player-team {{ font-size: 0.55rem; }}
+    .player-stat {{ font-size: 1rem; }}
+    .player-endval {{ font-size: 0.55rem; }}
+    .player-pa {{ font-size: 0.55rem; }}
+    .footer {{ 
+        padding: 0 0.5rem; 
+        margin-top: 1rem;
+    }}
+    .footer p {{ font-size: 0.65rem; }}
+}}
 </style>
 </head>
 <body>{grid_html}</body>

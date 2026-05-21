@@ -524,6 +524,7 @@ card_html = f"""
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
@@ -538,14 +539,11 @@ card_html = f"""
     border-radius: 12px;
     padding: 1.5rem 1.5rem 1.5rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-
     box-sizing: border-box;
     width: 100%;
     max-width: 700px;
     margin: 0 auto;
-
   }}
-
   .player-header {{
     display: flex;
     align-items: center;
@@ -598,11 +596,10 @@ card_html = f"""
     align-items: center;
     padding: 5.5px 10px;
     gap: 6px;
-    
 }}
   .stat-row:last-child {{ 
     border-bottom: none; 
-    }}
+  }}
   .stat-block {{
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
@@ -632,10 +629,10 @@ card_html = f"""
   }}
   .delta-good {{ 
     color: #1a7a3c; 
-    }}
+  }}
   .delta-bad  {{ 
     color: #c0392b; 
-    }}
+  }}
   .footer {{
     display: flex;
     justify-content: space-between;
@@ -646,6 +643,52 @@ card_html = f"""
   }}
   .signs {{
     color: #635c5b;
+  }}
+
+  /* Compact Screenshot Overrides for Mobile Screens */
+  @media (max-width: 600px) {{
+    .card {{
+        padding: 1rem; /* Tightens inner frame spacing */
+    }}
+    .player-header {{
+        gap: 10px;
+        margin-bottom: 0.75rem;
+    }}
+    .headshot-img {{
+        width: 75px; /* Cut photo dimension in half */
+        height: 75px;
+        border-width: 1px;
+    }}
+    .player-info {{
+        margin-left: 0.25rem;
+    }}
+    .player-name {{
+        font-size: 1.3rem; /* Brings down name scaling */
+    }}
+    .player-meta {{
+        font-size: 0.85rem;
+    }}
+    .col-header {{
+        padding: 5px 6px;
+        font-size: 0.8rem; /* Keeps label line clean without stacking */
+    }}
+    .stat-row {{
+        padding: 4px 4px;
+        gap: 2px;
+    }}
+    .stat-label {{
+        font-size: 0.8rem;
+    }}
+    .val-start, .val-end {{
+        font-size: 0.85rem;
+    }}
+    .val-delta {{
+        font-size: 0.9rem;
+    }}
+    .footer {{
+        font-size: 0.75rem;
+        margin-top: 0.4rem;
+    }}
   }}
 </style>
 </head>

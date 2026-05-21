@@ -21,12 +21,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Pitcher Stat Filter Leaderboard")
 with meta_col:
     st.markdown(
-        '<div style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
+        '<div class = "mobile-meta" style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
         'Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a></div>',
         unsafe_allow_html=True,
     )
@@ -317,6 +332,7 @@ full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 html, body {{ background: transparent; font-family: "Source Sans Pro", sans-serif; margin:0; padding:0; }}
@@ -329,6 +345,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
+    box-sizing: border-box; /* Prevents padding from causing layout clipping */
 }}
 .leaderboard-title {{
     font-weight: 900;
@@ -359,13 +376,57 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .player-name {{ font-weight: 800; font-size: 1rem; margin-top: 0.35rem; line-height: 1.2; }}
 .player-team {{ color: #666; font-size: 0.8rem; margin-bottom: 0.25rem; }}
 .player-stat-line {{ text-align: center; font-size: 0.95rem; margin-top: 0.15rem; }}
+.player-pa {{ color: #666; font-size: .9rem; }}
 .stat-label {{ color: #888; font-size: 0.85rem; }}
 .stat-value {{ font-weight: 800; font-size: 0.95rem; color: #1a1a1a; }}
-.player-ip {{ color: #aaa; font-size: 0.8rem; margin-top: 0.1rem; }}
 .footer {{ display: flex; justify-content: space-between; margin-top: 1.5rem; padding: 0 4rem; }}
 .footer p {{ margin: 0; font-size: 1rem; color: #888; flex: 1; text-align: center; }}
 .footer p:first-child {{ text-align: left; }}
 .footer p:last-child {{ text-align: right; }}
+
+/* This block now safely fires and forces scaling on phone screens */
+@media (max-width: 600px) {{
+    .leaderboard-card {{
+        width: 100% !important;
+        padding: 1.5rem 0.5rem;
+    }}
+    .leaderboard-title {{
+        font-size: 1.4rem;
+        margin-bottom: 0.6rem;
+    }}
+    .leaderboard-subtitle, .overflow-note {{
+        font-size: 0.9rem;
+        margin-bottom: 0.8rem;
+    }}
+    .players-grid {{
+        gap: 1rem 0.35rem;
+    }}
+    .player-card {{
+        flex: 0 0 calc(20% - 0.3rem);
+        width: calc(20% - 0.3rem);
+    }}
+    .player-card img {{
+        width: 100%;
+        height: auto;
+        aspect-ratio: 1 / 1;
+    }}
+    .player-name {{ 
+        font-size: 0.65rem; 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+    }}
+    .player-team {{ font-size: 0.55rem; }}
+    .player-stat-line {{ font-size: 0.65rem; }}
+    .player-pa {{ font-size: 0.6rem; }}
+    .stat-label {{ font-size: 0.6rem; }}
+    .stat-value {{ font-size: 0.65rem; }}
+    .footer {{ 
+        padding: 0 0.5rem; 
+        margin-top: 1rem;
+    }}
+    .footer p {{ font-size: 0.65rem; }}
+}}
 </style>
 </head>
 <body>{grid_html}</body>

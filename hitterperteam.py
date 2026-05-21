@@ -21,12 +21,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 title_col, meta_col = st.columns([3, 1])
 with title_col:
     st.title("Hitters Per Team Leaderboard")
 with meta_col:
     st.markdown(
-        '<div style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
+        '<div class = "mobile-meta" style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
         'Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a></div>',
         unsafe_allow_html=True,
     )
@@ -256,7 +271,6 @@ if not df.empty and active_filters:
                 compare_val = val / 100
         mask = mask & (col_vals >= compare_val if op == ">=" else col_vals <= compare_val)
     df = df[mask]
-    st.write(df.columns.tolist())
 
 if "Team" in df.columns:
     df = df[df["TeamDisplay"] != "2+ Teams"]
@@ -389,9 +403,9 @@ else:
 
         logo_img = (
             f'<img src="{html.escape(logo_url)}" alt="{html.escape(abbrev)}" '
-            f'width="38" height="38" style="object-fit:contain;display:block;"/>'
+            f'style="object-fit:contain;display:block;"/>'
             if logo_url else
-            f'<div style="width:38px;height:38px;display:flex;align-items:center;'
+            f'<div display:flex;align-items:center;'
             f'justify-content:center;font-size:10px;font-weight:700;color:#888;">'
             f'{html.escape(abbrev)}</div>'
         )
@@ -475,6 +489,7 @@ full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 html, body {{
@@ -491,6 +506,7 @@ html, body {{
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
+    box-sizing: border-box;
 }}
 .leaderboard-title {{
     font-weight: 900;
@@ -624,6 +640,52 @@ html, body {{
 }}
 .footer p:first-child {{ text-align: left; }}
 .footer p:last-child  {{ text-align: right; }}
+
+/* Compact Screenshot Rules for Small Screens */
+@media (max-width: 600px) {{
+    .leaderboard-card {{
+        padding: 1rem 0.5rem;
+    }}
+    .leaderboard-title {{
+        font-size: 1.2rem;
+    }}
+    .leaderboard-subtitle {{
+        font-size: 0.8rem;
+    }}
+    .teams-grid {{
+        grid-template-columns: repeat(3, 1fr); /* Locks the 3-column grid layout */
+        gap: 4px; /* Tighter gutters */
+    }}
+    .team-header {{
+        padding: 4px 4px 3px;
+        gap: 4px;
+    }}
+    .team-logo-wrap {{
+        width: 18px; /* Smaller icon footprint */
+        height: 18px;
+    }}
+    .team-abbrev-label {{
+        font-size: 0.7rem; /* Scales text down dynamically */
+    }}
+    .team-badge {{
+        font-size: 0.5rem;
+    }}
+    .team-rank {{
+        font-size: 0.65rem;
+    }}
+    .player-list {{
+        padding: 2px 4px;
+    }}
+    .p-name, .p-stat-val {{
+        font-size: 0.5rem;
+    }}
+    .p-stat-label, .p-pa {{
+        font-size: 0.5rem;
+    }}
+    .footer p {{
+        font-size: 0.7rem;
+    }}
+}}
 </style>
 </head>
 <body>{grid_html}</body>
