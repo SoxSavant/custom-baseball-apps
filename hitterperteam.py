@@ -135,7 +135,7 @@ col1, col2 = st.columns([0.5, 2])
 with col1:
     num_stats = st.radio(
         "Number of stat filters", [1, 2, 3, 4],
-        index=1, horizontal=True, key="tc_num_stats",
+        index=0, horizontal=True, key="tc_num_stats",
     )
 
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="tc_mode")

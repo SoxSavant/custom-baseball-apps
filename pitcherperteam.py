@@ -132,7 +132,7 @@ col1, col2 = st.columns([0.5, 2])
 with col1:
     num_stats = st.radio(
         "Number of stat filters", [1, 2, 3, 4],
-        index=1, horizontal=True, key="tc_num_stats",
+        index=0, horizontal=True, key="tc_num_stats",
     )
 
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="tc_mode")
@@ -650,10 +650,14 @@ html, body {{
         padding: 4px 4px 3px;
         gap: 4px;
     }}
-    .team-logo-wrap {{
-        width: 18px; /* Smaller icon footprint */
-        height: 18px;
-    }}
+     .team-logo-wrap {{
+            width: 18px !important; 
+            height: 18px !important;
+        }}
+    .team-logo-wrap img {{
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
     .team-abbrev-label {{
         font-size: 0.7rem; /* Scales text down dynamically */
     }}
