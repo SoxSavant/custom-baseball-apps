@@ -661,8 +661,10 @@ html, body {{
         gap: 4px;
     }}
     .team-logo-wrap {{
-        width: 18px; /* Smaller icon footprint */
-        height: 18px;
+        width: 20px; 
+        max-width: 100%;
+        height: auto !important;
+        object-fit: contain;
     }}
     .team-abbrev-label {{
         font-size: 0.7rem; /* Scales text down dynamically */
