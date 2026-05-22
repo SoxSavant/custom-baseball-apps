@@ -272,22 +272,64 @@ with col1:
 
     current_stats = list(st.session_state["ll_stats"])
 
-    hdr_a, hdr_b, hdr_c = st.columns([0.3, 0.3, 1])
-    hdr_a.markdown("**▲**")
-    hdr_b.markdown("**▼**")
-    hdr_c.markdown("**Stat**")
+# data_editor with Show checkboxes
+    config_df = pd.DataFrame([
+        {"Stat": label_map.get(s, s), "Show": True}
+        for s in st.session_state["ll_stats"]
+    ])
+    if "ll_stat_show" not in st.session_state:
+        st.session_state["ll_stat_show"] = {s: True for s in st.session_state["ll_stats"]}
 
-    for i, stat in enumerate(current_stats):
-        up_col, dn_col, nm_col = st.columns([0.3, 0.3, 1])
-        with up_col:
-            st.button("▲", key=f"ll_up_{i}", disabled=(i == 0),
-                      on_click=_move_stat, args=(i, -1))
-        with dn_col:
-            st.button("▼", key=f"ll_dn_{i}", disabled=(i == len(current_stats) - 1),
-                      on_click=_move_stat, args=(i, 1))
-        nm_col.write(label_map.get(stat, stat))
+    config_df = pd.DataFrame([
+        {"Stat": label_map.get(s, s), "Show": st.session_state["ll_stat_show"].get(s, True)}
+        for s in st.session_state["ll_stats"]
+    ])
 
-    selected_stats = list(st.session_state["ll_stats"])
+    edited = st.data_editor(
+        config_df,
+        column_config={
+            "Stat": st.column_config.TextColumn("Stat", disabled=True),
+            "Show": st.column_config.CheckboxColumn("Show"),
+        },
+        hide_index=True,
+        use_container_width=True,
+        num_rows="fixed",
+        key=f"ll_stat_editor_{st.session_state.get('ll_stat_editor_version', 0)}",
+    )
+
+    if edited is not None:
+        current = list(st.session_state["ll_stats"])
+        st.session_state["ll_stat_show"] = {
+            current[i]: bool(erow["Show"]) for i, erow in edited.iterrows() if i < len(current)
+        }
+
+    # Single ▲▼ reorder selectbox
+    move_col, up_col, down_col = st.columns([3, 1, 1])
+    with move_col:
+        move_stat = st.selectbox(
+            "Reorder",
+            [""] + [label_map.get(s, s) for s in st.session_state["ll_stats"]],
+            label_visibility="collapsed",
+            key="ll_stat_reorder_select",
+        )
+    idx = next(
+        (i for i, s in enumerate(st.session_state["ll_stats"])
+         if label_map.get(s, s) == move_stat),
+        None,
+    )
+    with up_col:
+        st.button("▲", key="ll_move_up",
+                  disabled=not move_stat or idx == 0,
+                  on_click=_move_stat, args=(idx if idx is not None else 0, -1))
+    with down_col:
+        st.button("▼", key="ll_move_down",
+                  disabled=not move_stat or idx == len(st.session_state["ll_stats"]) - 1,
+                  on_click=_move_stat, args=(idx if idx is not None else 0, 1))
+
+    selected_stats = [
+        s for s in st.session_state["ll_stats"]
+        if st.session_state.get("ll_stat_show", {}).get(s, True)
+    ]
 
 
 min_ip_val   = int(st.session_state.get("ll_min_ip", 0))
