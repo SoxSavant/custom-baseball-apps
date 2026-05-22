@@ -11,7 +11,7 @@ TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 start_year = 1901
 
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR", "xwOBA","wOBA",  "wOBA-xwOBA", "xBA", "xSLG",
+    "fWAR", "bWAR", "fWAR-bWAR Avg","xwOBA","wOBA",  "wOBA-xwOBA", "xBA", "xSLG",
     "EV", "Barrel%","HardHit%","Sweet-Spot%",
     "BatSpd","Squared-Up%", "Chase%", "Whiff%", 
     "K%", "BB%", "Off", "Def", "BsR", 
@@ -28,7 +28,7 @@ STAT_ALLOWLIST = [
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
-    "fWAR", "bWAR", "Off", "Def", "BsR",
+    "fWAR", "bWAR", "fWAR-bWAR Avg", "Off", "Def", "BsR",
     "DRS", "OAA", "FRV",
     "WPA", "FRM", "TZ", "Inn"
 }
@@ -47,7 +47,7 @@ RATE_STATS = {
 MAX_STATS = {"maxEV"}
 
 EVERY_STAT_PRESET = [
-    "bWAR", "fWAR", "G", "AB", "PA",  "SB", "HR", "RBI", "XBH",
+    "bWAR", "fWAR", "fWAR-bWAR Avg", "G", "AB", "PA",  "SB", "HR", "RBI", "XBH",
     "AVG", "OBP", "SLG", "OPS", "ISO", "BABIP",
     "wRC+", "Off", "BsR", "Def", "OAA", "FRV", "FRM", "wOBA",
     "xwOBA", "wOBA-xwOBA","xBA", "xSLG", "EV", "maxEV", "Barrel%", "HardHit%",
@@ -61,6 +61,7 @@ EVERY_STAT_PRESET = [
 STAT_DEFAULTS = {
     "HR": 30, "SB": 30, "RBI": 100, "R": 100, "H": 150,
     "fWAR": 5.0, "bWAR": 5.0, "wRC+": 130, "wOBA": 0.370, "OPS": 0.900,
+    "fWAR-bWAR Avg": 5.0,
     "xwOBA": 0.370, "xBA": 0.280, "xSLG": 0.480,
     "AVG": 0.300, "OBP": 0.370, "SLG": 0.500, "ISO": 0.200,
     "K%": 20.0, "BB%": 10.0, "Barrel%": 12.0, "HardHit%": 45.0,
@@ -246,6 +247,7 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
         result["FRV/1350"] = frv / inn_total * 1350
     if pd.notna(inn_total) and inn_total > 0 and pd.notna(frm):
         result["FRM/1350"] = frm / inn_total * 1350
+    result["fWAR-bWAR Avg"] = (fwar + bwar) / 2
 
     bb_v, hbp_v, sf_v = (0 if pd.isna(v) else v for v in (bb, hbp, sf))
     obp_den = (ab if pd.notna(ab) else 0) + bb_v + hbp_v + sf_v
@@ -266,7 +268,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"FRV", "OAA", "DRS","TZ","DRS/1350", "OAA/1350","FRV/1350",}:
         return f"{int(round(float(val)))}"
 
-    if upper_stat in {"Inn","WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350"}:
+    if upper_stat in {"Inn","WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350","FWAR-BWAR AVG"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -300,7 +302,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"Inn","BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350"}:
+    if upper_stat in {"Inn","BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350","FWAR-BWAR AVG"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:

@@ -29,7 +29,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(1901, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
@@ -92,7 +92,7 @@ for year in range(2026, 2027):
     for col in STAT_ALLOWLIST:
         if col not in final.columns:
             final[col] = None
-    
+    final["fWAR-bWAR Avg"] = (final["WAR"] + final["bWAR"]) / 2
     if "WAR" and "IP" in final.columns:
         final["fWAR/200"] = final["WAR"] / final["IP"] * 200
     if "bWAR" and "IP" in final.columns:

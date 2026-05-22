@@ -36,7 +36,7 @@ STAT_DISPLAY_NAMES = {
 
 
 STAT_ALLOWLIST = [
-    "fWAR", "bWAR",
+    "fWAR", "bWAR", "fWAR-bWAR Avg"
     "ERA", "xERA", "FIP", "xFIP", "ERA-xERA","vFA", "K%", "BB%", "K-BB%", "IP", 
     "Chase%", "Whiff%", "G", "GS",
     "Barrel%", "HardHit%", "EV", "GB%", "K/9","BB/9","K/BB","HR/9", "BABIP", "LOB%", "HR/FB",
@@ -47,6 +47,7 @@ STAT_ALLOWLIST = [
 
 STAT_DEFAULTS = {
     "fWAR": 4.0, "bWAR": 4.0, "ERA": 3.00, "xERA": 3.00, "FIP": 3.00, "xFIP": 3.00,
+    "fWAR-bWAR Avg": 4.0,
     "WHIP": 1.10, "ERA-": 80.0, "FIP-": 80.0, "SIERA": 3.50,
     "IP": 162.0, "G": 30.0, "GS": 25.0, "W": 12.0, "L": 10.0,
     "SV": 20.0, "SO": 180.0, "BB": 50.0,
@@ -63,7 +64,7 @@ STAT_DEFAULTS = {
     "vFA": 95.0,
 }
 
-EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
+EVERY_STAT_PRESET = ["fWAR", "bWAR", "fWAR-bWAR Avg", "W-L", "vFA",
         "ERA", "xERA", "FIP", "xFIP", "ERA-xERA","IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
         "SV", "K%", "BB%", "K-BB%", "BB/9","HR/9","K/BB","AVG", "WHIP", "ERA-", "FIP-",
@@ -73,7 +74,7 @@ EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",
 
 
 SUM_STATS = {
-    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR", "TBF", "ER"
+    "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR", "TBF", "ER", "fWAR-bWAR Avg"
 }
 RATE_STATS = {
     "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
@@ -256,6 +257,7 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
         result["fWAR/200"] = fwar / ip_innings * 200
     if pd.notna(bwar) and ip_innings > 0:
         result["bWAR/200"] = bwar / ip_innings * 200
+    result["fWAR-bWAR Avg"] = (fwar + bwar) / 2
 
     return result
 
@@ -272,7 +274,7 @@ def format_stat(stat: str, val) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FWAR", "BWAR","FWAR/200", "BWAR/200"}:
+    if upper_stat in {"FWAR", "BWAR","FWAR/200", "BWAR/200","FWAR-BWAR AVG"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -316,7 +318,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         return ""
     upper_stat = stat.upper()
 
-    if upper_stat in {"FWAR", "BWAR","FWAR/200", "BWAR/200"}:
+    if upper_stat in {"FWAR", "BWAR","FWAR/200", "BWAR/200","FWAR-BWAR AVG"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:

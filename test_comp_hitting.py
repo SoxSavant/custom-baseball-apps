@@ -30,7 +30,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2007, 2027):
+for year in range(1901, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -118,6 +118,7 @@ for year in range(2007, 2027):
     
     final["TB"] = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
     final["XBH"] = final["2B"]+ final["3B"] + final["HR"]
+    final["fWAR-bWAR Avg"] = (final["WAR"] + final["bWAR"]) / 2
     if "WAR" and "PA" in final.columns:
         final["fWAR/650"] = final["WAR"] / final["PA"] * 650
     if "bWAR" and "PA" in final.columns:
