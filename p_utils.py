@@ -60,6 +60,7 @@ STAT_DEFAULTS = {
     "fWAR/200": 5.0,
     "bWAR/200": 5.0,
     "ERA-xERA": 0.5,
+    "vFA": 95.0,
 }
 
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "W-L", "vFA",

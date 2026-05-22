@@ -20,7 +20,7 @@ STAT_ALLOWLIST = [
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
     "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
      "BB/K", "WPA", "Clutch",
-     "FRM", "TZ","Swing%", "Z-Swing%",
+     "FRM", "TZ","Swing%", "Z-Swing%", "Z-Swing% - Chase%",
     "O-Contact%", "Z-Contact%", "Zone%",  "Inn",
     "fWAR/650","bWAR/650", "DRS/1350", "OAA/1350","FRV/1350","FRM/1350",
 ]
@@ -41,7 +41,7 @@ RATE_STATS = {
     "wRC+", "Clutch", "Chase%", "Swing%", "Z-Swing%",
     "O-Contact%", "Z-Contact%", "Zone%", "wOBA-xwOBA",
     "Squared-Up%", "fWAR/650","bWAR/650","Sweet-Spot%",
-    "DRS/1350", "OAA/1350","FRV/1350","FRM/1350",
+    "DRS/1350", "OAA/1350","FRV/1350","FRM/1350", "Z-Swing% - Chase%"
 }
 
 MAX_STATS = {"maxEV"}
@@ -53,7 +53,7 @@ EVERY_STAT_PRESET = [
     "xwOBA", "wOBA-xwOBA","xBA", "xSLG", "EV", "maxEV", "Barrel%", "HardHit%",
     "Chase%", "Whiff%", "K%", "BB%", "BB/K","BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
-    "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%",
+    "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%", "Z-Swing% - Chase%"
     "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "Squared-Up%", "TZ", "Inn"
     "fWAR/650","bWAR/650","DRS/1350", "OAA/1350","FRV/1350","FRM/1350",
 ]
@@ -83,6 +83,7 @@ STAT_DEFAULTS = {
     "OAA/1350":10,
     "FRV/1350":10,
     "FRM/1350":5.0,
+    "Z-Swing% - Chase%": 20.0,
 }
 
 STAT_DISPLAY_NAMES = {
@@ -347,7 +348,7 @@ def apply_dh_override(df):
     df = df.copy()
 
 
-    # row-level DH eligibility (THIS is the key fix)
+    # row-level DH eligibility
     eligible = df["Season"] >= 1973
 
     is_pitcher = df["Pos"].astype(str).str.upper().eq("P")

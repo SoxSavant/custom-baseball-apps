@@ -30,7 +30,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(2026, 2027):
+for year in range(2007, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -135,6 +135,8 @@ for year in range(2026, 2027):
         final["FRV/1350"] = (final["FRV"] / final["Inn"] * 1350).round(0)
     if "FRM" in final.columns and "Inn" in final.columns:
         final["FRM/1350"] = (final["FRM"] / final["Inn"] * 1350).round(1)
+    if "O-Swing%" in final.columns and "Z-Swing%" in final.columns:
+        final["Z-Swing% - Chase%"] = final["Z-Swing%"] - final["O-Swing%"]
     
     
     cols_to_drop = [c for c in ["fWAR", "Chase%", "Whiff%", "Squared-Up%"] 
