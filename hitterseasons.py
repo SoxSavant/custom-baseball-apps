@@ -9,6 +9,10 @@ st.set_page_config(page_title="Hitter Season Counter Leaderboard", layout="wide"
 st.markdown(
     """
     <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -287,7 +291,7 @@ grid_html = f"""
     <div class="players-grid">{body}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -360,10 +364,21 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .player-team {{ color: #666; font-size: 0.8rem; margin-bottom: 0.2rem; }}
 .season-count {{ font-weight: 800; font-size: 1.05rem; color: #1a1a1a; margin-top: 0.25rem; }}
 .season-years {{ color: #aaa; font-size: 0.78rem; margin-top: 0.1rem; line-height: 1.3; }}
-.footer {{ display: flex; justify-content: space-between; margin-top: 1.5rem; padding: 0 4rem; }}
-.footer p {{ margin: 0; font-size: 1rem; color: #888; flex: 1; text-align: center; }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child {{ text-align: right; }}
+
+.footer {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
 
 /* Compact Screenshot Overrides for Mobile Screens */
 @media (max-width: 600px) {{
@@ -397,12 +412,13 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     .player-team {{ font-size: 0.55rem; }}
     .season-count {{ font-size: 0.75rem; }}
     .season-years {{ font-size: 0.55rem; }}
-    .footer {{
-        padding: 0 0.5rem;
-        margin-top: 1rem;
-    }}
+
     .footer p {{
         font-size: 0.65rem;
+    }}
+
+    .footer {{
+    padding: 0 2rem;
     }}
 }}
 </style>

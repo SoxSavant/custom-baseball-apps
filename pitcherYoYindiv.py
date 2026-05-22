@@ -11,6 +11,10 @@ st.set_page_config(page_title="Individual Pitcher Year-over-Year", layout="wide"
 st.markdown(
     """
     <style>
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -655,14 +659,20 @@ card_html = f"""
   .delta-bad  {{ 
     color: #c0392b; 
     }}
-  .footer {{
-    display: flex;
-    justify-content: space-between;
-    margin-top: .5rem;
-    padding-top: 0.6rem;
-    color: #777;
-    font-size: 0.95rem;
-  }}
+.footer {{
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin: 1.3rem -1rem 0 -1rem;
+padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
   .signs {{
     color: #635c5b;
   }}
@@ -705,10 +715,14 @@ card_html = f"""
     .val-delta {{
         font-size: 0.9rem;
     }}
-    .footer {{
-        font-size: 0.75rem;
-        margin-top: 0.4rem;
-    }}
+   .footer p {{
+font-size: 0.65rem;
+}}
+
+.footer {{
+padding: 0 2rem;
+margin-top: 0.8rem;
+}}
   }}
 </style>
 </head>
@@ -730,8 +744,8 @@ card_html = f"""
   {rows_html_str}
 
   <div class="footer">
-    <div>By: Sox_Savant</div>
-    <div>Data: FanGraphs, Bref</div>
+    <p>By: Sox_Savant</p>
+    <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
   </div>
 
 </div>

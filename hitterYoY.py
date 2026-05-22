@@ -11,6 +11,10 @@ st.set_page_config(page_title="Hitting Year-over-Year Improvers & Decliners", la
 st.markdown(
     """
     <style>
+     .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -339,7 +343,7 @@ grid_html = f"""
     </div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -403,10 +407,21 @@ full_html = f"""
 .player-endval {{ color: #888; font-size: .9rem; margin-top: 0.1rem; }}
 .player-pa {{ color: #666; font-size: 0.9rem; margin-top: 0.1rem; }}
 html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
-.footer {{ display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; }}
-.footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child  {{ text-align: right; }}
+
+.footer {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
 
 /* Compact Screenshot Overrides for Mobile Screens */
 @media (max-width: 600px) {{
@@ -441,14 +456,23 @@ html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
         text-overflow: ellipsis; 
     }}
     .player-team {{ font-size: 0.55rem; }}
-    .player-stat {{ font-size: 1rem; }}
-    .player-endval {{ font-size: 0.55rem; }}
+    .player-stat {{ font-size: 0.9rem; }}
+    .player-endval {{ font-size: 0.6rem; }}
     .player-pa {{ font-size: 0.55rem; }}
     .footer {{ 
         padding: 0 0.5rem; 
         margin-top: 1rem;
     }}
-    .footer p {{ font-size: 0.65rem; }}
+       .footer p {{
+        font-size: 0.65rem;
+    }}
+
+    .footer {{
+    padding: 0 2rem;
+    }}
+    .leaderboard-subtitle {{
+    margin-top: 0rem;
+}}
 }}
 </style>
 </head>

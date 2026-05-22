@@ -464,8 +464,8 @@ with right_col:
              ha="center", va="center", fontsize=22, fontweight="bold")
     fig.text(0.5, subtitle_y, f"(min {min_ip} IP)",
              ha="center", va="center", fontsize=13, color="#555")
-    fig.text(0.2,  footer_y,  "By: Sox_Savant",       ha="center", va="center", fontsize=10, color="#555")
-    fig.text(0.75, footer_y,  "Data: FanGraphs, Bref", ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.16,  footer_y,  "By: Sox_Savant",       ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.6, footer_y,  "Data: FanGraphs • Baseball Reference • Baseball Savant", ha="center", va="center", fontsize=10, color="#555")
 
     y = np.arange(n)
     TRACK_H     = 0.82

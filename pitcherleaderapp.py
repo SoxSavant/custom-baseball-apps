@@ -11,6 +11,10 @@ st.set_page_config(page_title="Custom Pitching Leaderboard", layout="wide", page
 st.markdown(
     """
     <style>
+     .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -240,7 +244,7 @@ grid_html = f"""
     <div class="players-grid">{"".join(cards)}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -298,10 +302,21 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .player-stat {{ font-weight: 900; font-size: 1.5rem; margin-top: 0.25rem; }}
 .player-ip {{ color: #666; font-size: .85rem; }}
 html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
-.footer {{ display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }}
-.footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child {{ text-align: right; }}
+
+.footer {{
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin: 1.3rem -1rem 0 -1rem;
+padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
 
 @media (max-width: 600px) {{
 
@@ -343,9 +358,13 @@ html, body {{ margin: 0; padding: 0; background: transparent; width: 100%; }}
     .player-stat {{ font-size: .9rem; }}
     .player-pa {{ font-size: 0.75rem; }}
 
-    .footer p {{
+      .footer p {{
         font-size: 0.7rem;
     }}
+    .footer {{
+    margin-top: 1rem;
+    }}
+}}
 </style>
 </head>
 <body>{grid_html}</body>

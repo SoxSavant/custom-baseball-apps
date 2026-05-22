@@ -186,6 +186,20 @@ st.markdown(
         color: #111111;
     }
 
+   .footer {
+display: flex;
+justify-content: space-between;
+align-items: center;
+margin: 1.3rem -1rem 0 -1rem;
+padding: 0 3rem;
+}
+
+.footer p {
+margin: 0;
+font-size: 0.9rem;
+color: #666;
+white-space: nowrap;
+}
     /* 2. THE MEDIA QUERY OVERRIDES CAN WORK WITHOUT INLINE CONFLICTS NOW */
     @media (max-width: 600px) {
         :root {
@@ -219,8 +233,14 @@ st.markdown(
          .compare-card .player-meta {
         font-size: 1rem;
     }
-    .footer {
-    font-size: 0.7rem;}
+
+    .footer p {
+        font-size: 0.65rem;
+        }
+
+.footer {
+    padding: 0 2rem;
+    margin-top: -0.5rem;
     }
     </style>
     """,
@@ -930,9 +950,9 @@ with right_col:
         rows.extend([
             '    </tbody>',
             '  </table>',
-            '  <div class = "footer" style="display:flex; justify-content:space-between; margin-top:0.35rem; color:#555;">',
-            '    <div>By: Sox_Savant</div>',
-            '    <div>Data: FanGraphs, Bref</div>',
+            '  <div class = "footer">',
+            '    <p>By: Sox_Savant</p>',
+            '    <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>',
             '  </div>',
             '</div>',
  

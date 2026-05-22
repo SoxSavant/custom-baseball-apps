@@ -12,6 +12,10 @@ st.set_page_config(page_title="Hitter League Leaders", layout="wide", page_icon=
 st.markdown(
     """
     <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -496,7 +500,7 @@ grid_html = f"""
     <div class="footer">
         <p>By: Sox_Savant</p>
         <p></p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -575,10 +579,20 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 }}
 .card-no-data {{ color: #aaa; font-size: 0.9rem; margin-top: 0.5rem; }}
 .card-stat-line {{ font-size: 0.95rem; color: #999; margin-top: 0.15rem; }}
-.footer {{ display: flex; justify-content: space-between; align-items: center; margin-top: .5rem; }}
-.footer p {{ margin: 0; font-size: 0.9rem; color: #666; flex: 1; text-align: center; }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child {{ text-align: right; }}
+.footer {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
 
 @media (max-width: 600px) {{
 
@@ -621,7 +635,10 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     .player-pa {{ font-size: 0.75rem; }}
 
     .footer p {{
-        font-size: 0.5rem;
+        font-size: 0.7rem;
+    }}
+    .footer {{
+    margin-top: 1rem;
     }}
 }}
 </style>

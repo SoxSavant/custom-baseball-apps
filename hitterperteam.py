@@ -10,6 +10,10 @@ st.set_page_config(page_title="Hitters Per Team Leaderboard", layout="wide", pag
 st.markdown(
     """
     <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -474,7 +478,7 @@ grid_html = f"""
     <div class="teams-grid">{team_card_html}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -628,18 +632,17 @@ html, body {{
 .footer {{
     display: flex;
     justify-content: space-between;
-    margin-top: 1.5rem;
-    padding: 0 0.5rem;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
 }}
+
 .footer p {{
-    margin: 0;
-    font-size: .95rem;
-    color: #6d7075;
-    flex: 1;
-    text-align: center;
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
 }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child  {{ text-align: right; }}
 
 /* Compact Screenshot Rules for Small Screens */
 @media (max-width: 600px) {{
@@ -687,9 +690,15 @@ html, body {{
     .p-stat-label, .p-pa {{
         font-size: 0.5rem;
     }}
-    .footer p {{
+     .footer p {{
         font-size: 0.7rem;
     }}
+    .footer {{
+    margin-top: 1rem;
+    }}
+     .leaderboard-subtitle {{
+    margin-bottom: -0.7rem;
+}}
 }}
 </style>
 </head>

@@ -10,6 +10,10 @@ st.set_page_config(page_title="Pitcher Stat Filter Leaderboard", layout="wide", 
 st.markdown(
     """
     <style>
+     .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
         [data-testid="stToolbar"] {visibility: hidden;}
         [data-testid="stDecoration"] {display: none;}
         [data-testid="stStatusWidget"] {display: none;}
@@ -319,7 +323,7 @@ grid_html = f"""
     <div class="players-grid">{body}</div>
     <div class="footer">
         <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -379,10 +383,21 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 .player-pa {{ color: #666; font-size: .9rem; }}
 .stat-label {{ color: #888; font-size: 0.85rem; }}
 .stat-value {{ font-weight: 800; font-size: 0.95rem; color: #1a1a1a; }}
-.footer {{ display: flex; justify-content: space-between; margin-top: 1.5rem; padding: 0 4rem; }}
-.footer p {{ margin: 0; font-size: 1rem; color: #888; flex: 1; text-align: center; }}
-.footer p:first-child {{ text-align: left; }}
-.footer p:last-child {{ text-align: right; }}
+
+.footer {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
 
 /* This block now safely fires and forces scaling on phone screens */
 @media (max-width: 600px) {{
@@ -421,11 +436,13 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     .player-pa {{ font-size: 0.6rem; }}
     .stat-label {{ font-size: 0.6rem; }}
     .stat-value {{ font-size: 0.65rem; }}
-    .footer {{ 
-        padding: 0 0.5rem; 
-        margin-top: 1rem;
+      .footer p {{
+        font-size: 0.65rem;
     }}
-    .footer p {{ font-size: 0.65rem; }}
+
+    .footer {{
+    padding: 0 2rem;
+    }}
 }}
 </style>
 </head>

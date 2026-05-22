@@ -15,6 +15,10 @@ st.set_page_config(page_title="Custom Pitcher Savant Page", layout="wide", page_
 
 st.markdown("""
 <style>
+             .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
     @media only screen and (max-width: 600px) {
         [data-testid="stAppViewContainer"] h1 {
             font-size: 1.8rem !important;
@@ -467,8 +471,8 @@ with right_col:
     fig.text(0.5,  title_y,  title,                    ha="center", va="center", fontsize=22, fontweight="bold")
 
     footer_y = (FOOTER_H / 2) / fig_height
-    fig.text(0.2,  footer_y, "By: Sox_Savant",         ha="center", va="center", fontsize=10, color="#555")
-    fig.text(0.75, footer_y, "Data: FanGraphs, Bref",  ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.17,  footer_y, "By: Sox_Savant",         ha="center", va="center", fontsize=10, color="#555")
+    fig.text(0.6, footer_y, "Data: FanGraphs • Baseball Reference • Baseball Savant",  ha="center", va="center", fontsize=10, color="#555")
 
     y = np.arange(n)
     TRACK_H     = 0.82

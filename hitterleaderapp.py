@@ -307,7 +307,7 @@ grid_html = f"""
     <div class="footer">
         <p>By: Sox_Savant</p>
         <p></p>
-        <p>Data: FanGraphs, Bref</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
     </div>
 </div>
 """
@@ -377,19 +377,19 @@ html, body {{
 .player-team {{ color: #666; font-size: 0.85rem; }}
 .player-stat {{ font-weight: 900; font-size: 1.5rem; margin-top: 0.25rem; }}
 .player-pa {{ color: #666; font-size: 1rem; }}
-
 .footer {{
     display: flex;
     justify-content: space-between;
-    margin-top: .5rem;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
 }}
 
 .footer p {{
-    margin: 0;
-    font-size: 0.9rem;
-    color: #666;
-    flex: 1;
-    text-align: center;
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
 }}
 
 /* ───────── MOBILE ───────── */
@@ -437,6 +437,10 @@ html, body {{
     .footer p {{
         font-size: 0.7rem;
     }}
+    .footer {{
+    margin-top: 1rem;
+    }}
+
 }}
 </style>
 </head>
