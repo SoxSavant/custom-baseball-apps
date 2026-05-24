@@ -7,6 +7,42 @@ keep_cols = ["Name", "PlayerId","MLBAMID","Team"]
 
 LOCAL_BWAR_FILE = Path("war_daily_pitch.txt") 
 
+SAVANT_TO_FG = {
+    "avg_hit_speed": "EV",
+    "ev95percent":   "HardHit%",
+    "brl_percent":   "Barrel%",
+}
+
+def load_savant_statcast(year: int) -> pd.DataFrame | None:
+    ev_path   = Path(f"data/ev_{year}.csv")
+    xera_path = Path(f"data/xera_{year}.csv")
+
+    if not ev_path.exists() and not xera_path.exists():
+        return None
+
+    frames = []
+
+    if ev_path.exists():
+        ev_df = pd.read_csv(ev_path)
+        cols = {k: v for k, v in SAVANT_TO_FG.items() if k in ev_df.columns}
+        ev_df = ev_df[["player_id"] + list(cols.keys())].rename(columns=cols)
+        frames.append(ev_df)
+
+    if xera_path.exists():
+        xera_df = pd.read_csv(xera_path)
+        xera_df = xera_df[["player_id", "xera"]].rename(columns={"xera": "xERA_sv"})
+        frames.append(xera_df)
+
+    if not frames:
+        return None
+
+    if len(frames) == 2:
+        merged = frames[0].merge(frames[1], on="player_id", how="outer")
+    else:
+        merged = frames[0]
+
+    return merged
+
 def load_bwar_master() -> pd.DataFrame:
     """Loads the entire BRef pitching history and aggregates by ID and Year."""
     if not LOCAL_BWAR_FILE.exists():
@@ -29,7 +65,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(1901, 2027):
+for year in range(2026, 2027):
 
     pitching_dfs = [
         pd.read_csv(f"data/pitching_{year}.csv"),
@@ -37,8 +73,18 @@ for year in range(1901, 2027):
         pd.read_csv(f"data/pitching_standard_{year}.csv"),
     ]
 
-    if year>=2015: #statcast data started in 2015
-        pitching_dfs.append(pd.read_csv(f"data/pitching_statcast_{year}.csv"))
+    if year >= 2015:
+        fg_statcast_path = Path(f"data/pitching_statcast_{year}.csv")
+        if fg_statcast_path.exists():
+            pitching_dfs.append(pd.read_csv(fg_statcast_path))
+            savant_df = None
+        else:
+            savant_df = load_savant_statcast(year)
+            if savant_df is None:
+                pd.read_csv(f"data/pitching_statcast_{year}.csv")  # raises naturally
+    else:
+        savant_df = None
+
 
     if year >=2007: #plate discipline data started in 2007
         pitching_dfs.append(pd.read_csv(f"data/discipline_pitching_{year}.csv"))
@@ -68,6 +114,9 @@ for year in range(1901, 2027):
 
     final = pitching_merged
     final["Year"] = year
+    if savant_df is not None:
+        final = final.merge(savant_df, left_on="MLBAMID", right_on="player_id", how="left")
+        final.drop(columns=["player_id"], inplace=True)
 
     if not bwar_master.empty:
         # Ensure MLBAMID is numeric for matching
@@ -97,6 +146,12 @@ for year in range(1901, 2027):
         final["fWAR/200"] = final["WAR"] / final["IP"] * 200
     if "bWAR" and "IP" in final.columns:
         final["bWAR/200"] = final["bWAR"] / final["IP"] * 200
+    if "xERA_sv" in final.columns:
+        if "xERA" not in final.columns:
+            final.rename(columns={"xERA_sv": "xERA"}, inplace=True)
+        else:
+            final["xERA"] = final["xERA_sv"].fillna(final["xERA"])
+            final.drop(columns=["xERA_sv"], inplace=True)
     if "ERA" in final.columns and "xERA" in final.columns:
         final["ERA-xERA"] = final["ERA"] - final["xERA"]
     
@@ -124,3 +179,4 @@ for year in range(1901, 2027):
     final = final[keep_cols + [col for col in STAT_ALLOWLIST]] # only drop columns AFTER renaming them to ones in allow list
     
     final.to_csv(f"data/final/pitching_final_{year}.csv", index=False)
+

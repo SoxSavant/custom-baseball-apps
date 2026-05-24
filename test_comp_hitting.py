@@ -8,6 +8,66 @@ keep_cols = ["Name", "PlayerId","MLBAMID","Pos","Team"]
 # --- Configuration ---
 LOCAL_BWAR_FILE = Path("war_daily_bat.txt") 
 
+SAVANT_SWEETSPOT_TO_FG = {
+    "avg_hit_speed": "EV",
+    "max_hit_speed": "maxEV",
+    "ev95percent":   "HardHit%",
+    "brl_percent":   "Barrel%",
+}
+
+SAVANT_XWOBA_TO_FG = {
+    "est_ba":    "xBA",
+    "est_slg":   "xSLG",
+    "est_woba":  "xwOBA",
+    "woba":      "wOBA",
+}
+
+SAVANT_BATTRACKING_TO_FG = {
+    "avg_bat_speed":          "BatSpd",
+    "squared_up_per_swing":   "SqUpSw%",
+}
+
+def load_savant_statcast_hitting(year: int):
+    sweetspot_path   = Path(f"data/sweetspot_{year}.csv")
+    xwoba_path       = Path(f"data/xwoba_{year}.csv")
+
+    if not sweetspot_path.exists() and not xwoba_path.exists():
+        return None
+
+    frames = []
+
+    if sweetspot_path.exists():
+        sv_df = pd.read_csv(sweetspot_path)
+        cols = {k: v for k, v in SAVANT_SWEETSPOT_TO_FG.items() if k in sv_df.columns}
+        keep = ["player_id", "anglesweetspotpercent"] + list(cols.keys())
+        sv_df = sv_df[[c for c in keep if c in sv_df.columns]].rename(columns=cols)
+        frames.append(sv_df)
+
+    if xwoba_path.exists():
+        xw_df = pd.read_csv(xwoba_path)
+        cols = {k: v for k, v in SAVANT_XWOBA_TO_FG.items() if k in xw_df.columns}
+        xw_df = xw_df[["player_id"] + list(cols.keys())].rename(columns=cols)
+        frames.append(xw_df)
+
+    if not frames:
+        return None
+
+    if len(frames) == 2:
+        return frames[0].merge(frames[1], on="player_id", how="outer")
+    return frames[0]
+
+
+def load_savant_battracking(year: int):
+    path = Path(f"data/bat-tracking_{year}.csv")
+    if not path.exists():
+        return None
+
+    df = pd.read_csv(path)
+    cols = {k: v for k, v in SAVANT_BATTRACKING_TO_FG.items() if k in df.columns}
+    return df[["id"] + list(cols.keys())].rename(columns=cols) # its called id and not player_id in this csv idk why
+
+
+
 def load_bwar_master() -> pd.DataFrame:
     """Loads the entire BRef history and aggregates by ID and Year."""
     if not LOCAL_BWAR_FILE.exists():
@@ -30,7 +90,7 @@ def load_bwar_master() -> pd.DataFrame:
 
 bwar_master = load_bwar_master()
 
-for year in range(1901, 2027):
+for year in range(2026, 2027):
 
     hitting_dfs = [
         pd.read_csv(f"data/batting_{year}.csv"),
@@ -40,10 +100,27 @@ for year in range(1901, 2027):
 
     
     
-    if year >=2023: #bat speed data started in 2023
-        hitting_dfs.append(pd.read_csv(f"data/batspeed_{year}.csv"))
-    if year >=2015: #statcast data started in 2015
-        hitting_dfs.append(pd.read_csv(f"data/statcast_{year}.csv"))
+    savant_battracking_df = None
+    if year >= 2023:
+        fg_batspeed_path = Path(f"data/batspeed_{year}.csv")
+        if fg_batspeed_path.exists():
+            hitting_dfs.append(pd.read_csv(fg_batspeed_path))
+        else:
+            savant_battracking_df = load_savant_battracking(year)
+            if savant_battracking_df is None:
+                pd.read_csv(f"data/batspeed_{year}.csv")  # crashes naturally
+
+    if year >= 2015:
+        fg_statcast_path = Path(f"data/statcast_{year}.csv")
+        if fg_statcast_path.exists():
+            # Drop wOBA and xwOBA since Savant is preferred
+            sc_df = pd.read_csv(fg_statcast_path)
+            sc_df.drop(columns=[c for c in ["wOBA", "xwOBA"] if c in sc_df.columns], inplace=True)
+            hitting_dfs.append(sc_df)
+        else:
+            savant_statcast_df = load_savant_statcast_hitting(year)
+            if savant_statcast_df is None:
+                pd.read_csv(f"data/statcast_{year}.csv")  # crashes naturally
     if year >=2007: #discipline data started in 2015
         hitting_dfs.append(pd.read_csv(f"data/discipline_{year}.csv"))
     if year >= 1974: # win prob started in 1974
@@ -54,6 +131,11 @@ for year in range(1901, 2027):
     for df in hitting_dfs:
         df.columns = df.columns.str.strip()
         df.columns = df.columns.str.replace('\ufeff', '')
+    
+    if savant_statcast_df is not None:
+        for df in hitting_dfs:
+            df.drop(columns=[c for c in ["wOBA", "xwOBA", "xBA", "xSLG", "EV", "maxEV", "HardHit%", "Barrel%"] 
+                         if c in df.columns], inplace=True)
 
     # Build merged result iteratively, dropping duplicate cols before each merge
     hitting_merged = hitting_dfs[0]
@@ -71,6 +153,18 @@ for year in range(1901, 2027):
     if year >=2015: #for special baseball savant csv which has player_id, not PlayerId
         ss_df = pd.read_csv(f"data/sweetspot_{year}.csv")
         hitting_merged = hitting_merged.merge(ss_df, left_on = "MLBAMID", right_on = "player_id", how = "left").drop(columns=["player_id"], errors="ignore")
+
+    if savant_statcast_df is not None:
+    # Drop FG versions of these cols from hitting_dfs if they snuck in
+        for df in hitting_dfs:
+            df.drop(columns=[c for c in ["wOBA", "xwOBA", "xBA", "xSLG", "EV", "maxEV", "HardHit%", "Barrel%"] 
+                         if c in df.columns], inplace=True)
+        hitting_merged = hitting_merged.merge(savant_statcast_df, left_on="MLBAMID", right_on="player_id", how="left")
+        hitting_merged.drop(columns=["player_id"], inplace=True)
+
+    if savant_battracking_df is not None:
+        hitting_merged = hitting_merged.merge(savant_battracking_df, left_on="MLBAMID", right_on="id", how="left")
+        hitting_merged.drop(columns=["id"], inplace=True)
 
     # Fielding: aggregate across positions, then drop cols already in hitting
     fielding = pd.read_csv(f"data/fielding_{year}.csv")
