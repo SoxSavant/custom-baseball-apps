@@ -79,7 +79,7 @@ def load_all_seasons(start: int, end: int) -> pd.DataFrame:
 for key, default in [
     ("ps_start_year",  current_year - 10),
     ("ps_end_year",    current_year - 1),
-    ("ps_min_ip",      162),
+    ("ps_min_ip",      100),
     ("ps_show_min_ip", False),
     ("pc_show_ip",     False),
     ("ps_val_0",       4.00),
