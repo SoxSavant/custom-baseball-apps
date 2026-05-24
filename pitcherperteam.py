@@ -373,9 +373,9 @@ filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 if mode == MODE_SPLIT and collapse_split:
-    mode_label   = " (Single Season)"
+    mode_label   = " (Combined Single Seasons)"
 elif mode == MODE_SPLIT:
-     mode_label   = " (Single Year)"
+     mode_label   = " (Single Season)"
 else:
     mode_label = " "
 middle_label = " in " if mode == MODE_SINGLE else ": "

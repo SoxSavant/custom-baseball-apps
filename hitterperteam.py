@@ -370,10 +370,10 @@ else:
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
-if mode == MODE_SPLIT and collapse_split:
-    mode_label   = " (Single Season)"
-elif mode == MODE_SPLIT:
-     mode_label   = " (Single Year)"
+if mode == MODE_SPLIT and collapse_split: # ex NYY (eight individual judge seasons), BOS (5 mookie seasons, 3 devers)
+    mode_label   = " (Combined Single Seasons)"
+elif mode == MODE_SPLIT: # ex NYY - 2019, BOS - 2018
+     mode_label   = " (Single Season)"
 else:
     mode_label = " "
 pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""

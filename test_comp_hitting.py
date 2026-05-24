@@ -151,8 +151,9 @@ for year in range(2026, 2027):
 
         hitting_merged = hitting_merged.merge(df, on="PlayerId", how="left")
     if year >=2015: #for special baseball savant csv which has player_id, not PlayerId
-        ss_df = pd.read_csv(f"data/sweetspot_{year}.csv")
-        hitting_merged = hitting_merged.merge(ss_df, left_on = "MLBAMID", right_on = "player_id", how = "left").drop(columns=["player_id"], errors="ignore")
+        if savant_statcast_df is None: # only if not using savant file which already has it
+            ss_df = pd.read_csv(f"data/sweetspot_{year}.csv")
+            hitting_merged = hitting_merged.merge(ss_df, left_on = "MLBAMID", right_on = "player_id", how = "left").drop(columns=["player_id"], errors="ignore")
 
     if savant_statcast_df is not None:
     # Drop FG versions of these cols from hitting_dfs if they snuck in
