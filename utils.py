@@ -27,8 +27,8 @@ def get_dynamic_min_ip(year):
 
     days_since = (today - opening_day).days
 
-    # Approx: 1 game per day → 1 IP per game
-    min_ip = max(5, days_since * 1.0)
+    # Approx: 0.8 games per day → 1 IP per game
+    min_ip = max(5, days_since * 0.8)
 
     return min(min_ip, 162)
 
