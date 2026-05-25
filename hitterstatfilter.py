@@ -55,7 +55,7 @@ with meta_col:
 # ─────────────────────────────────────────────
 MAX_DISPLAY = 30
 
-from h_utils import (STAT_ALLOWLIST, SUM_STATS, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
+from h_utils import (STAT_ALLOWLIST, STAT_ROUND, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
 get_headshot, label_map, lower_better,  start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, 
 get_team_display, filter_by_position, load_final_year,aggregate_player_group)
 
@@ -187,17 +187,13 @@ with col1:
         with op_col:
             st.selectbox("Op", [">=", "<="], key=f"sc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
-            RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
-            if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
-                step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or  new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off","BsR","Inn","fWAR-bWAR Avg"}:
-                step, fmt = 0.1, "%.1f"
-            elif  new_stat == "WPA" or new_stat == "Clutch":
-                step, fmt = 0.01, "%.2f"
-            else:
-                step, fmt = 1.0, "%.0f"
-            st.number_input(f"Value {i+1}", step=step, key=f"sc_val_{i}",
-                            label_visibility="collapsed", format=fmt)
+            decimals = STAT_ROUND.get(new_stat, 0)
+            step = 10 ** -decimals if decimals > 0 else 1.0
+            fmt = f"%.{decimals}f"
+            st.number_input(
+                f"Value {i+1}", step=step, key=f"sc_val_{i}",
+                label_visibility="collapsed", format=fmt,
+            )
 
     st.selectbox("Position", options=list(POSITION_OPTIONS.keys()),
                  format_func=lambda x: POSITION_OPTIONS[x], key="sc_position")

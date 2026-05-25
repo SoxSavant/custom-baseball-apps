@@ -53,7 +53,7 @@ with meta_col:
 from h_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,
     label_map, lower_better, start_year, POSITION_OPTIONS,
-    normalize_team, get_team_display, filter_by_position, load_final_year, TEAMS,
+    normalize_team, get_team_display, filter_by_position, load_final_year, TEAMS, STAT_ROUND
 )
 from utils import get_dynamic_min_pa, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url
 
@@ -191,15 +191,9 @@ with col1:
         with op_col:
             st.selectbox("Op", [">=", "<="], key=f"tc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
-            RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
-            if new_stat in RATE_STATS_3DP or new_stat == "wOBA-xwOBA":
-                step, fmt = 0.001, "%.3f"
-            elif "%" in new_stat or new_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def", "Off","fWAR-bWAR Avg"}:
-                step, fmt = 0.1, "%.1f"
-            elif new_stat in {"WPA", "Clutch"}:
-                step, fmt = 0.01, "%.2f"
-            else:
-                step, fmt = 1.0, "%.0f"
+            decimals = STAT_ROUND.get(new_stat, 0)
+            step = 10 ** -decimals if decimals > 0 else 1.0
+            fmt = f"%.{decimals}f"
             st.number_input(
                 f"Value {i+1}", step=step, key=f"tc_val_{i}",
                 label_visibility="collapsed", format=fmt,
@@ -270,6 +264,8 @@ if not df.empty and active_filters:
         if stat not in df.columns:
             continue
         col_vals    = pd.to_numeric(df[stat], errors="coerce")
+        decimals = STAT_ROUND.get(stat, 0)
+        col_vals = col_vals.round(decimals)
         compare_val = val
         if stat in RATE_STATS:
             median_col = col_vals.median()

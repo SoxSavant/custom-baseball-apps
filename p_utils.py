@@ -45,6 +45,29 @@ STAT_ALLOWLIST = [
     "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER", "TBF", "fWAR/200", "bWAR/200"
 ]
 
+STAT_ROUND = {
+    # 3 decimal places
+    "WHIP": 3, "BABIP": 3, "AVG": 3,
+
+    # 2 decimal places
+    "ERA": 2, "xERA": 2, "FIP": 2, "xFIP": 2, "ERA-xERA": 2,
+    "SIERA": 2, "K/9": 2, "BB/9": 2, "HR/9": 2, "HR/FB": 2, "K/BB": 2,
+    "WPA": 2, "Clutch": 2,
+
+    # 1 decimal place
+    "fWAR": 1, "bWAR": 1, "fWAR-bWAR Avg": 1,
+    "fWAR/200": 1, "bWAR/200": 1,
+    "EV": 1, "vFA": 1, "IP": 1,
+    "K%": 1, "BB%": 1, "K-BB%": 1,
+    "Chase%": 1, "Whiff%": 1,
+    "Barrel%": 1, "HardHit%": 1, "GB%": 1, "LOB%": 1,
+
+    # 0 decimal places
+    "ERA-": 0, "FIP-": 0,
+    "G": 0, "GS": 0, "SO": 0, "BB": 0, "HBP": 0, "HR": 0,
+    "QS": 0, "CG": 0, "ShO": 0, "ER": 0, "TBF": 0, "SV": 0,
+}
+
 STAT_DEFAULTS = {
     "fWAR": 4.0, "bWAR": 4.0, "ERA": 3.00, "xERA": 3.00, "FIP": 3.00, "xFIP": 3.00,
     "fWAR-bWAR Avg": 4.0,

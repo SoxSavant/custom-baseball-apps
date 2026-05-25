@@ -53,7 +53,7 @@ with meta_col:
 
 from p_utils import ( STAT_ALLOWLIST,  TEAM_OPTIONS, format_stat,
 get_headshot, label_map, lower_better,  start_year, STAT_DEFAULTS,
-normalize_team, get_team_display ,load_final_year, aggregate_player_group)
+normalize_team, get_team_display ,load_final_year, aggregate_player_group, STAT_ROUND)
 
 MAX_DISPLAY = 30
 
@@ -174,18 +174,13 @@ with col1:
         with op_col:
             st.selectbox("Op", ["<=", ">="], key=f"pc_op_{i}", index=0, label_visibility="collapsed")
         with val_col:
-            RATE_3DP = {"WHIP", "BABIP"}
-            RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB", "WPA", "Clutch","ERA-xERA"}
-            if new_stat in RATE_3DP:
-                step, fmt = 0.001, "%.3f"
-            elif new_stat in RATE_2DP:
-                step, fmt = 0.01, "%.2f"
-            elif "%" in new_stat or new_stat == "EV" or "WAR" in new_stat:
-                step, fmt = 0.1, "%.1f"
-            else:
-                step, fmt = 1.0, "%.0f"
-            st.number_input(f"Value {i+1}", step=step, key=f"pc_val_{i}",
-                            label_visibility="collapsed", format=fmt)
+            decimals = STAT_ROUND.get(new_stat, 0)
+            step = 10 ** -decimals if decimals > 0 else 1.0
+            fmt = f"%.{decimals}f"
+            st.number_input(
+                f"Value {i+1}", step=step, key=f"pc_val_{i}",
+                label_visibility="collapsed", format=fmt,
+            )
 
     team_disabled = (mode == MODE_MULTI)
     st.selectbox(

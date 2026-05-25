@@ -54,7 +54,7 @@ with meta_col:
 from p_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,
     label_map, lower_better, start_year, 
-    normalize_team, get_team_display, load_final_year, TEAMS,
+    normalize_team, get_team_display, load_final_year, TEAMS, STAT_ROUND
 )
 from utils import get_dynamic_min_ip, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url
 
@@ -245,6 +245,8 @@ if not df.empty and active_filters:
         if stat not in df.columns:
             continue
         col_vals    = pd.to_numeric(df[stat], errors="coerce")
+        decimals = STAT_ROUND.get(stat, 0)
+        col_vals = col_vals.round(decimals)
         compare_val = val
         if stat in RATE_STATS:
             median_col = col_vals.median()

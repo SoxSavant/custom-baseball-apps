@@ -53,7 +53,7 @@ with meta_col:
 from p_utils import (
     STAT_ALLOWLIST,  PCT_STATS, format_stat, STAT_DEFAULTS,
     get_headshot, label_map, lower_better, start_year,
-    get_team_display,load_final_year
+    get_team_display,load_final_year, STAT_ROUND
 )
 
 MAX_DISPLAY  = 10
@@ -102,9 +102,6 @@ with col1:
 
     st.number_input("Min IP (per season)", min_value=0, max_value=5000, key="ps_min_ip")
 
-    RATE_3DP = {"WHIP", "BABIP"}
-    RATE_2DP = {"ERA", "xERA", "FIP", "xFIP", "SIERA", "K/9", "BB/9", "HR/9", "HR/FB", "WPA", "Clutch","ERA-xERA",}
-
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
         default_stat  = "ERA" if i == 0 else "FIP" if i == 1 else STAT_ALLOWLIST[0]
@@ -122,16 +119,13 @@ with col1:
         with op_col:
             st.selectbox("Op", [">=", "<="], key=f"ps_op_{i}", label_visibility="collapsed")
         with val_col:
-            if chosen_stat in RATE_3DP:
-                step, fmt = 0.001, "%.3f"
-            elif chosen_stat in RATE_2DP:
-                step, fmt = 0.01, "%.2f"
-            elif chosen_stat in PCT_STATS or "EV" in chosen_stat or "WAR" in chosen_stat:
-                step, fmt = 0.1, "%.1f"
-            else:
-                step, fmt = 1.0, "%.0f"
-            st.number_input(f"Value {i+1}", step=step, key=f"ps_val_{i}",
-                            label_visibility="collapsed", format=fmt)
+            decimals = STAT_ROUND.get(chosen_stat, 0)
+            step = 10 ** -decimals if decimals > 0 else 1.0
+            fmt = f"%.{decimals}f"
+            st.number_input(
+                f"Value {i+1}", step=step, key=f"ps_val_{i}",
+                label_visibility="collapsed", format=fmt,
+            )
 
     st.checkbox("Show min IP", key="ps_show_min_ip")
     st.checkbox("Show player IP",      key="pc_show_ip")

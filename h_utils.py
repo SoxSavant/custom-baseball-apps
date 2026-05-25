@@ -25,6 +25,35 @@ STAT_ALLOWLIST = [
     "fWAR/650","bWAR/650", "DRS/1350", "OAA/1350","FRV/1350","FRM/1350",
 ]
 
+STAT_ROUND = {
+    # 3 decimal places
+    "wOBA": 3, "xwOBA": 3, "wOBA-xwOBA": 3, "xBA": 3, "xSLG": 3,
+    "OPS": 3, "SLG": 3, "OBP": 3, "AVG": 3, "ISO": 3, "BABIP": 3,
+
+    # 2 decimal places
+    "WPA": 2, "Clutch": 2, "BB/K": 2,
+
+    # 1 decimal place
+    "fWAR": 1, "bWAR": 1, "fWAR-bWAR Avg": 1,
+    "EV": 1, "BatSpd": 1, "maxEV": 1,
+    "Off": 1, "Def": 1, "BsR": 1,
+    "FRM": 1, "FRM/1350": 1,
+    "fWAR/650": 1, "bWAR/650": 1,
+    "Barrel%": 1, "HardHit%": 1, "Sweet-Spot%": 1,
+    "Squared-Up%": 1, "Chase%": 1, "Whiff%": 1,
+    "K%": 1, "BB%": 1, "Swing%": 1, "Z-Swing%": 1,
+    "Z-Swing% - Chase%": 1, "O-Contact%": 1, "Z-Contact%": 1, "Zone%": 1,
+    "Inn": 1,
+
+    # 0 decimal places (integers)
+    "wRC+": 0,
+    "FRV": 0, "OAA": 0, "DRS": 0, "TZ": 0,
+    "DRS/1350": 0, "OAA/1350": 0, "FRV/1350": 0,
+    "G": 0, "PA": 0, "AB": 0, "R": 0, "RBI": 0, "HR": 0,
+    "XBH": 0, "TB": 0, "H": 0, "1B": 0, "2B": 0, "3B": 0,
+    "SB": 0, "BB": 0, "IBB": 0, "SO": 0,
+}
+
 SUM_STATS = {
     "G", "PA", "AB", "R", "H", "1B", "2B", "3B", "HR", "RBI", "SB",
     "BB", "IBB", "SO", "HBP", "SF", "SH", "XBH", "TB",
@@ -278,7 +307,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"AVG", "OBP", "SLG", "OPS", "WOBA", "XWOBA", "XBA", "XSLG", "BABIP", "ISO", "WOBA-XWOBA"}:
         return f"{float(val):.3f}".lstrip("0") or ".000"
 
-    if upper_stat in {"WRC+", "OPS+"}:
+    if upper_stat in {"WRC+"}:
         return f"{int(round(float(val)))}"
 
     if (

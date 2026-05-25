@@ -49,7 +49,7 @@ with meta_col:
     )
 
 from h_utils import (
-    STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS,
+    STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, STAT_ROUND,
     get_headshot, label_map, lower_better, start_year,
     POSITION_OPTIONS, get_team_display, filter_by_position, load_final_year
 )
@@ -106,8 +106,6 @@ with col1:
     else:
         st.number_input("Min PA", min_value=0, max_value=20000, value = min_pa, key="hs_min_pa")
 
-    RATE_STATS_3DP = {"AVG", "OBP", "SLG", "OPS", "wOBA", "xwOBA", "xBA", "xSLG", "ISO", "BABIP"}
-
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
         default_stat  = "fWAR" if i == 0 else "RBI" if i == 1 else STAT_ALLOWLIST[0]
@@ -125,16 +123,13 @@ with col1:
         with op_col:
             st.selectbox("Op", [">=", "<="], key=f"hs_op_{i}", label_visibility="collapsed")
         with val_col:
-            if chosen_stat in RATE_STATS_3DP or chosen_stat == "wOBA-xwOBA":
-                step, fmt = 0.001, "%.3f"
-            elif "%" in chosen_stat or  chosen_stat in {"EV", "fWAR", "bWAR", "BatSpd", "Def" ,"Off"}:
-                step, fmt = 0.1, "%.1f"
-            elif chosen_stat in {"WPA", "Clutch"}:
-                step, fmt = 0.01, "%.2f"
-            else:
-                step, fmt = 1.0, "%.0f"
-            st.number_input(f"Value {i+1}", step=step, key=f"hs_val_{i}",
-                            label_visibility="collapsed", format=fmt)
+            decimals = STAT_ROUND.get(chosen_stat, 0)
+            step = 10 ** -decimals if decimals > 0 else 1.0
+            fmt = f"%.{decimals}f"
+            st.number_input(
+                f"Value {i+1}", step=step, key=f"sc_val_{i}",
+                label_visibility="collapsed", format=fmt,
+            )
 
     st.selectbox(
         "Position", options=list(POSITION_OPTIONS.keys()),
