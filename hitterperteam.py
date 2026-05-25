@@ -121,6 +121,7 @@ for key, default in [
     ("tc_show_min_pa",    True),
     ("tc_show_player_pa", False),
     ("tc_show_all_teams", False),
+    ("tc_leaders_only",False),
     ("tc_collapse_split", True),
     ("tc_val_0",          .350),
     ("tc_val_1",          125),
@@ -220,6 +221,7 @@ with col1:
         st.checkbox("Show Player Inn", key="tc_show_player_pa")
 
     st.checkbox("Show all 30 teams",  key="tc_show_all_teams")
+    st.checkbox("Only show leaders", key = "tc_leaders_only")
 
     st.markdown("**Divisions**")
     for div in ALL_DIVISIONS:
@@ -338,7 +340,10 @@ if mode == MODE_SPLIT and not collapse_split:
         x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
         x["abbrev"], x["year"] or 0,
     ))
-    if not show_all_teams:
+    if st.session_state.get("tc_leaders_only") and team_groups:
+        top_count = team_groups[0]["player_count"]
+        team_groups = [tg for tg in team_groups if tg["player_count"] == top_count]
+    elif not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
 else:
@@ -364,7 +369,10 @@ else:
         x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
         x["abbrev"],
     ))
-    if not show_all_teams:
+    if st.session_state.get("tc_leaders_only") and team_groups:
+        top_count = team_groups[0]["player_count"]
+        team_groups = [tg for tg in team_groups if tg["player_count"] == top_count]
+    elif not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]

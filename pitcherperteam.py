@@ -119,6 +119,7 @@ for key, default in [
     ("tc_show_min_ip",  True),
     ("tc_show_player_ip", False),
     ("tc_show_all_teams", False),
+    ("tc_leaders_only",False),
     ("tc_collapse_split", True),
     ("tc_val_0",        3.00),
     ("tc_val_1",        3.00),
@@ -205,6 +206,7 @@ with col1:
     st.checkbox("Show min IP",      key="tc_show_min_ip")
     st.checkbox("Show player IP",   key="tc_show_player_ip")
     st.checkbox("Show all 30 teams", key="tc_show_all_teams")
+    st.checkbox("Only show leaders", key = "tc_leaders_only")
 
     st.markdown("**Divisions**")
     for div in ALL_DIVISIONS:
@@ -319,7 +321,10 @@ if mode == MODE_SPLIT and not collapse_split:
             x["year"] or 0,
         )
     )
-    if not show_all_teams:
+    if st.session_state.get("tc_leaders_only") and team_groups:
+        top_count = team_groups[0]["player_count"]
+        team_groups = [tg for tg in team_groups if tg["player_count"] == top_count]
+    elif not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
 else:
@@ -365,7 +370,10 @@ else:
             x["abbrev"],
         )
     )
-    if not show_all_teams:
+    if st.session_state.get("tc_leaders_only") and team_groups:
+        top_count = team_groups[0]["player_count"]
+        team_groups = [tg for tg in team_groups if tg["player_count"] == top_count]
+    elif not show_all_teams:
         team_groups = team_groups[:MAX_TEAMS]
 
 
