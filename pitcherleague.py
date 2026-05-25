@@ -68,7 +68,7 @@ PRESETS = {
     "Statcast": [
         "xERA", "xFIP", "vFA", "EV", "Chase%", "Whiff%", "K%","BB%","Barrel%", "HardHit%", 
     ],
-    "Standard": ["fWAR","bWAR", "ERA","FIP","IP","SO","BB","WHIP", "QS", "HR"],
+    "Standard": ["fWAR","bWAR", "ERA","xERA", "FIP","xFIP", "IP","K%","BB%","WHIP",],
     "Misc": ["WPA","Clutch", "HR/9","K/BB","SIERA","AVG", "LOB%","BABIP", "HBP", "CG"],
     "Empty – Add your own": [],
 }
