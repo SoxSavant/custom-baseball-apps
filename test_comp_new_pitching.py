@@ -1,7 +1,9 @@
 import pandas as pd
 from pathlib import Path
-
 from p_utils import STAT_ALLOWLIST
+import boto3
+import os
+from io import StringIO
 
 YEAR = 2026
 LOCAL_BWAR_FILE = Path("war_daily_pitch.txt")
@@ -67,3 +69,18 @@ final = final[["Name", "PlayerId", "MLBAMID", "Team"] + [col for col in STAT_ALL
 
 Path("data/final").mkdir(parents=True, exist_ok=True)
 final.to_csv(f"data/final/pitching_final_{YEAR}.csv", index=False)
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+)
+bucket = "sports-analytics-files"
+
+csv_buffer = StringIO()
+final.to_csv(csv_buffer, index=False)
+s3.put_object(
+            Bucket=bucket,
+            Key=f"processed/pitching_final_{YEAR}.csv",
+            Body=csv_buffer.getvalue().encode("utf-8"),
+        )
