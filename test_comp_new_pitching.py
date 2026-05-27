@@ -40,17 +40,23 @@ final = final.merge(year_bwar[["MLBAMID", "bWAR_val"]], on="MLBAMID", how="left"
 final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
 final["bWAR"] = final["bWAR"].fillna(0)
 
-final["fWAR-bWAR Avg"]     = (final["WAR"] + final["bWAR"]) / 2
-final["fWAR/200"]          = final["WAR"] / final["IP"] * 200
+final.rename(columns={
+    "WAR": "fWAR", "Contact% (sc)": "Whiff%",
+    "O-Swing% (mlb)": "Chase%", "vFA (pi)": "vFA",
+}, inplace=True)
+
+final["fWAR-bWAR Avg"]     = (final["fWAR"] + final["bWAR"]) / 2
+final["fWAR/200"]          = final["fWAR"] / final["IP"] * 200
 final["bWAR/200"]          = final["bWAR"] / final["IP"] * 200
-final["Contact%"]          = 1 - final["Contact%"]
+final["Whiff%"]          = 1 - final["Whiff%"]
 final["xERA"]              = final["xERA_sv"].fillna(final["xERA"])
 final["ERA-xERA"]          = final["ERA"] - final["xERA"]
 final.drop(columns=["xERA_sv"], inplace=True)
 
 
 final.rename(columns={
-    "WAR": "fWAR", "O-Swing%": "Chase%", "Contact%": "Whiff%", "vFA (pi)": "vFA",
+    "WAR": "fWAR", "Contact% (sc)": "Whiff%",
+    "O-Swing% (mlb)": "Chase%", "vFA (pi)": "vFA",
 }, inplace=True)
 
 for col in STAT_ALLOWLIST:

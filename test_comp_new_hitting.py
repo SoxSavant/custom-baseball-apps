@@ -62,23 +62,31 @@ final = final.merge(year_bwar[["MLBAMID", "bWAR_val"]], on="MLBAMID", how="left"
 final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
 final["bWAR"] = final["bWAR"].fillna(0)
 
+final.rename(columns={
+    "WAR": "fWAR",
+    "Swing% (sc)": "Swing%",
+    "Contact% (sc)": "Whiff%",
+    "O-Swing% (mlb)": "Chase%",
+    "O-Contact% (mlb)": "O-Contact%",
+    "Z-Swing% (mlb)": "Z-Swing%",
+    "Z-Contact% (mlb)": "Z-Contact%",
+    "Zone% (mlb)": "Zone%",
+    "SqUpSw%": "Squared-Up%",
+    "anglesweetspotpercent": "Sweet-Spot%",
+}, inplace=True)
+
 final["TB"]                = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
 final["XBH"]               = final["2B"] + final["3B"] + final["HR"]
-final["fWAR-bWAR Avg"]     = (final["WAR"] + final["bWAR"]) / 2
-final["fWAR/650"]          = final["WAR"] / final["PA"] * 650
+final["fWAR-bWAR Avg"]     = (final["fWAR"] + final["bWAR"]) / 2
+final["fWAR/650"]          = final["fWAR"] / final["PA"] * 650
 final["bWAR/650"]          = final["bWAR"] / final["PA"] * 650
 final["wOBA-xwOBA"]        = final["wOBA"] - final["xwOBA"]
-final["Contact%"]          = 1 - final["Contact%"]
-final["Z-Swing% - Chase%"] = final["Z-Swing%"] - final["O-Swing%"]
+final["Whiff%"]          = 1 - final["Whiff%"]
+final["Z-Swing% - Chase%"] = final["Z-Swing%"] - final["Chase%"]
 final["DRS/1350"]          = (final["DRS"] / final["Inn"] * 1350).round(0)
 final["OAA/1350"]          = (final["OAA"] / final["Inn"] * 1350).round(0)
 final["FRV/1350"]          = (final["FRV"] / final["Inn"] * 1350).round(0)
 final["FRM/1350"]          = (final["FRM"] / final["Inn"] * 1350).round(1)
-
-final.rename(columns={
-    "WAR": "fWAR", "O-Swing%": "Chase%", "Contact%": "Whiff%",
-    "SqUpSw%": "Squared-Up%", "anglesweetspotpercent": "Sweet-Spot%",
-}, inplace=True)
 
 for col in STAT_ALLOWLIST:
     if col not in final.columns:
