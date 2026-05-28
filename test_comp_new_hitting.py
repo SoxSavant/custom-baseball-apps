@@ -128,8 +128,6 @@ for col in STAT_ALLOWLIST:
 
 final = final[["Name", "PlayerId", "MLBAMID", "Pos", "Team"] + [col for col in STAT_ALLOWLIST]]
 
-Path("data/final").mkdir(parents=True, exist_ok=True)
-final.to_csv(f"data/final/hitting_final_{YEAR}.csv", index=False)
 
 s3 = boto3.client(
     "s3",
