@@ -5,6 +5,7 @@ import requests
 import boto3
 import os
 import numpy as np
+from zoneinfo import ZoneInfo
 
 TRUTHY_STRINGS = {"true", "1", "yes", "y", "t"}
 
@@ -432,7 +433,7 @@ s3 = boto3.client(
 
 bucket = "sports-analytics-files"
 
-@st.cache_data(show_spinner=False, ttl=900)
+
 def load_final_year(year: int) -> pd.DataFrame:
     key = f"processed/hitting_final_{year}.csv"
     try:
@@ -553,3 +554,11 @@ STAT_PRESETS_YOY = {
     "Only Improvements": [],
     "Only Regressions": [],
 }
+
+def get_last_updated(year: int) -> str:
+    try:
+        obj = s3.get_object(Bucket=bucket, Key=f"processed/hitting_final_{year}.csv")
+        last_modified = obj["LastModified"].astimezone(ZoneInfo("America/New_York"))
+        return last_modified.strftime("%B %d, %Y at %I:%M %p ET")
+    except Exception as e:
+        return "unknown"

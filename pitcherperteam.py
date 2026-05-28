@@ -49,7 +49,10 @@ with meta_col:
         'Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a></div>',
         unsafe_allow_html=True,
     )
-
+from h_utils import get_last_updated
+current_year = date.today().year
+last_updated = get_last_updated(current_year)
+st.caption(f"2026 data last updated: {last_updated}")
 
 from p_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,

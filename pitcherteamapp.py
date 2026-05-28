@@ -52,7 +52,10 @@ with meta_col:
     """,
     unsafe_allow_html=True,
 )
-
+from h_utils import get_last_updated
+current_year = date.today().year
+last_updated = get_last_updated(current_year)
+st.caption(f"2026 data last updated: {last_updated}")
 from p_utils import (STAT_ALLOWLIST, STAT_DISPLAY_NAMES, format_stat, TEAMS, TRUTHY_STRINGS,
  label_map, lower_better, STAT_PRESETS_SAVANT,
 normalize_team, start_year,load_final_year)
