@@ -113,3 +113,4 @@ s3.put_object(
             Key=f"processed/pitching_final_{YEAR}.csv",
             Body=csv_buffer.getvalue().encode("utf-8"),
         )
+print(f"Uploaded {len(final)} players to s3://{bucket}/processed/pitching_final_{YEAR}.csv")

@@ -8,6 +8,8 @@ import requests
 
 YEAR = 2026
 
+upload = False
+
 def _browser_headers(cookie_string: str) -> dict:
     return {
         "User-Agent": (
@@ -46,27 +48,76 @@ def fetch_bwar(year: int) -> pd.DataFrame:
     df = df[df["year_ID"] == year]
 
     return df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR_val"].sum()
+
+def fetch_statcast_ev(year: int) -> pd.DataFrame:
+    url = (
+        "https://baseballsavant.mlb.com/leaderboard/statcast"
+        f"?csv=true&type=batter&year={year}&position=&team=&min=1"
+        "&sort=barrels_per_pa&sortDir=desc"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    df = pd.read_csv(StringIO(r.text))
+    df = df[
+        ["player_id", "anglesweetspotpercent", "avg_hit_speed", "max_hit_speed", "ev95percent", "brl_percent"]
+    ].rename(columns={
+        "avg_hit_speed":  "EV",
+        "max_hit_speed":  "maxEV",
+        "ev95percent":    "HardHit%",
+        "brl_percent":    "Barrel%",
+    })
+    df["player_id"]           = pd.to_numeric(df["player_id"],           errors="coerce")
+    df["EV"]                  = pd.to_numeric(df["EV"],                  errors="coerce")
+    df["maxEV"]               = pd.to_numeric(df["maxEV"],               errors="coerce")
+    df["HardHit%"]            = pd.to_numeric(df["HardHit%"],            errors="coerce")
+    df["Barrel%"]             = pd.to_numeric(df["Barrel%"],             errors="coerce")
+    df["anglesweetspotpercent"] = pd.to_numeric(df["anglesweetspotpercent"], errors="coerce")
+    return df
+
+
+def fetch_expected_stats(year: int) -> pd.DataFrame:
+    url = (
+        "https://baseballsavant.mlb.com/leaderboard/expected_statistics"
+        f"?csv=true&type=batter&year={year}&position=&team=&filterType=bip&min=1"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    df = pd.read_csv(StringIO(r.text))
+    df = df[["player_id", "est_ba", "est_slg", "est_woba", "woba"]].rename(columns={
+        "est_ba": "xBA", "est_slg": "xSLG", "est_woba": "xwOBA", "woba": "wOBA",
+    })
+    df["player_id"] = pd.to_numeric(df["player_id"], errors="coerce")
+    for col in ["xBA", "xSLG", "xwOBA", "wOBA"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+def fetch_bat_tracking(year: int) -> pd.DataFrame:
+    url = (
+        "https://baseballsavant.mlb.com/leaderboard/bat-tracking"
+        f"?csv=true&type=batter&gameType=Regular&minSwings=1&minGroupSwings=1"
+        f"&seasonStart={year}&seasonEnd={year}"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    df = pd.read_csv(StringIO(r.text))
+    df = df[["id", "avg_bat_speed", "squared_up_per_swing"]].rename(columns={
+        "avg_bat_speed": "BatSpd", "squared_up_per_swing": "SqUpSw%",
+    })
+    df = df.rename(columns={"id": "player_id"})
+    df["player_id"] = pd.to_numeric(df["player_id"], errors="coerce")
+    for col in ["BatSpd", "SqUpSw%"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
 year_bwar = fetch_bwar(YEAR)
-
-sv_df = pd.read_csv(f"data/sweetspot_{YEAR}.csv")
-sv_df = sv_df[["player_id", "anglesweetspotpercent", "avg_hit_speed", "max_hit_speed", "ev95percent", "brl_percent"]].rename(columns={
-    "avg_hit_speed": "EV", "max_hit_speed": "maxEV", "ev95percent": "HardHit%", "brl_percent": "Barrel%",
-})
-
-xw_df = pd.read_csv(f"data/xwoba_{YEAR}.csv")
-xw_df = xw_df[["player_id", "est_ba", "est_slg", "est_woba", "woba"]].rename(columns={
-    "est_ba": "xBA", "est_slg": "xSLG", "est_woba": "xwOBA", "woba": "wOBA",
-})
-
+sv_df = fetch_statcast_ev(YEAR)
+xw_df = fetch_expected_stats(YEAR)
+battracking_df = fetch_bat_tracking(YEAR)
 
 savant_statcast_df = sv_df.merge(xw_df, on="player_id", how="outer")
 savant_statcast_df["player_id"] = pd.to_numeric(savant_statcast_df["player_id"], errors="coerce")
 
-bt_df = pd.read_csv(f"data/bat-tracking_{YEAR}.csv")
 
-savant_battracking_df = bt_df[["id", "avg_bat_speed", "squared_up_per_swing"]].rename(columns={
-    "avg_bat_speed": "BatSpd", "squared_up_per_swing": "SqUpSw%",
-})
 
 
 
@@ -91,7 +142,7 @@ final.drop(columns=[
 ], errors="ignore", inplace=True)
 final = final.merge(savant_statcast_df, left_on="MLBAMID", right_on="player_id", how="left")
 
-final = final.merge(savant_battracking_df, left_on="MLBAMID", right_on="id", how="left")
+final = final.merge(battracking_df, left_on="MLBAMID", right_on="player_id", how="left")
 final = final.merge(year_bwar[["MLBAMID", "bWAR_val"]], on="MLBAMID", how="left")
 final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
 final["bWAR"] = final["bWAR"].fillna(0)
@@ -128,7 +179,7 @@ for col in STAT_ALLOWLIST:
 
 final = final[["Name", "PlayerId", "MLBAMID", "Pos", "Team"] + [col for col in STAT_ALLOWLIST]]
 
-
+final.to_csv(f"data/final/hitting_final_{YEAR}.csv")
 s3 = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
@@ -136,11 +187,12 @@ s3 = boto3.client(
 )
 bucket = "sports-analytics-files"
 
-csv_buffer = StringIO()
-final.to_csv(csv_buffer, index=False)
-s3.put_object(
-            Bucket=bucket,
-            Key=f"processed/hitting_final_{YEAR}.csv",
-            Body=csv_buffer.getvalue().encode("utf-8"),
-        )
-
+if upload:
+    csv_buffer = StringIO()
+    final.to_csv(csv_buffer, index=False)
+    s3.put_object(
+                Bucket=bucket,
+                Key=f"processed/hitting_final_{YEAR}.csv",
+                Body=csv_buffer.getvalue().encode("utf-8"),
+            )
+    print(f"Uploaded {len(final)} players to s3://{bucket}/processed/hitting_final_{YEAR}.csv")
