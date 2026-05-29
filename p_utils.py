@@ -391,13 +391,13 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         if show_sign and v > 0:
             return f"+{formatted}"
         return f"-{formatted}" if v < 0 else formatted
-
+    ALREADY_PCT_POINTS = {"Barrel%", "HardHit%"}
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
         or "Chase" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
-        if v <= 1:
+        if v <= 1 and stat not in ALREADY_PCT_POINTS:
             v *= 100
         formatted = f"{abs(v):.1f}%"
         if show_sign and v > 0:

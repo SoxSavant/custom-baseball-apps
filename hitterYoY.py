@@ -57,7 +57,7 @@ from h_utils import get_last_updated
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
-from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better, normalize_pct,
+from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better,
 format_stat_yoy, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year)
 
 current_year = date.today().year
@@ -150,8 +150,6 @@ def load_risers_data(
         for col in numeric_cols:
             s_val = pd.to_numeric(row_s.get(col, np.nan), errors="coerce")
             e_val = pd.to_numeric(row_e.get(col, np.nan), errors="coerce")
-            s_val = normalize_pct(col, s_val)
-            e_val = normalize_pct(col, e_val)
             record[f"{col}_start"] = s_val
             record[f"{col}_end"]   = e_val
             record[col] = e_val - s_val
