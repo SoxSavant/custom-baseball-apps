@@ -8,6 +8,8 @@ import requests
 
 YEAR = 2026
 
+upload = False
+
 def _browser_headers(cookie_string: str) -> dict:
     return {
         "User-Agent": (
@@ -46,15 +48,42 @@ def fetch_bwar(year: int) -> pd.DataFrame:
     df = df[df["year_ID"] == year]
 
     return df.groupby(["MLBAMID", "year_ID"], as_index=False)["bWAR_val"].sum()
+
+def fetch_statcast_ev_pitching(year: int) -> pd.DataFrame:
+    url = (
+        "https://baseballsavant.mlb.com/leaderboard/statcast"
+        f"?csv=true&type=pitcher&year={year}&position=&team=&min=1"
+        "&sort=barrels_per_pa&sortDir=asc"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    df = pd.read_csv(StringIO(r.text))
+    df = df[["player_id", "avg_hit_speed", "ev95percent", "brl_percent"]].rename(columns={
+        "avg_hit_speed": "EV", "ev95percent": "HardHit%", "brl_percent": "Barrel%",
+    })
+    df["player_id"] = pd.to_numeric(df["player_id"], errors="coerce")
+    for col in ["EV", "HardHit%", "Barrel%"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
+
+def fetch_xera(year: int) -> pd.DataFrame:
+    url = (
+        "https://baseballsavant.mlb.com/leaderboard/expected_statistics"
+        f"?csv=true&type=pitcher&year={year}&position=&team=&filterType=bip&min=1"
+    )
+    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    df = pd.read_csv(StringIO(r.text))
+    df = df[["player_id", "xera"]].rename(columns={"xera": "xERA_sv"})
+    df["player_id"] = pd.to_numeric(df["player_id"], errors="coerce")
+    df["xERA_sv"] = pd.to_numeric(df["xERA_sv"], errors="coerce")
+    return df
+
 year_bwar = fetch_bwar(YEAR)
 
-ev_df = pd.read_csv(f"data/ev_{YEAR}.csv")
-ev_df = ev_df[["player_id", "avg_hit_speed", "ev95percent", "brl_percent"]].rename(columns={
-    "avg_hit_speed": "EV", "ev95percent": "HardHit%", "brl_percent": "Barrel%",
-})
+ev_df = fetch_statcast_ev_pitching(YEAR)
 
-xera_df = pd.read_csv(f"data/xera_{YEAR}.csv")
-xera_df = xera_df[["player_id", "xera"]].rename(columns={"xera": "xERA_sv"})
+xera_df = fetch_xera(YEAR)
 
 savant_df = ev_df.merge(xera_df, on="player_id", how="outer")
 
@@ -99,6 +128,8 @@ for col in STAT_ALLOWLIST:
 
 final = final[["Name", "PlayerId", "MLBAMID", "Team"] + [col for col in STAT_ALLOWLIST]]
 
+final.to_csv(f"data/final/pitching_final_{YEAR}.csv")
+
 s3 = boto3.client(
     "s3",
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
@@ -106,11 +137,12 @@ s3 = boto3.client(
 )
 bucket = "sports-analytics-files"
 
-csv_buffer = StringIO()
-final.to_csv(csv_buffer, index=False)
-s3.put_object(
-            Bucket=bucket,
-            Key=f"processed/pitching_final_{YEAR}.csv",
-            Body=csv_buffer.getvalue().encode("utf-8"),
-        )
-print(f"Uploaded {len(final)} players to s3://{bucket}/processed/pitching_final_{YEAR}.csv")
+if upload:
+    csv_buffer = StringIO()
+    final.to_csv(csv_buffer, index=False)
+    s3.put_object(
+                Bucket=bucket,
+                Key=f"processed/pitching_final_{YEAR}.csv",
+                Body=csv_buffer.getvalue().encode("utf-8"),
+            )
+    print(f"Uploaded {len(final)} players to s3://{bucket}/processed/pitching_final_{YEAR}.csv")
