@@ -310,13 +310,13 @@ def format_stat(stat: str, val) -> str:
 
     if upper_stat in {"WRC+"}:
         return f"{int(round(float(val)))}"
-
+    ALREADY_PCT_POINTS = {"Barrel%", "HardHit%", "Sweet-Spot%"}
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
-        if v <= 1:
+        if v <= 1 and stat not in ALREADY_PCT_POINTS:
             v *= 100
         return f"{v:.1f}%"
 
@@ -353,13 +353,13 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
     if upper_stat in {"WRC+"}:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
-
+    ALREADY_PCT_POINTS = {"Barrel%", "HardHit%", "Sweet-Spot%"}
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
-        if v <= 1:
+        if v <= 1 and stat not in ALREADY_PCT_POINTS:
             v *= 100
         formatted = f"{abs(v):.1f}%"
         if show_sign and v > 0:

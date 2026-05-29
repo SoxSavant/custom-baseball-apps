@@ -8,8 +8,6 @@ import requests
 import re
 
 
-YEAR = 2026
-
 localUpload = True
 
 upload = False
@@ -172,75 +170,76 @@ def fetch_fangraphs_batting(year: int) -> pd.DataFrame:
         "NameASCII", "PlayerId", "MLBAMID",
     ]]
 
+for YEAR in range(2021,2026):
+    year_bwar = fetch_bwar(YEAR)
+    sv_df = fetch_statcast_ev(YEAR)
+    xw_df = fetch_expected_stats(YEAR)
+    battracking_df = fetch_bat_tracking(YEAR)
 
-year_bwar = fetch_bwar(YEAR)
-sv_df = fetch_statcast_ev(YEAR)
-xw_df = fetch_expected_stats(YEAR)
-battracking_df = fetch_bat_tracking(YEAR)
+    savant_statcast_df = sv_df.merge(xw_df, on="player_id", how="outer")
+    savant_statcast_df["player_id"] = pd.to_numeric(savant_statcast_df["player_id"], errors="coerce")
+    final = fetch_fangraphs_batting(YEAR)
+    final.columns = final.columns.str.strip().str.replace('\ufeff', '')
+    final["Year"] = YEAR
+    final["MLBAMID"] = pd.to_numeric(final["MLBAMID"], errors="coerce")
+    fielding = pd.read_csv(f"data/fielding_{YEAR}.csv")
+    fielding.columns = fielding.columns.str.strip().str.replace('\ufeff', '')
+    fielding["Inn"] = pd.to_numeric(fielding["Inn"], errors="coerce")
+    primary_pos  = fielding.loc[fielding.groupby("PlayerId")["Inn"].idxmax(), ["PlayerId", "Pos"]]
+    fielding_agg = fielding.groupby("PlayerId", as_index=False).sum(numeric_only=True).merge(primary_pos, on="PlayerId", how="left")
+    fielding_agg.drop(columns=[c for c in fielding_agg.columns if c != "PlayerId" and c in final.columns], inplace=True)
+    final = final.merge(fielding_agg, on="PlayerId", how="left")
+    final.drop(columns=[
+            "wOBA", "xwOBA", "xBA", "xSLG",
+            "EV", "maxEV", "HardHit%", "Barrel%",
+            "BatSpd", "SqUpSw%"
+        ], errors="ignore", inplace=True)
+    final = final.merge(savant_statcast_df, left_on="MLBAMID", right_on="player_id", how="left")
 
-savant_statcast_df = sv_df.merge(xw_df, on="player_id", how="outer")
-savant_statcast_df["player_id"] = pd.to_numeric(savant_statcast_df["player_id"], errors="coerce")
-final = fetch_fangraphs_batting(YEAR)
-final.columns = final.columns.str.strip().str.replace('\ufeff', '')
-final["Year"] = YEAR
-final["MLBAMID"] = pd.to_numeric(final["MLBAMID"], errors="coerce")
-fielding = pd.read_csv(f"data/fielding_{YEAR}.csv")
-fielding.columns = fielding.columns.str.strip().str.replace('\ufeff', '')
-fielding["Inn"] = pd.to_numeric(fielding["Inn"], errors="coerce")
-primary_pos  = fielding.loc[fielding.groupby("PlayerId")["Inn"].idxmax(), ["PlayerId", "Pos"]]
-fielding_agg = fielding.groupby("PlayerId", as_index=False).sum(numeric_only=True).merge(primary_pos, on="PlayerId", how="left")
-fielding_agg.drop(columns=[c for c in fielding_agg.columns if c != "PlayerId" and c in final.columns], inplace=True)
-final = final.merge(fielding_agg, on="PlayerId", how="left")
-final.drop(columns=[
-        "wOBA", "xwOBA", "xBA", "xSLG",
-        "EV", "maxEV", "HardHit%", "Barrel%",
-        "BatSpd", "SqUpSw%"
-    ], errors="ignore", inplace=True)
-final = final.merge(savant_statcast_df, left_on="MLBAMID", right_on="player_id", how="left")
+    final = final.merge(battracking_df, left_on="MLBAMID", right_on="player_id", how="left")
+        
 
-final = final.merge(battracking_df, left_on="MLBAMID", right_on="player_id", how="left")
-    
-
-final = final.merge(year_bwar[["MLBAMID", "bWAR_val"]], on="MLBAMID", how="left")
-final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
-final["bWAR"] = final["bWAR"].fillna(0)
+    final = final.merge(year_bwar[["MLBAMID", "bWAR_val"]], on="MLBAMID", how="left")
+    final.rename(columns={"bWAR_val": "bWAR"}, inplace=True)
+    final["bWAR"] = final["bWAR"].fillna(0)
 
 
 
-final["TB"]                = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
-final["XBH"]               = final["2B"] + final["3B"] + final["HR"]
-final["fWAR-bWAR Avg"]     = (final["fWAR"] + final["bWAR"]) / 2
-final["fWAR/650"]          = final["fWAR"] / final["PA"] * 650
-final["bWAR/650"]          = final["bWAR"] / final["PA"] * 650
-final["wOBA-xwOBA"]        = final["wOBA"] - final["xwOBA"]
-final["Whiff%"]          = 1 - final["Whiff%"]
-final["Z-Swing% - Chase%"] = final["Z-Swing%"] - final["Chase%"]
-final["DRS/1350"]          = (final["DRS"] / final["Inn"] * 1350).round(0)
-final["OAA/1350"]          = (final["OAA"] / final["Inn"] * 1350).round(0)
-final["FRV/1350"]          = (final["FRV"] / final["Inn"] * 1350).round(0)
-final["FRM/1350"]          = (final["FRM"] / final["Inn"] * 1350).round(1)
+    final["TB"]                = final["1B"] + final["2B"]*2 + final["3B"]*3 + final["HR"]*4
+    final["XBH"]               = final["2B"] + final["3B"] + final["HR"]
+    final["fWAR-bWAR Avg"]     = (final["fWAR"] + final["bWAR"]) / 2
+    final["fWAR/650"]          = final["fWAR"] / final["PA"] * 650
+    final["bWAR/650"]          = final["bWAR"] / final["PA"] * 650
+    final["wOBA-xwOBA"]        = final["wOBA"] - final["xwOBA"]
+    final["Whiff%"]          = 1 - final["Whiff%"]
+    final["Z-Swing% - Chase%"] = final["Z-Swing%"] - final["Chase%"]
+    final["DRS/1350"]          = (final["DRS"] / final["Inn"] * 1350).round(0)
+    final["OAA/1350"]          = (final["OAA"] / final["Inn"] * 1350).round(0)
+    final["FRV/1350"]          = (final["FRV"] / final["Inn"] * 1350).round(0)
+    final["FRM/1350"]          = (final["FRM"] / final["Inn"] * 1350).round(1)
 
-for col in STAT_ALLOWLIST:
-    if col not in final.columns:
-        final[col] = None
+    for col in STAT_ALLOWLIST:
+        if col not in final.columns:
+            final[col] = None
 
-final = final[["Name", "PlayerId", "MLBAMID", "Pos", "Team"] + [col for col in STAT_ALLOWLIST]]
+    final = final[["Name", "PlayerId", "MLBAMID", "Pos", "Team"] + [col for col in STAT_ALLOWLIST]]
 
-if localUpload:
-    final.to_csv(f"data/final/hitting_final_{YEAR}.csv")
-s3 = boto3.client(
-    "s3",
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-)
-bucket = "sports-analytics-files"
+    if localUpload:
+        final.to_csv(f"data/final/hitting_final_{YEAR}.csv")
+        print(f"Locally uploaded {len(final)} players to data/final/hitting_final_{YEAR}.csv")
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    )
+    bucket = "sports-analytics-files"
 
-if upload:
-    csv_buffer = StringIO()
-    final.to_csv(csv_buffer, index=False)
-    s3.put_object(
-                Bucket=bucket,
-                Key=f"processed/hitting_final_{YEAR}.csv",
-                Body=csv_buffer.getvalue().encode("utf-8"),
-            )
-    print(f"Uploaded {len(final)} players to s3://{bucket}/processed/hitting_final_{YEAR}.csv")
+    if upload:
+        csv_buffer = StringIO()
+        final.to_csv(csv_buffer, index=False)
+        s3.put_object(
+                    Bucket=bucket,
+                    Key=f"processed/hitting_final_{YEAR}.csv",
+                    Body=csv_buffer.getvalue().encode("utf-8"),
+                )
+        print(f"Uploaded {len(final)} players to s3://{bucket}/processed/hitting_final_{YEAR}.csv")
