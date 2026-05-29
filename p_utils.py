@@ -477,11 +477,18 @@ STAT_PRESETS_SAVANT = {
 }
 
 STAT_PRESETS_YOY = {
+    "Default": [
+        "ERA", "xERA", "FIP","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
     "Statcast": [
          "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Stat Mix": [
         "fWAR", "bWAR", "GS", "IP", "ERA",  "FIP", 
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
+    ],
+    "Stat Mix Rate Basis": [
+        "fWAR/200", "bWAR/200", "ERA",  "FIP", 
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Standard": [

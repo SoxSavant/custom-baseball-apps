@@ -139,7 +139,7 @@ REMOVE_SELECT_KEY    = "iyoy_remove_stat_select"
 ADD_RESET_KEY        = "iyoy_reset_add_select"
 REMOVE_RESET_KEY     = "iyoy_reset_remove_select"
 
-DEFAULT_PRESET = "Statcast"
+DEFAULT_PRESET = "Default"
 
 
 with left_col:

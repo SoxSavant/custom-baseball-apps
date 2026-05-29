@@ -538,6 +538,10 @@ STAT_PRESETS_YOY = {
         "fWAR", "bWAR", "G", "PA", "HR", "wRC+", "xwOBA",
         "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
     ],
+    "Stat Mix Rate Basis": [
+        "fWAR/650", "bWAR/650", "wRC+", "xwOBA", "EV", "Barrel%", "HardHit%", "Sweet-Spot%",
+        "K%", "BB%", "FRV/1350", "DRS/1350",
+    ],
 
     "Standard": [
         "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
@@ -546,6 +550,9 @@ STAT_PRESETS_YOY = {
     ],
     "Fielding": [
         "DRS", "FRV", "OAA", "Def"
+    ],
+    "Fielding Rates": [
+        "DRS/1350", "FRV/1350", "OAA/1350",
     ],
     "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": [
