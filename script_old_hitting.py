@@ -252,6 +252,9 @@ for year in range(2026, 2027):
         rename_map["anglesweetspotpercent"] = "Sweet-Spot%"
 
     final.rename(columns=rename_map, inplace=True)
+    for col in ["Barrel%", "HardHit%"]:
+        if col in final.columns:
+            final[col] = final[col] * 100
 
     for col in STAT_ALLOWLIST:
         if col not in final.columns:
