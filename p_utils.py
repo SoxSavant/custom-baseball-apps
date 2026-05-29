@@ -497,6 +497,6 @@ def get_last_updated(year: int) -> str:
     try:
         obj = s3.get_object(Bucket=bucket, Key=f"processed/pitching_final_{year}.csv")
         last_modified = obj["LastModified"].astimezone(ZoneInfo("America/New_York"))
-        return last_modified.strftime("%B %d, %Y at %I:%M %p ET")
+        return last_modified.strftime("%B %d, %Y")
     except Exception:
         return "unknown"
