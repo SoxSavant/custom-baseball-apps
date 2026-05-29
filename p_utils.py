@@ -449,6 +449,9 @@ STAT_PRESETS = {
     "Statcast": [
         "fWAR", "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
+    "Stat Mix": [
+        "fWAR", "bWAR", "ERA", "xERA", "FIP", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
     "Standard": [
         "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
     ], 

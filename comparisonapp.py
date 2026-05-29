@@ -62,7 +62,7 @@ with meta_col:
     unsafe_allow_html=True,
 )
 
-from h_utils import get_last_updated
+from h_utils import get_last_updated, STAT_ROUND
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
@@ -809,7 +809,10 @@ for stat in stats_order:
             numeric_vals.append(np.nan)
             continue
         try:
-            numeric_vals.append(float(val))
+            num = float(val)
+            decimals = STAT_ROUND.get(stat,1)
+            num = round(num,decimals)
+            numeric_vals.append(num)
         except Exception:
             has_non_numeric = True
             numeric_vals.append(np.nan)

@@ -221,7 +221,7 @@ with meta_col:
         """,
         unsafe_allow_html=True,
     )
-from p_utils import get_last_updated
+from p_utils import get_last_updated, STAT_ROUND
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
@@ -421,12 +421,6 @@ other_stats = [stat for stat in numeric_stats if stat not in preferred_stats]
 stat_options = preferred_stats + other_stats
 allowed_add_stats = preferred_stats if preferred_stats else stat_options.copy()
 
-has_record = all("W" in df.columns and "L" in df.columns for df in dfs)
-if has_record:
-    if "W-L" not in stat_options:
-        stat_options = ["W-L"] + stat_options
-    if "W-L" not in allowed_add_stats:
-        allowed_add_stats = ["W-L"] + allowed_add_stats
 
 if not stat_options:
     st.error("No numeric stats available to display.")
@@ -508,8 +502,6 @@ def stat_preset_callback(preset_key, stat_key, available_stats):
         if len(players_data) < 2:
             return leads
         for stat in available_stats:
-            if stat == "W-L" or stat not in STAT_ALLOWLIST:
-                continue
             if any(stat not in p["df"].columns for p in players_data):
                 continue
             vals = []
@@ -700,31 +692,6 @@ winner_map: dict[str, set[str]] = {}
 col_order = [p["col_label"] for p in players_data]
 
 for stat in stats_order:
-    if stat == "W-L":
-        if any("W" not in p["df"].columns or "L" not in p["df"].columns for p in players_data):
-            continue
-        values, ratios = [], []
-        for pdata in players_data:
-            w = pd.to_numeric(pdata["row"].get("W", np.nan), errors="coerce")
-            l = pd.to_numeric(pdata["row"].get("L", np.nan), errors="coerce")
-            if pd.isna(w) or pd.isna(l):
-                values.append(""); ratios.append(np.nan)
-            else:
-                values.append(f"{int(round(w))}-{int(round(l))}")
-                total = w + l
-                ratios.append(np.nan if total <= 0 else w / total)
-        winners = set()
-        cands = [v for v in ratios if not pd.isna(v)]
-        if cands:
-            best = max(cands)
-            winners = {col_order[i] for i, v in enumerate(ratios) if not pd.isna(v) and abs(v - best) < 1e-9}
-        row_dict = {"Stat": "W-L"}
-        for i, pdata in enumerate(players_data):
-            row_dict[pdata["col_label"]] = values[i]
-        comparison_rows.append(row_dict)
-        winner_map["W-L"] = winners
-        continue
-
     if any(stat not in p["df"].columns for p in players_data):
         continue
 
@@ -739,7 +706,10 @@ for stat in stats_order:
             numeric_vals.append(np.nan)
         else:
             try:
-                numeric_vals.append(float(val))
+                num = float(val)
+                decimals = STAT_ROUND.get(stat,1)
+                num = round(num,decimals)
+                numeric_vals.append(num)
             except Exception:
                 has_non_numeric = True
                 numeric_vals.append(np.nan)
