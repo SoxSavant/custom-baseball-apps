@@ -323,13 +323,13 @@ def format_stat(stat: str, val) -> str:
 
     if upper_stat in {"BABIP", "AVG"}:
         return f"{float(val):.3f}".lstrip("0") or ".000"
-
+    ALREADY_PCT_POINTS = {"Barrel%", "HardHit%"}
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
         or "Chase" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
-        if v <= 1:
+        if v <= 1 and stat not in ALREADY_PCT_POINTS:
             v *= 100
         return f"{v:.1f}%"
 
