@@ -1,6 +1,8 @@
 from datetime import date
 from p_utils import normalize_team
 import re
+import boto3
+import os
 
 current_year = date.today().year
 
@@ -129,4 +131,11 @@ def _browser_headers(cookie_string: str) -> dict:
         "Referer": "https://www.baseball-reference.com/",
         "cookie": cookie_string,
     }
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    )
+bucket = "sports-analytics-files"
 
