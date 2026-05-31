@@ -3,11 +3,11 @@ import pandas as pd
 from datetime import date
 from zoneinfo import ZoneInfo
 from h_utils import (
-    load_final_year, label_map,
+    load_final_year,
     POSITION_OPTIONS, TEAM_OPTIONS, normalize_team,
     apply_dh_override, s3, bucket,
-    STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, RATE_STATS, MAX_STATS,
-    STAT_PRESETS, STAT_DISPLAY_NAMES,
+    STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, MAX_STATS,
+    STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES,
 )
 
 st.set_page_config(page_title="Hitting Database", layout="wide", page_icon="⚾")
@@ -56,10 +56,6 @@ START_YEAR   = 1901
 
 MULTI_TEAM_PLACEHOLDERS = {"---", "TOT", "2TM", "3TM", "4TM", "- - -", ""}
 
-EXCLUDED_PRESETS = {"Player A leads", "Player B leads", "Player C leads",
-                    "Player D leads", "Player E leads"}
-
-PRESET_OPTIONS = [k for k in STAT_PRESETS if k not in EXCLUDED_PRESETS]
 
 def get_last_updated(year: int) -> str:
     try:
@@ -130,6 +126,8 @@ def fmt(stat: str, val) -> str:
         return f"{int(round(float(val)))}"
     return f"{float(val):.{decimals}f}"
 
+from utils import get_dynamic_min_pa
+
 last_updated = get_last_updated(current_year)
 st.caption(f"{current_year} data last updated: {last_updated}")
 
@@ -178,7 +176,7 @@ with c5:
 
 with c6:
     if view_mode == "Player":
-        min_pa = st.number_input("Min PA", min_value=0, max_value=5000, value=0, step=10)
+        min_pa = st.number_input("Min PA", min_value=0, max_value=5000, value= get_dynamic_min_pa(current_year), step=10)
     else:
         min_pa = 0
 
@@ -191,9 +189,9 @@ with c7:
 pc1, pc2 = st.columns([1, 3])
 
 with pc1:
-    preset_choice = st.selectbox("Stat Preset", PRESET_OPTIONS)
+    preset_choice = st.selectbox("Stat Preset", STAT_PRESETS_DATABASE)
 
-preset_stats = [s for s in STAT_PRESETS.get(preset_choice, []) if s in STAT_ALLOWLIST]
+preset_stats = [s for s in STAT_PRESETS_DATABASE.get(preset_choice, []) if s in STAT_ALLOWLIST]
 
 with pc2:
     selected_stats = st.multiselect(
@@ -255,9 +253,9 @@ if view_mode == "Player":
             df = df[mask]
 
     if year_mode == "Split Season":
-        base_cols = [c for c in ["Name", "Team", "Year", "Pos", "PA"] if c in df.columns]
+        base_cols = [c for c in ["Name", "Team", "Year", "Pos"] if c in df.columns]
     else:
-        base_cols = [c for c in ["Name", "Team", "Pos", "PA"] if c in df.columns]
+        base_cols = [c for c in ["Name", "Team", "Pos"] if c in df.columns]
 
     default_sort = next((s for s in selected_stats if s in df.columns), None)
 

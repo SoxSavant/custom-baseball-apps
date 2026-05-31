@@ -3,13 +3,11 @@ import time
 
 APPS = [
     "https://custom-comparison-app.streamlit.app/",
-    "https://customizable-team-savant-page-creator.streamlit.app/",
     "https://customizable-player-savant-page.streamlit.app/",
     "https://hitterleaderboardapp.streamlit.app/",
     "https://hitter-year-over-year.streamlit.app/",
     "https://custompitchercomparisonapp.streamlit.app/",
     "https://pitcher-savant-page.streamlit.app/",
-    "https://team-pitching-savant.streamlit.app/",
     "https://pitcher-leaderboard.streamlit.app/",
     "https://pitcher-year-over-year.streamlit.app/",
     "https://hitter-stat-filter.streamlit.app/",
@@ -22,6 +20,7 @@ APPS = [
     "https://pitchers-per-team.streamlit.app/",
     "https://hitter-indiv-yoy.streamlit.app/",
     "https://pitcher-indiv-yoy.streamlit.app/",
+    "https://hitting-database.streamlit.app/",
 ]
 
 def wake_app(url):
