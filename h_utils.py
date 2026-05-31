@@ -14,7 +14,7 @@ start_year = 1901
 STAT_ALLOWLIST = [
     "fWAR", "bWAR", "fWAR-bWAR Avg","xwOBA","wOBA",  "wOBA-xwOBA", "xBA", "xSLG",
     "EV", "Barrel%","HardHit%","Sweet-Spot%",
-    "BatSpd","Squared-Up%",  "Whiff%", 
+    "BatSpd","Squared-Up%",  "Whiff%", "Chase%",
     "K%", "BB%", "Off", "Def", "BsR", 
     "FRV", "OAA", "DRS",
     "wRC+", "maxEV","OPS", "SLG", "OBP", "AVG", "ISO",
@@ -579,7 +579,7 @@ STAT_PRESETS_DATABASE = {
         "K%", "BB%", "DRS",
     ],
     "Fielding": [
-        "DRS", "FRV", "OAA", "Def", "FRM"
+        "DRS", "FRV", "OAA", "Def", "FRM",
     ],
     "Discipline": ["Chase%","Z-Swing%", "Z-Swing% - Chase%", "Swing%", 
     "O-Contact%", "Z-Contact%", "Zone%",],
