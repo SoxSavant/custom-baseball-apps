@@ -84,7 +84,7 @@ EVERY_STAT_PRESET = [
     "Chase%", "Whiff%", "K%", "BB%", "BB/K","BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
     "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%", "Z-Swing% - Chase%"
-    "O-Contact%","Z-Contact%","Whiff%","Zone%","BatSpd", "Squared-Up%", "TZ", "Inn"
+    "O-Contact%","Z-Contact%","Zone%","BatSpd", "Squared-Up%", "Inn"
     "fWAR/650","bWAR/650","DRS/1350", "OAA/1350","FRV/1350","FRM/1350",
 ]
 
@@ -560,6 +560,32 @@ STAT_PRESETS_YOY = {
     ],
     "Only Improvements": [],
     "Only Regressions": [],
+}
+
+STAT_PRESETS_DATABASE = {
+    "Default": [
+        "G", "fWAR", "bWAR", "HR", "wRC+", "xwOBA",
+        "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
+    ],
+   
+    "Statcast": [
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 
+        "BatSpd","Squared-Up%",
+        "Chase%", "Whiff%", "K%", "BB%",
+    ],
+    "Standard": [
+        "fWAR", "AVG", "OBP", "SLG", "OPS",
+        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+        "K%", "BB%", "DRS",
+    ],
+    "Fielding": [
+        "DRS", "FRV", "OAA", "Def", "FRM"
+    ],
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Create your own": [
+        "fWAR",
+    ],
+
 }
 
 def get_last_updated(year: int) -> str:
