@@ -584,7 +584,7 @@ STAT_PRESETS_DATABASE = {
     "Discipline": ["Chase%","Z-Swing%", "Z-Swing% - Chase%", "Swing%", 
     "O-Contact%", "Z-Contact%", "Zone%",],
     "Every Stat": EVERY_STAT_PRESET,
-    "Blank – Create your own": [
+    "Blank – Add your own": [
         "fWAR",
     ],
 

@@ -503,6 +503,27 @@ STAT_PRESETS_YOY = {
     "Only Regressions": [],
 }
 
+STAT_PRESETS_DATABASE = {
+    "Default": [
+        "fWAR", "bWAR",  "GS","ERA", "xERA", "FIP", "xFIP", "IP",
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
+    ],
+    "Statcast": [
+        "ERA","xERA", "ERA-xERA","vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
+   
+    "Standard": [
+   "G", "GS", "IP", 
+    "K/9","BB/9","K/BB","K-BB%", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "SV", "AVG", "WHIP",  "SO", "BB", "HBP", "HR", "QS", "CG", "ShO", "ER", "TBF", 
+    ],
+    "Misc": [ "fWAR/200", "bWAR/200", "fWAR-bWAR Avg", "ERA-", "FIP-", "SIERA", "WPA", "Clutch", 
+    ] ,
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Add your own": ["fWAR"],
+
+}
+
 def get_last_updated(year: int) -> str:
     try:
         obj = s3.get_object(Bucket=bucket, Key=f"processed/pitching_final_{year}.csv")
@@ -510,3 +531,4 @@ def get_last_updated(year: int) -> str:
         return last_modified.strftime("%B %d, %Y")
     except Exception:
         return "unknown"
+    
