@@ -336,8 +336,8 @@ with left_col:
     available_pool  = allowed_add_stats if allowed_add_stats else stat_options
     available_stats = [s for s in available_pool if s not in stats_in_config]
 
-    sentinel_add    = "Select stat to add"
-    sentinel_remove = "Select stat to remove"
+    sentinel_add    = "Add stat"
+    sentinel_remove = "Remove stat"
     add_options     = [sentinel_add]    + available_stats
     remove_options  = [sentinel_remove] + stats_in_config
 
