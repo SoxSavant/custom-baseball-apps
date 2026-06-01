@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-from zoneinfo import ZoneInfo
 from h_utils import (
     load_final_year,
     POSITION_OPTIONS, TEAM_OPTIONS, normalize_team,
@@ -89,8 +88,11 @@ def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) ->
         elif stat in MAX_STATS:
             agg[stat] = (stat, "max")
         else:
-            df[f"_w_{stat}"] = df[stat] * df.get("PA", pd.Series(1, index=df.index))
+            mask = df[stat].notna()
+            df[f"_w_{stat}"] = df[stat] * df["PA"].where(mask, 0)
+            df[f"_pa_{stat}"] = df["PA"].where(mask, 0)
             agg[f"_w_{stat}"] = (f"_w_{stat}", "sum")
+            agg[f"_pa_{stat}"] = (f"_pa_{stat}", "sum")
 
     grouped = df.groupby(group_cols, as_index=False).agg(**agg)
 
@@ -100,8 +102,13 @@ def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) ->
             continue
         if stat not in SUM_STATS and stat not in MAX_STATS:
             wkey = f"_w_{stat}"
+            pakey = f"_pa_{stat}"
             if wkey in grouped.columns:
-                grouped[stat] = grouped[wkey] / pa_col.replace(0, float("nan"))
+                denom = grouped[pakey] if pakey in grouped.columns else pa_col
+                grouped[stat] = grouped[wkey] / denom.replace(0, float("nan"))
+                drop_cols = [wkey]
+                if pakey in grouped.columns:
+                    drop_cols.append(pakey)
                 grouped.drop(columns=[wkey], inplace=True)
 
     return grouped
@@ -251,15 +258,23 @@ with left_col:
             options=list(TEAM_OPTIONS.keys()),
             format_func=lambda x: TEAM_OPTIONS[x],
         )
-        min_pa = st.number_input(
-            "Min PA", min_value=0, max_value=5000,
+        min_type = st.selectbox("Min Type", ["PA","Inn"])
+        if min_type == "PA":
+            min_pa = st.number_input(
+            "Min PA", min_value=0, max_value=100000,
             value=get_dynamic_min_pa(current_year), step=10,
-        )
+            )
+        else:
+            min_inn = st.number_input(
+            "Min Inn", min_value=0, max_value=100000,
+            value=get_dynamic_min_pa(current_year)*2, step=50,
+            )
         search = st.text_input("Search players (separate by commas)")
     else:
         position = "all"
         team     = "all"
         min_pa   = 0
+        min_inn = 0
         search   = ""
 
     st.divider()
@@ -414,8 +429,12 @@ with right_col:
             df = aggregate_multi_year(df, selected_stats, ["PlayerId"])
             df = df.merge(last, on="PlayerId", how="left")
 
-        if min_pa > 0 and "PA" in df.columns:
-            df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa]
+        if min_type == "PA":
+            if min_pa > 0 and "PA" in df.columns:
+                df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa]
+        else:
+            if min_inn > 0 and "Inn" in df.columns:
+                df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn]
 
         if search.strip():
             terms = [t.strip() for t in search.split(",") if t.strip()]
@@ -467,18 +486,22 @@ with right_col:
 
     PCT_STAT_SET = PCT_STATS | {s for s in stat_cols if "%" in s}
 
-    for stat in PCT_STAT_SET:
+    for stat in stat_cols:
         if stat in display.columns:
-            display[stat] = display[stat].apply(lambda v: format_stat(stat, v))
+            if stat in PCT_STAT_SET:
+                display[stat] = display[stat].apply(lambda v: format_stat(stat, v))
+            else:
+                decimals = STAT_ROUND.get(stat, 1)
+                display[stat] = display[stat].apply(
+                    lambda v, d=decimals: "" if pd.isna(v) else f"{v:.{d}f}"
+                )
 
     col_config: dict = {}
+    rename_map = {stat: STAT_DISPLAY_NAMES.get(stat, stat) for stat in stat_cols}
+    display = display.rename(columns=rename_map)
     for stat in stat_cols:
         label = STAT_DISPLAY_NAMES.get(stat, stat)
-        if stat in PCT_STAT_SET:
-            col_config[stat] = st.column_config.TextColumn(label=label)
-        else:
-            decimals = STAT_ROUND.get(stat, 1)
-            col_config[stat] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f")
+        col_config[stat] = st.column_config.TextColumn(label=label)
 
     year_label = str(year_start) if year_mode == "Single Season" else f"{year_start}–{year_end}"
     if view_mode == "Team":

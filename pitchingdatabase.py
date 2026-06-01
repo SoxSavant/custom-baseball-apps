@@ -77,8 +77,11 @@ def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) ->
         if stat in SUM_STATS:
             agg[stat] = (stat, "sum")
         else:
-            df[f"_w_{stat}"] = df[stat] * df["_outs"]
+            mask = df[stat].notna()
+            df[f"_w_{stat}"] = df[stat] * df["_outs"].where(mask, 0)
+            df[f"_outs_{stat}"] = df["_outs"].where(mask, 0)
             agg[f"_w_{stat}"] = (f"_w_{stat}", "sum")
+            agg[f"_outs_{stat}"] = (f"_outs_{stat}", "sum")
 
     grouped = df.groupby(group_cols, as_index=False).agg(**agg)
     grouped["IP"] = grouped["_outs"].apply(outs_to_ip)
@@ -87,9 +90,14 @@ def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) ->
         if stat not in df.columns or stat == "IP" or stat in SUM_STATS:
             continue
         wkey = f"_w_{stat}"
+        outskey = f"_outs_{stat}"
         if wkey in grouped.columns:
-            grouped[stat] = grouped[wkey] / grouped["_outs"].replace(0, float("nan"))
-            grouped.drop(columns=[wkey], inplace=True)
+            denom = grouped[outskey] if outskey in grouped.columns else grouped["_outs"]
+            grouped[stat] = grouped[wkey] / denom.replace(0, float("nan"))
+            drop_cols = [wkey]
+            if outskey in grouped.columns:
+                drop_cols.append(outskey)
+            grouped.drop(columns=drop_cols, inplace=True)
 
     grouped.drop(columns=[c for c in grouped.columns if c.startswith("_")], inplace=True)
     return grouped
@@ -441,18 +449,24 @@ with right_col:
 
     PCT_STAT_SET = PCT_STATS | {s for s in stat_cols if "%" in s}
 
-    for stat in PCT_STAT_SET:
+    for stat in stat_cols:
         if stat in display.columns:
-            display[stat] = display[stat].apply(lambda v: format_stat(stat, v))
+            if stat in PCT_STAT_SET:
+                display[stat] = display[stat].apply(lambda v: format_stat(stat, v))
+            else:
+                decimals = STAT_ROUND.get(stat, 1)
+                display[stat] = display[stat].apply(
+                    lambda v, d=decimals: "" if pd.isna(v) else f"{v:.{d}f}"
+                )
 
     col_config: dict = {}
     for stat in stat_cols:
         label = STAT_DISPLAY_NAMES.get(stat, stat)
-        if stat in PCT_STAT_SET:
-            col_config[stat] = st.column_config.TextColumn(label=label)
-        else:
-            decimals = STAT_ROUND.get(stat, 1)
-            col_config[stat] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f")
+        col_config[stat] = st.column_config.TextColumn(label=label)
+
+    rename_map = {stat: STAT_DISPLAY_NAMES.get(stat, stat) for stat in stat_cols}
+    display = display.rename(columns=rename_map)
+    col_config = {STAT_DISPLAY_NAMES.get(k, k): v for k, v in col_config.items()}
 
     year_label = str(year_start) if year_mode == "Single Season" else f"{year_start}–{year_end}"
     if view_mode == "Team":
