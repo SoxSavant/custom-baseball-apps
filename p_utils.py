@@ -443,7 +443,7 @@ def load_final_year(year: int) -> pd.DataFrame:
     
 STAT_PRESETS = {
     "Default": [
-        "fWAR", "bWAR",  "GS","ERA", "xERA", "FIP", "IP",
+        "fWAR", "bWAR", "ERA", "xERA", "FIP", "IP",
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
