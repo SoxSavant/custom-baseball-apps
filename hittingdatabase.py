@@ -504,10 +504,14 @@ with right_col:
         col_config[stat] = st.column_config.TextColumn(label=label)
 
     year_label = str(year_start) if year_mode == "Single Season" else f"{year_start}–{year_end}"
-    if view_mode == "Team":
-        mode_label = "Team Seasons" if year_mode == "Split Season" else "Teams"
+    if year_mode == "Single Season":
+        mode_label = "Season"
+    elif year_mode == "Split Season":
+        mode_label = "Split Seasons"
     else:
-        mode_label = "Player Seasons" if year_mode == "Split Season" else "Players"
+        mode_label = "Multi-Year Span"
+        
+    st.caption(f" {mode_label} – {year_label}")
 
     st.dataframe(display, width = "stretch", height=700, column_config=col_config)
 
