@@ -21,6 +21,7 @@ APPS = [
     "https://hitter-indiv-yoy.streamlit.app/",
     "https://pitcher-indiv-yoy.streamlit.app/",
     "https://hitting-database.streamlit.app/",
+    "https://pitching-database.streamlit.app/",
     "https://compositedatabase.streamlit.app/",
 ]
 
