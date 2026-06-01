@@ -810,6 +810,10 @@ for stat in stats_order:
             continue
         try:
             num = float(val)
+            if (
+            "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
+            or "Chase" in stat or "Whiff" in stat or "%" in stat )and stat not in {"Barrel%", "HardHit%"} and num <= 1:
+                v *= 100
             decimals = STAT_ROUND.get(stat,1)
             num = round(num,decimals)
             numeric_vals.append(num)
