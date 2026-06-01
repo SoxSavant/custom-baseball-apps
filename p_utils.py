@@ -259,10 +259,11 @@ def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
             continue
         if col in SUM_STATS:
             result[col] = series.sum(skipna=True)
-        elif col in RATE_STATS and weight_total > 0:
-            result[col] = (series * weight).sum(skipna=True) / weight_total
-        else:
-            result[col] = series.mean(skipna=True)
+        elif col in RATE_STATS: 
+            mask = series.notna()
+            w_stat = weight.where(mask, 0)
+            w_stat_total = w_stat.sum()
+            result[col] = (series * w_stat).sum(skipna=True) / w_stat_total if w_stat_total > 0 else float("nan")
 
     ip_innings = ip_outs_total / 3.0
     bb, so, er, fwar, bwar = (pd.to_numeric(result.get(c), errors="coerce") for c in ("BB", "SO", "ER", "fWAR", "bWAR"))

@@ -255,7 +255,10 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
         elif col in MAX_STATS:
             result[col] = series.max(skipna=True)
         else:
-            result[col] = (series * pa_weight).sum(skipna=True) / pa_total if pa_total > 0 else series.mean(skipna=True)
+            mask = series.notna()
+            pa_stat = pa_weight.where(mask, 0)
+            pa_stat_total = pa_stat.sum()
+            result[col] = (series * pa_stat).sum(skipna=True) / pa_stat_total if pa_stat_total > 0 else float("nan")
 
     h, ab, bb, hbp, sf, tb, fwar, bwar, drs, oaa, frv, frm = (pd.to_numeric(result.get(c), errors="coerce") for c in ("H", "AB", "BB", "HBP", "SF", "TB","fWAR", "bWAR","DRS","OAA","FRV","FRM"))
 
