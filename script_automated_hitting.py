@@ -9,7 +9,7 @@ localUpload = False
 
 upload = True
  
-startYear = 2026
+startYear = 1901
 EndYear = 2026
 
 
@@ -155,7 +155,7 @@ def fetch_fangraphs_batting(year: int) -> pd.DataFrame:
         "Name", "Team", "G", "PA", "HR", "R", "RBI", "SB",
         "BB%", "K%", "ISO", "BABIP", "AVG", "OBP", "SLG",
         "wOBA", "xwOBA", "wRC+", "BsR", "Off", "Def", "fWAR",
-        "OPS", "BB", "IBB", "SO", "HBP", "AB", "H", "1B", "2B", "3B",
+        "OPS", "BB", "IBB", "SO", "HBP", "AB", "H", "1B", "2B", "3B", "SF",
         "BB/K", "WPA", "Clutch",
         "EV", "Barrel%", "maxEV", "HardHit%", "xBA", "xSLG",
         "BatSpd", "SqUpSw%",

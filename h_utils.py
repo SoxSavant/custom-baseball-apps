@@ -19,7 +19,7 @@ STAT_ALLOWLIST = [
     "FRV", "OAA", "DRS",
     "wRC+", "maxEV","OPS", "SLG", "OBP", "AVG", "ISO",
     "BABIP", "G", "PA", "AB", "R", "RBI", "HR", "XBH", "TB", "H",
-    "1B", "2B", "3B", "SB", "BB", "IBB", "SO",
+    "1B", "2B", "3B", "SB", "BB", "IBB", "SO", "HBP","SF",
      "BB/K", "WPA", "Clutch",
      "FRM", "TZ","Swing%", "Z-Swing%", "Z-Swing% - Chase%",
     "O-Contact%", "Z-Contact%", "Zone%",  "Inn",
@@ -225,7 +225,114 @@ def get_team_display(team_value: str) -> str:
         return "2+ Teams"
     return normalize_team(t)
 
-def aggregate_player_group(grp: pd.DataFrame) -> dict:
+def aggregate_player_group(df: pd.DataFrame) -> pd.DataFrame:
+    # ── Numeric coercion ─────────────────────────────────────────────────────
+    for col in df.select_dtypes(include="object").columns:
+        if col not in {"Name", "Team", "Pos", "PlayerId", "MLBAMID"}:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["PA"]  = pd.to_numeric(df.get("PA"),  errors="coerce").fillna(0)
+    df["Inn"] = pd.to_numeric(df.get("Inn"), errors="coerce").fillna(0)
+
+    g = df.groupby("PlayerId", as_index=False)
+
+    # ── Name, MLBAMID from last season ───────────────────────────────────────
+    last = df.sort_values("Season").groupby("PlayerId", as_index=False).last()[
+        ["PlayerId", "Name", "Pos", "MLBAMID"]
+    ]
+
+    # ── Team: 2+ Teams if multiple distinct teams ────────────────────────────
+    team_info = (
+        df.groupby("PlayerId")["Team"]
+        .apply(lambda teams: (
+            "2+ Teams"
+            if len({normalize_team(t) for t in teams if str(t).strip() not in ("", "- - -")}) > 1
+            else normalize_team(str(teams.iloc[0]))
+        ))
+        .reset_index()
+    )
+
+    # ── Sum stats ────────────────────────────────────────────────────────────
+    sum_cols = [c for c in SUM_STATS if c in df.columns]
+    summed = g[sum_cols].sum(min_count=1)
+
+    # ── Max stats ────────────────────────────────────────────────────────────
+    max_cols = [c for c in MAX_STATS if c in df.columns]
+    maxed = g[max_cols].max()
+
+    # ── PA-weighted rate stats ───────────────────────────────────────────────
+    rate_cols = [
+        c for c in df.columns
+        if c not in SUM_STATS and c not in MAX_STATS
+        and c not in {"PlayerId", "MLBAMID", "Season", "Name", "Team", "Pos"}
+        and pd.api.types.is_numeric_dtype(df[c])
+        and c not in {"PA", "Inn"}
+    ]
+
+    rate_parts = {"PlayerId": df["PlayerId"]}
+    for col in rate_cols:
+        mask = df[col].notna()
+        rate_parts[f"_w_{col}"]  = df[col] * df["PA"].where(mask, 0)
+        rate_parts[f"_pa_{col}"] = df["PA"].where(mask, 0)
+
+    rate_df = pd.DataFrame(rate_parts).groupby("PlayerId", as_index=False).sum()
+
+    rated = pd.DataFrame({"PlayerId": rate_df["PlayerId"]})
+    for col in rate_cols:
+        denom = rate_df[f"_pa_{col}"]
+        rated[col] = rate_df[f"_w_{col}"] / denom.replace(0, float("nan"))
+
+    # ── Merge everything ─────────────────────────────────────────────────────
+    result = last.merge(team_info, on="PlayerId", how="left")
+    result = result.merge(summed,  on="PlayerId", how="left")
+    result = result.merge(maxed,   on="PlayerId", how="left")
+    result = result.merge(rated,   on="PlayerId", how="left")
+
+    # ── Recalculate derived stats from aggregated counting stats ─────────────
+    ab   = pd.to_numeric(result.get("AB"),  errors="coerce")
+    h    = pd.to_numeric(result.get("H"),   errors="coerce")
+    bb   = pd.to_numeric(result.get("BB"),  errors="coerce").fillna(0)
+    hbp  = pd.to_numeric(result.get("HBP"), errors="coerce").fillna(0)
+    sf   = pd.to_numeric(result.get("SF"),  errors="coerce").fillna(0)
+    tb   = pd.to_numeric(result.get("TB"),  errors="coerce")
+    pa   = pd.to_numeric(result.get("PA"),  errors="coerce")
+    inn  = pd.to_numeric(result.get("Inn"), errors="coerce")
+    fwar = pd.to_numeric(result.get("fWAR"), errors="coerce")
+    bwar = pd.to_numeric(result.get("bWAR"), errors="coerce")
+    drs  = pd.to_numeric(result.get("DRS"),  errors="coerce")
+    oaa  = pd.to_numeric(result.get("OAA"),  errors="coerce")
+    frv  = pd.to_numeric(result.get("FRV"),  errors="coerce")
+    frm  = pd.to_numeric(result.get("FRM"),  errors="coerce")
+
+    if "AVG" in result.columns:
+        result["AVG"] = h / ab.replace(0, float("nan"))
+    if "SLG" in result.columns:
+        result["SLG"] = tb / ab.replace(0, float("nan"))
+    if "OBP" in result.columns:
+        obp_den = ab.fillna(0) + bb + hbp + sf
+        result["OBP"] = (h + bb + hbp) / obp_den.replace(0, float("nan"))
+    if "OPS" in result.columns:
+        result["OPS"] = result["SLG"] + result["OBP"]
+    if "ISO" in result.columns:
+        result["ISO"] = result["SLG"] - result["AVG"]
+    if "fWAR-bWAR Avg" in result.columns:
+        result["fWAR-bWAR Avg"] = (fwar + bwar) / 2
+    if "fWAR/650" in result.columns:
+        result["fWAR/650"] = fwar / pa.replace(0, float("nan")) * 650
+    if "bWAR/650" in result.columns:
+        result["bWAR/650"] = bwar / pa.replace(0, float("nan")) * 650
+    if "DRS/1350" in result.columns:
+        result["DRS/1350"] = drs / inn.replace(0, float("nan")) * 1350
+    if "OAA/1350" in result.columns:
+        result["OAA/1350"] = oaa / inn.replace(0, float("nan")) * 1350
+    if "FRV/1350" in result.columns:
+        result["FRV/1350"] = frv / inn.replace(0, float("nan")) * 1350
+    if "FRM/1350" in result.columns:
+        result["FRM/1350"] = frm / inn.replace(0, float("nan")) * 1350
+
+    return result
+
+def aggregate_player_group_single(grp: pd.DataFrame) -> dict:
     result: dict = {}
 
     result["Name"] = str(grp["Name"].iloc[0])
@@ -260,16 +367,17 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
             pa_stat_total = pa_stat.sum()
             result[col] = (series * pa_stat).sum(skipna=True) / pa_stat_total if pa_stat_total > 0 else float("nan")
 
-    h, ab, bb, hbp, sf, tb, fwar, bwar, drs, oaa, frv, frm = (pd.to_numeric(result.get(c), errors="coerce") for c in ("H", "AB", "BB", "HBP", "SF", "TB","fWAR", "bWAR","DRS","OAA","FRV","FRM"))
+    h, ab, bb, hbp, sf, tb, fwar, bwar, drs, oaa, frv, frm = (
+        pd.to_numeric(result.get(c), errors="coerce")
+        for c in ("H", "AB", "BB", "HBP", "SF", "TB", "fWAR", "bWAR", "DRS", "OAA", "FRV", "FRM")
+    )
 
     if pd.notna(ab) and ab > 0 and pd.notna(h):
         result["AVG"] = h / ab
     if pd.notna(ab) and ab > 0 and pd.notna(tb):
         result["SLG"] = tb / ab
-    
     if pd.notna(pa_total) and pa_total > 0 and pd.notna(fwar):
         result["fWAR/650"] = fwar / pa_total * 650
-    
     if pd.notna(pa_total) and pa_total > 0 and pd.notna(bwar):
         result["bWAR/650"] = bwar / pa_total * 650
     if pd.notna(inn_total) and inn_total > 0 and pd.notna(drs):
@@ -280,7 +388,7 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
         result["FRV/1350"] = frv / inn_total * 1350
     if pd.notna(inn_total) and inn_total > 0 and pd.notna(frm):
         result["FRM/1350"] = frm / inn_total * 1350
-    result["fWAR-bWAR Avg"] = (fwar + bwar) / 2
+    result["fWAR-bWAR Avg"] = (fwar + bwar) / 2 if pd.notna(fwar) and pd.notna(bwar) else float("nan")
 
     bb_v, hbp_v, sf_v = (0 if pd.isna(v) else v for v in (bb, hbp, sf))
     obp_den = (ab if pd.notna(ab) else 0) + bb_v + hbp_v + sf_v
@@ -288,8 +396,10 @@ def aggregate_player_group(grp: pd.DataFrame) -> dict:
         result["OBP"] = (h + bb_v + hbp_v) / obp_den
 
     slg, obp, avg = (result.get(c) for c in ("SLG", "OBP", "AVG"))
-    if pd.notna(slg) and pd.notna(obp): result["OPS"] = slg + obp
-    if pd.notna(slg) and pd.notna(avg): result["ISO"] = slg - avg
+    if pd.notna(slg) and pd.notna(obp):
+        result["OPS"] = slg + obp
+    if pd.notna(slg) and pd.notna(avg):
+        result["ISO"] = slg - avg
 
     return result
 

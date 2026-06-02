@@ -226,7 +226,100 @@ def get_player_id_by_name(name: str, year: int) -> int | None:
     ids = match["PlayerId"].dropna()
     return int(ids.iloc[0]) if not ids.empty else None
 
-def aggregate_player_group(grp: pd.DataFrame, start_year: int = 2015) -> dict:
+def aggregate_player_group(df: pd.DataFrame) -> pd.DataFrame:
+    # ── Numeric coercion ─────────────────────────────────────────────────────
+    for col in df.select_dtypes(include="object").columns:
+        if col not in {"Name", "Team", "Pos", "PlayerId", "MLBAMID", "IP"}:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # ── IP → outs (vectorized) ───────────────────────────────────────────────
+    df["_outs"] = df["IP"].apply(ip_to_outs)
+
+    # ── Name, MLBAMID from last season ───────────────────────────────────────
+    last = df.sort_values("Season").groupby("PlayerId", as_index=False).last()[
+        ["PlayerId", "Name", "MLBAMID"]
+    ]
+
+    # ── Team ─────────────────────────────────────────────────────────────────
+    team_info = (
+        df.groupby("PlayerId")["Team"]
+        .apply(lambda teams: get_team_display_multiseason(teams.tolist()))
+        .reset_index()
+    )
+
+    # ── IP: sum outs then convert back ───────────────────────────────────────
+    ip_agg = df.groupby("PlayerId", as_index=False)["_outs"].sum()
+    ip_agg["IP"] = ip_agg["_outs"].apply(outs_to_ip)
+    ip_agg["_ip_innings"] = ip_agg["_outs"] / 3.0
+
+# ── TBF ──────────────────────────────────────────────────────────────────
+    if "TBF" not in df.columns or df["TBF"].isna().all():
+        tbf_cols = [c for c in ("H", "BB", "HBP") if c in df.columns]
+        df["_tbf_est"] = df["_outs"] + df[tbf_cols].sum(axis=1)
+        df["TBF"] = df["_tbf_est"]
+
+    # ── Sum stats ────────────────────────────────────────────────────────────
+    sum_cols = [c for c in SUM_STATS if c in df.columns and c != "IP"]
+    summed = df.groupby("PlayerId", as_index=False)[sum_cols].sum(min_count=1)
+
+    # ── Outs-weighted rate stats ─────────────────────────────────────────────
+    rate_cols = [
+        c for c in df.columns
+        if c not in SUM_STATS
+        and c not in {"PlayerId", "MLBAMID", "Season", "Name", "Team", "IP",
+                      "_outs", "_tbf_est", "_ip_innings"}
+        and pd.api.types.is_numeric_dtype(df[c])
+    ]
+
+    rate_parts = {"PlayerId": df["PlayerId"]}
+    for col in rate_cols:
+        mask = df[col].notna()
+        rate_parts[f"_w_{col}"]  = df[col] * df["_outs"].where(mask, 0)
+        rate_parts[f"_ou_{col}"] = df["_outs"].where(mask, 0)
+
+    rate_df = pd.DataFrame(rate_parts).groupby("PlayerId", as_index=False).sum()
+    rated = pd.DataFrame({"PlayerId": rate_df["PlayerId"]})
+    for col in rate_cols:
+        denom = rate_df[f"_ou_{col}"]
+        rated[col] = rate_df[f"_w_{col}"] / denom.replace(0, float("nan"))
+
+    # ── Merge everything ─────────────────────────────────────────────────────
+    result = last.merge(team_info, on="PlayerId", how="left")
+    result = result.merge(ip_agg[["PlayerId", "IP", "_ip_innings"]], on="PlayerId", how="left")
+    result = result.merge(summed,  on="PlayerId", how="left")
+    result = result.merge(rated,   on="PlayerId", how="left")
+
+    # ── Recalculate derived stats ─────────────────────────────────────────────
+    ip  = result["_ip_innings"]
+    tbf = pd.to_numeric(result["TBF"], errors="coerce")
+    bb  = pd.to_numeric(result.get("BB"),   errors="coerce")
+    so  = pd.to_numeric(result.get("SO"),   errors="coerce")
+    er  = pd.to_numeric(result.get("ER"),   errors="coerce")
+    fwar = pd.to_numeric(result.get("fWAR"), errors="coerce")
+    bwar = pd.to_numeric(result.get("bWAR"), errors="coerce")
+
+    if "ERA" in result.columns:
+        result["ERA"] = (er / ip.replace(0, float("nan"))) * 9
+    if "BB%" in result.columns:
+        result["BB%"] = (bb / tbf.replace(0, float("nan"))) * 100
+    if "K%" in result.columns:
+        result["K%"] = (so / tbf.replace(0, float("nan"))) * 100
+    if "BB/9" in result.columns:
+        result["BB/9"] = (bb / ip.replace(0, float("nan"))) * 9
+    if "K/9" in result.columns:
+        result["K/9"] = (so / ip.replace(0, float("nan"))) * 9
+    if "fWAR/200" in result.columns:
+        result["fWAR/200"] = fwar / ip.replace(0, float("nan")) * 200
+    if "bWAR/200" in result.columns:
+        result["bWAR/200"] = bwar / ip.replace(0, float("nan")) * 200
+    if "fWAR-bWAR Avg" in result.columns:
+        result["fWAR-bWAR Avg"] = (fwar + bwar) / 2
+
+    result = result.drop(columns=["_ip_innings"], errors="ignore")
+
+    return result
+
+def aggregate_player_group_single(grp: pd.DataFrame, start_year: int = 2015) -> dict:
     result: dict = {}
 
     result["Name"] = str(grp["Name"].iloc[0])

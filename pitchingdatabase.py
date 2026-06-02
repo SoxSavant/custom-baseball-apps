@@ -4,7 +4,7 @@ from datetime import date
 from p_utils import (
     load_final_year,
     TEAM_OPTIONS, normalize_team,
-    STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, PCT_STATS,
+    STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, PCT_STATS, aggregate_player_group,
     STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES,
     format_stat, ip_to_outs, outs_to_ip, get_last_updated,
     TRUTHY_STRINGS,
@@ -63,43 +63,74 @@ def load_year_range(start: int, end: int) -> pd.DataFrame:
             frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-
 def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) -> pd.DataFrame:
-    df = df.copy()
-    df["_outs"] = pd.to_numeric(df["IP"], errors="coerce").apply(ip_to_outs)
+    agg: dict = {}
 
-    agg: dict = {"_outs": ("_outs", "sum")}
+    if "IP" in df.columns:
+        df["_outs"] = df["IP"].apply(ip_to_outs)
+        agg["_outs"] = ("_outs", "sum")
 
     for stat in stat_cols:
-        if stat not in df.columns or stat == "IP":
+        if stat not in df.columns:
             continue
         df[stat] = pd.to_numeric(df[stat], errors="coerce")
         if stat in SUM_STATS:
             agg[stat] = (stat, "sum")
-        else:
+        elif stat != "IP":
             mask = df[stat].notna()
             df[f"_w_{stat}"] = df[stat] * df["_outs"].where(mask, 0)
-            df[f"_outs_{stat}"] = df["_outs"].where(mask, 0)
+            df[f"_ou_{stat}"] = df["_outs"].where(mask, 0)
             agg[f"_w_{stat}"] = (f"_w_{stat}", "sum")
-            agg[f"_outs_{stat}"] = (f"_outs_{stat}", "sum")
+            agg[f"_ou_{stat}"] = (f"_ou_{stat}", "sum")
 
     grouped = df.groupby(group_cols, as_index=False).agg(**agg)
-    grouped["IP"] = grouped["_outs"].apply(outs_to_ip)
+
+    if "_outs" in grouped.columns:
+        grouped["IP"] = grouped["_outs"].apply(outs_to_ip)
+        ip_innings = grouped["_outs"] / 3.0
+    else:
+        ip_innings = pd.Series(float("nan"), index=grouped.index)
 
     for stat in stat_cols:
-        if stat not in df.columns or stat == "IP" or stat in SUM_STATS:
+        if stat not in df.columns or stat == "IP":
             continue
-        wkey = f"_w_{stat}"
-        outskey = f"_outs_{stat}"
-        if wkey in grouped.columns:
-            denom = grouped[outskey] if outskey in grouped.columns else grouped["_outs"]
-            grouped[stat] = grouped[wkey] / denom.replace(0, float("nan"))
-            drop_cols = [wkey]
-            if outskey in grouped.columns:
-                drop_cols.append(outskey)
-            grouped.drop(columns=drop_cols, inplace=True)
+        if stat not in SUM_STATS:
+            wkey = f"_w_{stat}"
+            oukey = f"_ou_{stat}"
+            if wkey in grouped.columns:
+                denom = grouped[oukey] if oukey in grouped.columns else pd.Series(1, index=grouped.index)
+                grouped[stat] = grouped[wkey] / denom.replace(0, float("nan"))
+                grouped.drop(columns=[wkey], inplace=True)
+                if oukey in grouped.columns:
+                    grouped.drop(columns=[oukey], inplace=True)
 
-    grouped.drop(columns=[c for c in grouped.columns if c.startswith("_")], inplace=True)
+    # Recalculate derived stats
+    tbf  = pd.to_numeric(grouped["TBF"],  errors="coerce") if "TBF"  in grouped.columns else pd.Series(float("nan"), index=grouped.index)
+    bb   = pd.to_numeric(grouped["BB"],   errors="coerce") if "BB"   in grouped.columns else pd.Series(float("nan"), index=grouped.index)
+    so   = pd.to_numeric(grouped["SO"],   errors="coerce") if "SO"   in grouped.columns else pd.Series(float("nan"), index=grouped.index)
+    er   = pd.to_numeric(grouped["ER"],   errors="coerce") if "ER"   in grouped.columns else pd.Series(float("nan"), index=grouped.index)
+    fwar = pd.to_numeric(grouped["fWAR"], errors="coerce") if "fWAR" in grouped.columns else pd.Series(float("nan"), index=grouped.index)
+    bwar = pd.to_numeric(grouped["bWAR"], errors="coerce") if "bWAR" in grouped.columns else pd.Series(float("nan"), index=grouped.index)
+
+    if "ERA" in grouped.columns:
+        grouped["ERA"] = (er / ip_innings.replace(0, float("nan"))) * 9
+    if "BB%" in grouped.columns:
+        grouped["BB%"] = (bb / tbf.replace(0, float("nan"))) * 100
+    if "K%" in grouped.columns:
+        grouped["K%"] = (so / tbf.replace(0, float("nan"))) * 100
+    if "BB/9" in grouped.columns:
+        grouped["BB/9"] = (bb / ip_innings.replace(0, float("nan"))) * 9
+    if "K/9" in grouped.columns:
+        grouped["K/9"] = (so / ip_innings.replace(0, float("nan"))) * 9
+    if "fWAR/200" in grouped.columns:
+        grouped["fWAR/200"] = fwar / ip_innings.replace(0, float("nan")) * 200
+    if "bWAR/200" in grouped.columns:
+        grouped["bWAR/200"] = bwar / ip_innings.replace(0, float("nan")) * 200
+    if "fWAR-bWAR Avg" in grouped.columns:
+        grouped["fWAR-bWAR Avg"] = (fwar + bwar) / 2
+
+    grouped.drop(columns=["_outs"], errors="ignore", inplace=True)
+
     return grouped
 
 
@@ -390,10 +421,7 @@ with right_col:
             df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
 
         if multi_year:
-            sorted_df = df.sort_values("Year")
-            last = sorted_df.groupby("PlayerId", as_index=False).last()[["PlayerId", "Name", "Team"]]
-            df = aggregate_multi_year(df, selected_stats, ["PlayerId"])
-            df = df.merge(last, on="PlayerId", how="left")
+            df = aggregate_player_group(df)
 
         if min_ip > 0 and "IP" in df.columns:
             df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip]

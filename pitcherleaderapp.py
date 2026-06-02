@@ -88,11 +88,7 @@ def load_data(start_year: int, end_year: int, mode: str) -> pd.DataFrame:
     if mode == MODE_SPLIT:
         return combined
 
-    grouped_rows = []
-    for _, grp in combined.groupby("PlayerId"):
-        grouped_rows.append(aggregate_player_group(grp))
-
-    return pd.DataFrame(grouped_rows)
+    return aggregate_player_group(combined)
     
 
 from utils import get_dynamic_min_ip

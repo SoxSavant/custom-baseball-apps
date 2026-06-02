@@ -44,7 +44,7 @@ st.markdown(
             --stat-col-width: 120px;
             --headshot-col-width: 220px;
             --headshot-img-width: 200px;
-            --player-name-size: 1.35rem;
+            --player-name-size: 1rem;
             --player-meta-size: 1.3rem;
         }
         [data-testid="stToolbar"] {visibility: hidden;}
@@ -254,10 +254,10 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
     if not frames:
         return None
     combined = pd.concat(frames, ignore_index=True)
-    agg = aggregate_player_group(combined, start_year=start_year)
-    if not agg:
+    agg = aggregate_player_group(combined)
+    if agg is None or agg.empty:
         return None
-    return pd.Series(agg)
+    return agg.iloc[0]
 
 
 def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:

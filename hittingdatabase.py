@@ -5,9 +5,10 @@ from h_utils import (
     load_final_year,
     POSITION_OPTIONS, TEAM_OPTIONS, normalize_team,
     apply_dh_override,
+    filter_by_position,
     STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, MAX_STATS,
     STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES, get_last_updated,
-    format_stat,
+    format_stat,aggregate_player_group
 )
 from utils import get_dynamic_min_pa
 
@@ -71,7 +72,6 @@ def load_year_range(start: int, end: int) -> pd.DataFrame:
             frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-
 def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) -> pd.DataFrame:
     agg: dict = {}
 
@@ -96,7 +96,6 @@ def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) ->
 
     grouped = df.groupby(group_cols, as_index=False).agg(**agg)
 
-    pa_col = grouped["PA"] if "PA" in grouped.columns else pd.Series(1, index=grouped.index)
     for stat in stat_cols:
         if stat not in df.columns:
             continue
@@ -104,15 +103,13 @@ def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) ->
             wkey = f"_w_{stat}"
             pakey = f"_pa_{stat}"
             if wkey in grouped.columns:
-                denom = grouped[pakey] if pakey in grouped.columns else pa_col
+                denom = grouped[pakey] if pakey in grouped.columns else pd.Series(1, index=grouped.index)
                 grouped[stat] = grouped[wkey] / denom.replace(0, float("nan"))
-                drop_cols = [wkey]
-                if pakey in grouped.columns:
-                    drop_cols.append(pakey)
                 grouped.drop(columns=[wkey], inplace=True)
+                if pakey in grouped.columns:
+                    grouped.drop(columns=[pakey], inplace=True)
 
     return grouped
-
 
 last_updated = get_last_updated(current_year)
 st.caption(f"{current_year} data last updated: {last_updated}")
@@ -410,25 +407,15 @@ with right_col:
     multi_year = (year_start != year_end) and (year_mode == "Multi-Year Span")
 
     if view_mode == "Player":
+        if multi_year:
+            df = aggregate_player_group(df)
         if position != "all":
-            pos = position.upper()
-            if pos == "OF":
-                df = df[df["Pos"].isin({"LF", "CF", "RF", "OF"})]
-            else:
-                df = df[df["Pos"] == pos]
-
+            df = filter_by_position(df, position)
         if team != "all" and "Team" in df.columns:
             target = normalize_team(team)
             df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
 
-        if multi_year:
-            sorted_df = df.sort_values("Year")
-            last = sorted_df.groupby("PlayerId", as_index=False).last()[
-                ["PlayerId", "Name", "Team", "Pos"]
-            ]
-            df = aggregate_multi_year(df, selected_stats, ["PlayerId"])
-            df = df.merge(last, on="PlayerId", how="left")
-
+    
         if min_type == "PA":
             if min_pa > 0 and "PA" in df.columns:
                 df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa]

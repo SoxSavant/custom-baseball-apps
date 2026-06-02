@@ -306,10 +306,10 @@ def build_player_profile(player_id: int, start_year: int, end_year: int) -> pd.S
 
     combined = pd.concat(frames, ignore_index=True)
     agg = aggregate_player_group(combined)
-    if not agg:
+    if agg is None or agg.empty:
         return None
+    return agg.iloc[0]
 
-    return pd.Series(agg)
 
 
 # layout
@@ -813,7 +813,7 @@ for stat in stats_order:
             if (
             "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
             or "Chase" in stat or "Whiff" in stat or "%" in stat )and stat not in {"Barrel%", "HardHit%"} and num <= 1:
-                v *= 100
+                num *= 100
             decimals = STAT_ROUND.get(stat,1)
             num = round(num,decimals)
             numeric_vals.append(num)

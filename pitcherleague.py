@@ -107,11 +107,7 @@ def load_data(s_year: int, e_year: int, mode: str) -> pd.DataFrame:
     if "PlayerId" not in combined.columns:
         return combined
 
-    grouped_rows = []
-    for _, grp in combined.groupby("PlayerId"):
-        grouped_rows.append(aggregate_player_group(grp))
-
-    return pd.DataFrame(grouped_rows)
+    return aggregate_player_group(combined)
 
 min_ip = get_dynamic_min_ip(current_year)
 default_stats = list(PRESETS["Statcast"])

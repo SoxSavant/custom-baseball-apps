@@ -54,7 +54,7 @@ current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
 from h_utils import (
-    STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group,
+    STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group_single,
     label_map, lower_better, start_year, POSITION_OPTIONS,
     normalize_team, get_team_display, filter_by_position, load_final_year, TEAMS, STAT_ROUND
 )
@@ -110,7 +110,7 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
     grouped_rows = []
     group_cols = ["PlayerId", "TeamNorm"] if "TeamNorm" in combined.columns else ["PlayerId"]
     for _, grp in combined.groupby(group_cols):
-        grouped_rows.append(aggregate_player_group(grp))
+        grouped_rows.append(aggregate_player_group_single(grp))
 
     return pd.DataFrame(grouped_rows)
 
