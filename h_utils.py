@@ -599,7 +599,7 @@ STAT_PRESETS = {
     ],
    
     "Statcast": [
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%",  "Sweet-Spot%",
         "BatSpd","Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
@@ -682,7 +682,7 @@ STAT_PRESETS_DATABASE = {
     ],
    
     "Statcast": [
-        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", 
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "Sweet-Spot%",
         "BatSpd","Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
