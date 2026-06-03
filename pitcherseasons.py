@@ -158,6 +158,8 @@ for stat, op, val in active_filters:
     if stat not in df_all.columns:
         continue
     col_vals = pd.to_numeric(df_all[stat], errors="coerce")
+    decimals = STAT_ROUND.get(stat, 0)
+    col_vals = col_vals.round(decimals)
     compare_val = val
     if stat in PCT_STATS:
         # Auto-convert percentage inputs to decimals if data is stored as decimals

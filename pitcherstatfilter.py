@@ -235,6 +235,8 @@ if not df.empty:
         if stat not in df.columns:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
+        decimals = STAT_ROUND.get(stat, 0)
+        col_vals = col_vals.round(decimals)
         compare_val = val
         if stat in PCT_STATS:
             median_col = col_vals.median()

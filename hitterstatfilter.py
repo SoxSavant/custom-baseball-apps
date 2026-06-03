@@ -270,6 +270,8 @@ if not df.empty:
         if stat not in df.columns:
             continue
         col_vals = pd.to_numeric(df[stat], errors="coerce")
+        decimals = STAT_ROUND.get(stat, 0)
+        col_vals = col_vals.round(decimals)
         compare_val = val
         if stat in RATE_STATS and "1350" not in stat:
             median_col = col_vals.median()
@@ -277,7 +279,6 @@ if not df.empty:
                 if val > 1:
                     compare_val = val / 100
         mask = mask & (col_vals >= compare_val if op == ">=" else col_vals <= compare_val)
-
     df = df[mask]
     total_qualified = len(df)
 
