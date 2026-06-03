@@ -60,13 +60,17 @@ PCT_STATS = {
 }
 
 
-def load_year_range(start: int, end: int) -> pd.DataFrame:
+def load_year_range(start: int, end: int, position: str = "all") -> pd.DataFrame:
     frames = []
     for yr in range(start, end + 1):
         df = load_final_year(yr)
         if df is not None and not df.empty:
             df = df.copy()
             df["Year"] = yr
+            if position != "all":
+                df["Pos"] = df["Pos"].astype(str).str.strip().str.upper()
+                df = apply_dh_override(df)
+                df = filter_by_position(df, position)
             frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
@@ -333,7 +337,8 @@ with right_col:
         if df is not None and not df.empty:
             df["Year"] = year_start
     else:
-        df = load_year_range(year_start, year_end)
+        split_position = position if year_mode == "Split Season" else "all"
+        df = load_year_range(year_start, year_end, position=split_position)
 
     if df is None or df.empty:
         st.error("No data found for the selected year(s).")
@@ -347,7 +352,7 @@ with right_col:
     if multi_year:
         df = aggregate_player_group(df)
 
-    if position != "all":
+    if position != "all" and year_mode != "Split Season":
         df = filter_by_position(df, position)
 
     if team != "all" and "Team" in df.columns:

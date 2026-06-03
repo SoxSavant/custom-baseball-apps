@@ -88,6 +88,8 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
     for year in range(start_yr, end_yr + 1):
         df = load_final_year(year)
         if df is not None and not df.empty:
+            if mode == MODE_SPLIT:
+                df = filter_by_position(df,position_val)
             frames.append(df)
 
     if not frames:
@@ -243,7 +245,7 @@ else:
     if min_pa_val > 0 and "PA" in df.columns:
         df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
-if mode != MODE_MULTI:
+if mode == MODE_SINGLE:
     df = filter_by_position(df, position_val)
 
 if "Team" in df.columns:
