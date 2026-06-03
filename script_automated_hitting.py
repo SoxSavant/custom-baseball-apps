@@ -9,7 +9,7 @@ localUpload = False
 
 upload = True
  
-startYear = 1901
+startYear = 2026
 EndYear = 2026
 
 

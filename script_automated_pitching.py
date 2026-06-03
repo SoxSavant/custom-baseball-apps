@@ -81,7 +81,7 @@ def fetch_fangraphs_pitching(year: int) -> pd.DataFrame:
         "xMLBAMID":   "MLBAMID",
         "PlayerName": "NameASCII",
         "pivFA":      "vFA",
-        "piO-Swing%": "Chase%",
+        "scO-Swing%": "Chase%",
         "piContact%": "Whiff%",
     })
     return df[[

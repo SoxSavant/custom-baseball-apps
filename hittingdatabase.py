@@ -8,7 +8,7 @@ from h_utils import (
     filter_by_position,
     STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, MAX_STATS,
     STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES, get_last_updated,
-    format_stat,aggregate_player_group
+    format_stat, aggregate_player_group
 )
 from utils import get_dynamic_min_pa
 
@@ -51,8 +51,6 @@ with meta_col:
 current_year = date.today().year
 START_YEAR   = 1901
 
-MULTI_TEAM_PLACEHOLDERS = {"---", "TOT", "2TM", "3TM", "4TM", "- - -", ""}
-
 TRUTHY_STRINGS = {"true", "1", "yes", "on"}
 
 PCT_STATS = {
@@ -72,52 +70,7 @@ def load_year_range(start: int, end: int) -> pd.DataFrame:
             frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-def aggregate_multi_year(df: pd.DataFrame, stat_cols: list, group_cols: list) -> pd.DataFrame:
-    agg: dict = {}
 
-    if "PA" in df.columns:
-        df["PA"] = pd.to_numeric(df["PA"], errors="coerce").fillna(0)
-        agg["PA"] = ("PA", "sum")
-
-    for stat in stat_cols:
-        if stat not in df.columns:
-            continue
-        df[stat] = pd.to_numeric(df[stat], errors="coerce")
-        if stat in SUM_STATS:
-            agg[stat] = (stat, "sum")
-        elif stat in MAX_STATS:
-            agg[stat] = (stat, "max")
-        else:
-            mask = df[stat].notna()
-            df[f"_w_{stat}"] = df[stat] * df["PA"].where(mask, 0)
-            df[f"_pa_{stat}"] = df["PA"].where(mask, 0)
-            agg[f"_w_{stat}"] = (f"_w_{stat}", "sum")
-            agg[f"_pa_{stat}"] = (f"_pa_{stat}", "sum")
-
-    grouped = df.groupby(group_cols, as_index=False).agg(**agg)
-
-    for stat in stat_cols:
-        if stat not in df.columns:
-            continue
-        if stat not in SUM_STATS and stat not in MAX_STATS:
-            wkey = f"_w_{stat}"
-            pakey = f"_pa_{stat}"
-            if wkey in grouped.columns:
-                denom = grouped[pakey] if pakey in grouped.columns else pd.Series(1, index=grouped.index)
-                grouped[stat] = grouped[wkey] / denom.replace(0, float("nan"))
-                grouped.drop(columns=[wkey], inplace=True)
-                if pakey in grouped.columns:
-                    grouped.drop(columns=[pakey], inplace=True)
-
-    return grouped
-
-last_updated = get_last_updated(current_year)
-st.caption(f"{current_year} data last updated: {last_updated}")
-
-# ── Layout: left controls + right dataframe ──────────────────────────────────
-left_col, right_col = st.columns([1, 2.8])
-
-# ── Stat builder state keys ───────────────────────────────────────────────────
 STAT_STATE_KEY    = "hdb_stat_config"
 STAT_PRESET_KEY   = "hdb_stat_preset"
 STAT_VERSION_KEY  = "hdb_stat_version"
@@ -127,9 +80,9 @@ REMOVE_SELECT_KEY = "hdb_remove_stat_select"
 ADD_RESET_KEY     = "hdb_add_reset"
 REMOVE_RESET_KEY  = "hdb_remove_reset"
 
-stat_options = list(STAT_ALLOWLIST)
+stat_options        = list(STAT_ALLOWLIST)
 default_preset_name = list(STAT_PRESETS_DATABASE.keys())[0]
-preset_options = list(STAT_PRESETS_DATABASE.keys())
+preset_options      = list(STAT_PRESETS_DATABASE.keys())
 
 _sentinel_add    = "Add stat"
 _sentinel_remove = "Remove stat"
@@ -216,23 +169,24 @@ def move_stat_row(delta, index, fallback):
         st.session_state[STAT_MANUAL_KEY] = True
 
 
-# Initialise state
 if STAT_STATE_KEY not in st.session_state:
     st.session_state[STAT_PRESET_KEY] = default_preset_name
-    st.session_state[STAT_STATE_KEY] = _preset_base(default_preset_name)
+    st.session_state[STAT_STATE_KEY]  = _preset_base(default_preset_name)
     st.session_state[STAT_VERSION_KEY] = 0
 
-current_preset = st.session_state.get(STAT_PRESET_KEY, default_preset_name)
-preset_base_config = _preset_base(current_preset)
+current_preset      = st.session_state.get(STAT_PRESET_KEY, default_preset_name)
+preset_base_config  = _preset_base(current_preset)
 current_stat_config = normalize_stat_rows(
     st.session_state.get(STAT_STATE_KEY, preset_base_config), preset_base_config
 )
 
-# ── LEFT PANEL ────────────────────────────────────────────────────────────────
+last_updated = get_last_updated(current_year)
+st.caption(f"{current_year} data last updated: {last_updated}")
+
+left_col, right_col = st.columns([1, 2.8])
+
 with left_col:
     st.markdown("### Filters")
-
-    view_mode = st.radio("View", ["Player", "Team"], horizontal=True, label_visibility="collapsed")
 
     year_mode = st.selectbox("Year Mode", ["Single Season", "Multi-Year Span", "Split Season"])
 
@@ -242,41 +196,28 @@ with left_col:
     else:
         year_start = st.selectbox("From", list(range(current_year, START_YEAR - 1, -1)), index=4)
         valid_ends = list(range(current_year, year_start - 1, -1))
-        year_end = st.selectbox("To", valid_ends, index=0)
+        year_end   = st.selectbox("To", valid_ends, index=0)
 
-    if view_mode == "Player":
-        position = st.selectbox(
-            "Position",
-            options=list(POSITION_OPTIONS.keys()),
-            format_func=lambda x: POSITION_OPTIONS[x],
-        )
-        team = st.selectbox(
-            "Team",
-            options=list(TEAM_OPTIONS.keys()),
-            format_func=lambda x: TEAM_OPTIONS[x],
-        )
-        min_type = st.selectbox("Min Type", ["PA","Inn"])
-        if min_type == "PA":
-            min_pa = st.number_input(
-            "Min PA", min_value=0, max_value=100000,
-            value=get_dynamic_min_pa(current_year), step=10,
-            )
-        else:
-            min_inn = st.number_input(
-            "Min Inn", min_value=0, max_value=100000,
-            value=get_dynamic_min_pa(current_year)*2, step=50,
-            )
-        search = st.text_input("Search players (separate by commas)")
-    else:
-        position = "all"
-        team     = "all"
-        min_pa   = 0
+    position = st.selectbox(
+        "Position",
+        options=list(POSITION_OPTIONS.keys()),
+        format_func=lambda x: POSITION_OPTIONS[x],
+    )
+    team = st.selectbox(
+        "Team",
+        options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x],
+    )
+    min_type = st.selectbox("Min Type", ["PA", "Inn"])
+    if min_type == "PA":
+        min_pa  = st.number_input("Min PA", min_value=0, max_value=100000, value=get_dynamic_min_pa(current_year), step=10)
         min_inn = 0
-        search   = ""
+    else:
+        min_inn = st.number_input("Min Inn", min_value=0, max_value=100000, value=get_dynamic_min_pa(current_year) * 2, step=50)
+        min_pa  = 0
+    search = st.text_input("Search players (separate by commas)")
 
     st.divider()
-
-    # ── Stat Builder ─────────────────────────────────────────────────────────
     st.markdown("### Stats")
 
     prior_preset = st.session_state.get(STAT_PRESET_KEY, default_preset_name)
@@ -313,7 +254,6 @@ with left_col:
             key=REMOVE_SELECT_KEY, on_change=remove_stat_callback,
         )
 
-    # Re-read config after potential callbacks
     current_stat_config = normalize_stat_rows(
         st.session_state.get(STAT_STATE_KEY, preset_base_config), preset_base_config
     )
@@ -330,7 +270,7 @@ with left_col:
             "Show": st.column_config.CheckboxColumn("Show"),
         },
         hide_index=True,
-        width = "stretch",
+        width="stretch",
         num_rows="fixed",
         key="hdb_stat_editor",
     )
@@ -378,13 +318,11 @@ with left_col:
         st.session_state.get(STAT_STATE_KEY, current_stat_config), preset_base_config
     )
 
-# ── Derive the final visible stat list ───────────────────────────────────────
 selected_stats = [
     r["Stat"] for r in st.session_state.get(STAT_STATE_KEY, current_stat_config)
     if r.get("Show", True)
 ]
 
-# ── RIGHT PANEL — data loading & display ─────────────────────────────────────
 with right_col:
     if not selected_stats:
         st.warning("Select at least one stat.")
@@ -406,52 +344,37 @@ with right_col:
 
     multi_year = (year_start != year_end) and (year_mode == "Multi-Year Span")
 
-    if view_mode == "Player":
-        if multi_year:
-            df = aggregate_player_group(df)
-        if position != "all":
-            df = filter_by_position(df, position)
-        if team != "all" and "Team" in df.columns:
-            target = normalize_team(team)
-            df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+    if multi_year:
+        df = aggregate_player_group(df)
 
-    
-        if min_type == "PA":
-            if min_pa > 0 and "PA" in df.columns:
-                df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa]
-        else:
-            if min_inn > 0 and "Inn" in df.columns:
-                df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn]
+    if position != "all":
+        df = filter_by_position(df, position)
 
-        if search.strip():
-            terms = [t.strip() for t in search.split(",") if t.strip()]
-            if terms:
-                mask = pd.Series(False, index=df.index)
-                for term in terms:
-                    mask |= df["Name"].astype(str).str.contains(term, case=False, na=False)
-                df = df[mask]
+    if team != "all" and "Team" in df.columns:
+        target = normalize_team(team)
+        df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
 
-        if year_mode == "Split Season":
-            base_cols = [c for c in ["Name", "Team", "Year", "Pos"] if c in df.columns]
-        else:
-            base_cols = [c for c in ["Name", "Team", "Pos"] if c in df.columns]
+    if min_type == "PA":
+        if min_pa > 0 and "PA" in df.columns:
+            df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa]
+    else:
+        if min_inn > 0 and "Inn" in df.columns:
+            df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn]
 
-        default_sort = next((s for s in selected_stats if s in df.columns), None)
+    if search.strip():
+        terms = [t.strip() for t in search.split(",") if t.strip()]
+        if terms:
+            mask = pd.Series(False, index=df.index)
+            for term in terms:
+                mask |= df["Name"].astype(str).str.contains(term, case=False, na=False)
+            df = df[mask]
 
-    elif view_mode == "Team":
-        if "Team" in df.columns:
-            df = df[~df["Team"].astype(str).str.strip().str.upper().isin(MULTI_TEAM_PLACEHOLDERS)]
-            group_cols = ["Team", "Year"] if year_mode == "Split Season" else ["Team"]
-            df = aggregate_multi_year(df, selected_stats, group_cols)
-        else:
-            st.error("No Team column found in data.")
-            st.stop()
+    if year_mode == "Split Season":
+        base_cols = [c for c in ["Name", "Team", "Year", "Pos"] if c in df.columns]
+    else:
+        base_cols = [c for c in ["Name", "Team", "Pos"] if c in df.columns]
 
-        base_cols = ["Team", "Year"] if year_mode == "Split Season" else ["Team"]
-        if "PA" in df.columns:
-            base_cols.append("PA")
-
-        default_sort = next((s for s in selected_stats if s in df.columns), None)
+    default_sort = next((s for s in selected_stats if s in df.columns), None)
 
     seen = set()
     deduped_stats = []
@@ -485,7 +408,7 @@ with right_col:
 
     col_config: dict = {}
     rename_map = {stat: STAT_DISPLAY_NAMES.get(stat, stat) for stat in stat_cols}
-    display = display.rename(columns=rename_map)
+    display    = display.rename(columns=rename_map)
     for stat in stat_cols:
         label = STAT_DISPLAY_NAMES.get(stat, stat)
         col_config[stat] = st.column_config.TextColumn(label=label)
@@ -497,10 +420,10 @@ with right_col:
         mode_label = "Split Seasons"
     else:
         mode_label = "Multi-Year Span"
-        
+
     st.caption(f" {mode_label} – {year_label}")
 
-    st.dataframe(display, width = "stretch", height=700, column_config=col_config)
+    st.dataframe(display, width="stretch", height=700, column_config=col_config)
 
     st.markdown(
         "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem;'>"

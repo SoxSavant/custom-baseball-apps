@@ -105,6 +105,7 @@ RATE_STATS = {
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
     "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB","fWAR/200", "bWAR/200", "ERA-xERA",
+    "ER","SO","BB","TBF"
 }
 
 PCT_STATS = {
