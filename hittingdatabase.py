@@ -6,7 +6,7 @@ from h_utils import (
     POSITION_OPTIONS, TEAM_OPTIONS, normalize_team,
     apply_dh_override,
     filter_by_position,
-    STAT_ALLOWLIST, STAT_ROUND, SUM_STATS, MAX_STATS,
+    STAT_ALLOWLIST, STAT_ROUND,
     STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES, get_last_updated,
     format_stat, aggregate_player_group
 )
@@ -403,9 +403,7 @@ with right_col:
 
     for stat in stat_cols:
         if stat in display.columns:
-            if stat in PCT_STAT_SET:
-                display[stat] = display[stat].apply(lambda v: format_stat(stat, v))
-            else:
+            if stat not in PCT_STAT_SET:
                 decimals = STAT_ROUND.get(stat, 1)
                 display[stat] = display[stat].apply(
                     lambda v, d=decimals: "" if pd.isna(v) else f"{v:.{d}f}"
@@ -416,7 +414,12 @@ with right_col:
     display    = display.rename(columns=rename_map)
     for stat in stat_cols:
         label = STAT_DISPLAY_NAMES.get(stat, stat)
-        col_config[stat] = st.column_config.TextColumn(label=label)
+        decimals = STAT_ROUND.get(stat, 1)
+        if stat in PCT_STAT_SET:
+            col_config[label] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f%%")
+        else:
+            decimals = STAT_ROUND.get(stat, 1)
+            col_config[label] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f")
 
     year_label = str(year_start) if year_mode == "Single Season" else f"{year_start}–{year_end}"
     if year_mode == "Single Season":

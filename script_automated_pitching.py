@@ -9,8 +9,12 @@ localUpload = False
 
 upload = True
 
-startYear = 2026
-EndYear = 2026
+startYear = 2004
+EndYear = 2025
+
+MULTIPLY_100_IF_DECIMAL = {
+    "Whiff%", "Chase%", "K%", "BB%",
+}
 
 
 def fetch_bwar(year: int) -> pd.DataFrame:
@@ -99,11 +103,12 @@ def fetch_fangraphs_pitching(year: int) -> pd.DataFrame:
 for YEAR in range(startYear,EndYear+1):
     year_bwar = fetch_bwar(YEAR)
 
-    ev_df = fetch_statcast_ev_pitching(YEAR)
-
-    xera_df = fetch_xera(YEAR)
-
-    savant_df = ev_df.merge(xera_df, on="player_id", how="outer")
+    if YEAR >= 2015:
+        ev_df = fetch_statcast_ev_pitching(YEAR)
+        xera_df = fetch_xera(YEAR)
+        savant_df = ev_df.merge(xera_df, on="player_id", how="outer")
+    else:
+        savant_df = pd.DataFrame(columns=["player_id", "EV", "HardHit%", "Barrel%", "xERA_sv"])
    
     final = fetch_fangraphs_pitching(YEAR)
     final.columns = final.columns.str.strip().str.replace('\ufeff', '')
@@ -129,6 +134,13 @@ for YEAR in range(startYear,EndYear+1):
     final["xERA"]              = final["xERA_sv"].fillna(final["xERA"])
     final["ERA-xERA"]          = final["ERA"] - final["xERA"]
     final.drop(columns=["xERA_sv"], inplace=True)
+
+    for col in MULTIPLY_100_IF_DECIMAL:
+        if col in final.columns:
+            numeric = pd.to_numeric(final[col], errors="coerce")
+            if numeric.median() <= 1:
+                final[col] = numeric * 100
+        
     for col in STAT_ALLOWLIST:
         if col not in final.columns:
             final[col] = None

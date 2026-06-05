@@ -9,10 +9,14 @@ localUpload = False
 
 upload = True
  
-startYear = 2026
+startYear = 2007
 EndYear = 2026
 
-
+MULTIPLY_100_IF_DECIMAL = {
+    "Whiff%", "Chase%", "K%", "BB%", "Swing%", "Z-Swing%",
+    "Z-Swing% - Chase%", "O-Contact%", "Z-Contact%", "Zone%",
+    "Sweet-Spot%", "Squared-Up%",
+}
 
 def fetch_bwar(year: int) -> pd.DataFrame:
     url = "https://www.baseball-reference.com/data/war_daily_bat.txt"
@@ -254,15 +258,22 @@ def fetch_fielding(year: int) -> pd.DataFrame:
     return agg.merge(pos, on="PlayerId", how="left")
 
 for YEAR in range(startYear, EndYear + 1):
+    
+    year_bwar   = fetch_bwar(YEAR)
+    fielding_fg = fetch_fielding(YEAR)
 
-    # --- Fetch all sources ---
-    year_bwar      = fetch_bwar(YEAR)
-    sv_df          = fetch_statcast_ev(YEAR)
-    xw_df          = fetch_expected_stats(YEAR)
-    battracking_df = fetch_bat_tracking(YEAR)
-    fielding_fg    = fetch_fielding(YEAR)   # PlayerId, DRS, FRM, Pos, Inn
-    fielding_frv   = fetch_frv(YEAR)        # MLBAMID, FRV
-    fielding_oaa   = fetch_oaa(YEAR)        # MLBAMID, OAA
+    if YEAR >= 2015:
+        sv_df          = fetch_statcast_ev(YEAR)
+        xw_df          = fetch_expected_stats(YEAR)
+        battracking_df = fetch_bat_tracking(YEAR)
+        fielding_frv   = fetch_frv(YEAR)
+        fielding_oaa   = fetch_oaa(YEAR)
+    else:
+        sv_df          = pd.DataFrame(columns=["player_id", "EV", "maxEV", "HardHit%", "Barrel%", "Sweet-Spot%"])
+        xw_df          = pd.DataFrame(columns=["player_id", "xBA", "xSLG", "xwOBA", "wOBA"])
+        battracking_df = pd.DataFrame(columns=["player_id", "BatSpd", "Squared-Up%"])
+        fielding_frv   = pd.DataFrame(columns=["MLBAMID", "FRV"])
+        fielding_oaa   = pd.DataFrame(columns=["MLBAMID", "OAA"])
 
     # --- Base: FanGraphs batting ---
     final = fetch_fangraphs_batting(YEAR)
@@ -312,10 +323,17 @@ for YEAR in range(startYear, EndYear + 1):
     final["FRV/1350"]          = (final["FRV"] / final["Inn"] * 1350).round(0)
     final["FRM/1350"]          = (final["FRM"] / final["Inn"] * 1350).round(1)
 
+    for col in MULTIPLY_100_IF_DECIMAL:
+        if col in final.columns:
+            numeric = pd.to_numeric(final[col], errors="coerce")
+            if numeric.median() <= 1:
+                final[col] = numeric * 100
+
     # --- Ensure every allowlisted col is present ---
     for col in STAT_ALLOWLIST:
         if col not in final.columns:
             final[col] = None
+
 
     final = final[["Name", "PlayerId", "MLBAMID", "Pos", "Team"] + list(STAT_ALLOWLIST)]
 
