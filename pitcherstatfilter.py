@@ -5,6 +5,8 @@ import numpy as np
 import html
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Pitcher Stat Filter Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -55,7 +57,7 @@ last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
 
 from p_utils import (
-    STAT_ALLOWLIST, TEAM_OPTIONS, format_stat,
+    STAT_ALLOWLIST, format_stat,
     get_headshot, label_map, lower_better, start_year, STAT_DEFAULTS,
     normalize_team, get_team_display, load_final_year, aggregate_player_group,
     STAT_ROUND, STAT_DISPLAY_NAMES, PCT_STATS,
@@ -119,6 +121,7 @@ for key, default in [
     ("pc_val_0",       3.00),
     ("pc_val_1",       3.00),
     ("pc_view",        "Graphic"),
+    ("pc_league", "All"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -190,6 +193,15 @@ with col1:
         help="Team filter unavailable for multi-year span" if team_disabled else None,
     )
 
+    league_disabled = (sel_start < 2013)
+    st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        key="pc_league",
+        disabled=team_disabled or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible inaccuracies" if league_disabled else None,
+    )
+
     if view_mode == "Graphic":
         st.checkbox("Show player IP",      key="pc_show_ip")
         st.checkbox("Show min IP",         key="pc_show_min_ip")
@@ -199,6 +211,7 @@ sel_start  = int(sel_start)
 sel_end    = int(max(sel_start, sel_end))
 min_ip_val = int(st.session_state["pc_min_ip"])
 team_val   = "all" if team_disabled else st.session_state["pc_team"]
+league_val = "All" if team_disabled or league_disabled else st.session_state.get("pc_league", "All")
 
 # ── Load & filter data (shared) ───────────────────────────────────────────────
 
@@ -214,6 +227,14 @@ if min_ip_val > 0 and "IP" in df.columns:
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(normalize_team) == target]
+
+if league_val != "All" and "Team" in df.columns:
+    league_teams = LEAGUES[league_val]
+    df = df[
+        df["Team"].astype(str).apply(
+            lambda t: normalize_team(t) in league_teams
+        )
+    ]
 
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
@@ -263,7 +284,8 @@ filter_str   = ", ".join(filter_parts)
 span_label   = f"{sel_start}" if mode == MODE_SINGLE else f"{sel_start}–{sel_end}"
 mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
 team_suffix  = f" ({team_val})" if team_val != "all" else ""
-title        = f"{filter_str} in {span_label}{mode_label}{team_suffix}"
+league_suffix = f" ({league_val})" if league_val != "All" else ""
+title        = f"{filter_str} in {span_label}{mode_label}{league_suffix}{team_suffix}"
 
 # ── GRAPHIC VIEW ──────────────────────────────────────────────────────────────
 

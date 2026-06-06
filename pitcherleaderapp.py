@@ -6,6 +6,8 @@ import html
 import re
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Custom Pitching Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -60,7 +62,7 @@ st.caption(f"2026 data last updated: {last_updated}")
 
 from p_utils import (
     STAT_ALLOWLIST, start_year,
-    get_headshot, label_map, lower_better, TEAM_OPTIONS, normalize_team, get_team_display,
+    get_headshot, label_map, lower_better, normalize_team, get_team_display,
     format_stat, load_final_year, aggregate_player_group,
     STAT_ROUND, STAT_DISPLAY_NAMES, PCT_STATS,
 )
@@ -109,6 +111,7 @@ for key, default in [
     ("pl_show_min_ip",    True),
     ("pl_show_player_ip", False),
     ("pl_view",           "Graphic"),
+    ("pl_league","All")
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -148,11 +151,19 @@ with col1:
     st.number_input("Min IP", min_value=0, max_value=5000, key="pl_min_ip")
 
     team_disabled = (mode == MODE_MULTI)
+    league_disabled = (sel_start < 2013)
     st.selectbox(
         "Team", options=list(TEAM_OPTIONS.keys()),
         format_func=lambda x: TEAM_OPTIONS[x], key="pl_team",
         disabled=team_disabled,
         help="Team filter unavailable for Multi-Year Span mode." if team_disabled else None,
+    )
+    st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        key="pl_league",
+        disabled=team_disabled or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible innacuracies" if league_disabled else None,
     )
 
     if view_mode == "Graphic":
@@ -164,6 +175,7 @@ sel_start  = int(sel_start)
 sel_end    = int(max(sel_start, sel_end))
 min_ip_val = int(st.session_state.get("pl_min_ip", 0))
 team_val   = "all" if team_disabled else st.session_state.get("pl_team", "all")
+league_val     = "All" if team_disabled or league_disabled else st.session_state.get("pl_league", "All")
 
 # ── Load & filter data (shared) ───────────────────────────────────────────────
 
@@ -178,6 +190,14 @@ if min_ip_val > 0 and "IP" in df.columns:
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+
+if league_val != "All" and "Team" in df.columns:
+    league_teams = LEAGUES[league_val]
+    df = df[
+        df["Team"].astype(str).apply(
+            lambda t: normalize_team(t) in league_teams
+        )
+    ]
 
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
@@ -230,9 +250,10 @@ with col2:
         span_label  = f"{sel_start}" if mode == MODE_SINGLE else f"{sel_start}–{sel_end}"
         title_label = label_map.get(stat, stat)
         team_label  = TEAM_OPTIONS.get(team_val, "") if team_val != "all" else ""
+        league_label  = league_val if league_val != "All" else ""
         mode_label  = " Single Season" if mode == MODE_SPLIT else ""
         worst_label = " Worst " if show_worst else ""
-        title = re.sub(r"  +", " ", f"{span_label}{mode_label} {team_label}{worst_label} {title_label} Leaders".strip())
+        title = re.sub(r"  +", " ", f"{span_label}{mode_label} {league_label} {team_label}{worst_label} {title_label} Leaders".strip())
 
         min_ip_subtitle = (
             f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'

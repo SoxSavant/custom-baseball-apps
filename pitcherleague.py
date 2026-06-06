@@ -6,6 +6,8 @@ import html
 import re
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Pitcher League Leaders", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -60,7 +62,7 @@ st.caption(f"2026 data last updated: {last_updated}")
 from p_utils import (
     STAT_ALLOWLIST, start_year,
     get_headshot, label_map, lower_better,
-    TEAM_OPTIONS, normalize_team, get_team_display,
+    normalize_team, get_team_display,
     aggregate_player_group, format_stat,load_final_year
 )
 from utils import get_dynamic_min_ip
@@ -123,6 +125,7 @@ for key, default in [
     ("ll_show_min_ip", True),
     ("ll_stats",       default_stats),
     ("ll_preset",      "Statcast"),
+    ("ll_league", "All"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -226,6 +229,15 @@ with col1:
         help="Team filter unavailable for multi-year span" if team_disabled else None,
     )
 
+    league_disabled = (s_year < 2013)
+    st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        key="ll_league",
+        disabled=team_disabled or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible inaccuracies" if league_disabled else None,
+    )
+
     st.checkbox("Show worst",  key="ll_show_worst")
     st.checkbox("Show min IP", key="ll_show_min_ip")
 
@@ -291,7 +303,7 @@ with col1:
             "Show": st.column_config.CheckboxColumn("Show"),
         },
         hide_index=True,
-        use_container_width=True,
+        width = "stretch",
         num_rows="fixed",
         key=f"ll_stat_editor_{st.session_state.get('ll_stat_editor_version', 0)}",
     )
@@ -333,6 +345,7 @@ with col1:
 
 min_ip_val   = int(st.session_state.get("ll_min_ip", 0))
 team_val     = "all" if team_disabled else st.session_state.get("ll_team", "all")
+league_val = "All" if team_disabled or league_disabled else st.session_state.get("ll_league", "All")
 show_worst   = st.session_state.get("ll_show_worst", False)
 
 
@@ -347,6 +360,14 @@ if min_ip_val > 0 and "IP" in df.columns:
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+
+if league_val != "All" and "Team" in df.columns:
+    league_teams = LEAGUES[league_val]
+    df = df[
+        df["Team"].astype(str).apply(
+            lambda t: normalize_team(t) in league_teams
+        )
+    ]
 
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
@@ -417,6 +438,7 @@ cards = [make_card(s, r) for s, r in leader_rows]
 
 span_label  = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 team_label  = f"{TEAM_OPTIONS.get(team_val, '')}" if team_val != "all" else ""
+league_label = league_val if league_val != "All" else ""
 mode_label  = " (Single Season) " if mode == MODE_SPLIT else ""
 worst_label = "(Worst)" if show_worst else ""
 
@@ -424,7 +446,7 @@ overall_label = "Stat Leaders"
 
 title = re.sub(
     r"  +", " ",
-    f"{team_label} {span_label} {overall_label} {mode_label}{worst_label} ".strip()
+    f"{span_label} {league_label} {team_label} {overall_label} {mode_label}{worst_label} ".strip()
 )
 
 min_ip_subtitle = (

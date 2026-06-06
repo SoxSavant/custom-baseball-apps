@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
+from utils import TEAM_OPTIONS, LEAGUES
 from p_utils import (
     load_final_year,
-    TEAM_OPTIONS, normalize_team,
+     normalize_team,
     STAT_ALLOWLIST, STAT_ROUND,  PCT_STATS, aggregate_player_group,
     STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES,
      get_last_updated,

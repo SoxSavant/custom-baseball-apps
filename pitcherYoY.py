@@ -5,6 +5,8 @@ import numpy as np
 import html
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Pitching Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -57,7 +59,7 @@ current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
 from p_utils import (STAT_ALLOWLIST, format_stat_yoy, start_year,
-get_headshot, label_map, lower_better, TEAM_OPTIONS,
+get_headshot, label_map, lower_better,
 normalize_team, get_team_display,load_final_year)
 
 current_year = date.today().year

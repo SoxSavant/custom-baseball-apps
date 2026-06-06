@@ -5,6 +5,8 @@ import numpy as np
 import html
 from datetime import date
 
+from utils import TEAMS, LEAGUES
+
 st.set_page_config(page_title="Hitters Per Team Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -56,7 +58,7 @@ st.caption(f"2026 data last updated: {last_updated}")
 from h_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group_single,
     label_map, lower_better, start_year, POSITION_OPTIONS,
-    normalize_team, get_team_display, filter_by_position, load_final_year, TEAMS, STAT_ROUND
+    normalize_team, get_team_display, filter_by_position, load_final_year,  STAT_ROUND
 )
 from utils import get_dynamic_min_pa, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url
 

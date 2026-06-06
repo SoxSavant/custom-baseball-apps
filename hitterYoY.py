@@ -6,6 +6,8 @@ import unicodedata
 import html
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Hitting Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -58,7 +60,7 @@ current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
 from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better,
-format_stat_yoy, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year)
+format_stat_yoy, POSITION_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year)
 
 current_year = date.today().year
 

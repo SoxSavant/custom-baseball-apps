@@ -154,36 +154,6 @@ def get_headshot(row: pd.Series) -> str:
                 return url
     return HEADSHOT_PLACEHOLDER
 
-TEAM_OPTIONS = {
-    "all": "All Teams",
-    "ARI": "ARI", "ATL": "ATL", "BAL": "BAL", "BOS": "BOS",
-    "CHC": "CHC", "CIN": "CIN", "CLE": "CLE", "COL": "COL",
-    "CHW": "CHW", "DET": "DET", "HOU": "HOU", "KCR": "KCR",
-    "LAA": "LAA", "LAD": "LAD", "MIA": "MIA", "MIL": "MIL",
-    "MIN": "MIN", "NYM": "NYM", "NYY": "NYY", "ATH": "ATH",
-    "PHI": "PHI", "PIT": "PIT", "SDP": "SDP", "SEA": "SEA",
-    "SFG": "SFG", "STL": "STL", "TBR": "TBR", "TEX": "TEX",
-    "TOR": "TOR", "WSN": "WSN",
-}
-
-TEAMS = {
-    "ARI": "Arizona Diamondbacks",   "ATL": "Atlanta Braves",
-    "BAL": "Baltimore Orioles",      "BOS": "Boston Red Sox",
-    "CHC": "Chicago Cubs",           "CIN": "Cincinnati Reds",
-    "CLE": "Cleveland Guardians",    "COL": "Colorado Rockies",
-    "CHW": "Chicago White Sox",      "DET": "Detroit Tigers",
-    "HOU": "Houston Astros",         "KCR": "Kansas City Royals",
-    "LAA": "Los Angeles Angels",     "LAD": "Los Angeles Dodgers",
-    "MIA": "Miami Marlins",          "MIL": "Milwaukee Brewers",
-    "MIN": "Minnesota Twins",        "NYM": "New York Mets",
-    "NYY": "New York Yankees",       "OAK": "Oakland Athletics",
-    "ATH": "Athletics",
-    "PHI": "Philadelphia Phillies",  "PIT": "Pittsburgh Pirates",
-    "SDP": "San Diego Padres",       "SEA": "Seattle Mariners",
-    "SFG": "San Francisco Giants",   "STL": "St. Louis Cardinals",
-    "TBR": "Tampa Bay Rays",         "TEX": "Texas Rangers",
-    "TOR": "Toronto Blue Jays",      "WSN": "Washington Nationals",
-}
 
 # ─────────────────────────────────────────────
 #  IP helpers

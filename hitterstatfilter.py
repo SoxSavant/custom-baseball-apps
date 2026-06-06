@@ -5,6 +5,8 @@ import numpy as np
 import html
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Hitter Stat Filter Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -57,7 +59,7 @@ st.caption(f"2026 data last updated: {last_updated}")
 MAX_DISPLAY = 30
 
 from h_utils import (STAT_ALLOWLIST, STAT_ROUND, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
-get_headshot, label_map, lower_better, start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team,
+get_headshot, label_map, lower_better, start_year, POSITION_OPTIONS, normalize_team,
 get_team_display, filter_by_position, load_final_year, aggregate_player_group,
 STAT_DISPLAY_NAMES)
 
@@ -133,6 +135,7 @@ for key, default in [
     ("sc_val_0",      160),
     ("sc_val_1",       .385),
     ("sc_view",        "Graphic"),
+    ("sc_league", "All"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -207,6 +210,15 @@ with col1:
         help="Team filter unavailable for multi-year span" if team_disabled else None,
     )
 
+    league_disabled = (start_year < 2013)
+    st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        key="sc_league",
+        disabled=team_disabled or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible inaccuracies" if league_disabled else None,
+    )
+
     if view_mode == "Graphic":
         if st.session_state["sc_min_type"] == "PA":
             st.checkbox("Show Min PA", key="sc_show_min_pa")
@@ -224,6 +236,7 @@ min_inn_val = int(st.session_state.get("sc_min_inn", 0))
 
 position_val = st.session_state["sc_position"]
 team_val     = "all" if team_disabled else st.session_state["sc_team"]
+league_val = "All" if team_disabled or league_disabled else st.session_state.get("sc_league", "All")
 
 df = load_data(start_year, end_year, mode, position=position_val)
 
@@ -244,6 +257,14 @@ if mode == MODE_SINGLE:
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(normalize_team) == target]
+
+if league_val != "All" and "Team" in df.columns:
+    league_teams = LEAGUES[league_val]
+    df = df[
+        df["Team"].astype(str).apply(
+            lambda t: normalize_team(t) in league_teams
+        )
+    ]
 
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
@@ -293,8 +314,10 @@ span_label   = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end
 mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
 pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 team_suffix  = f" ({team_val})" if team_val != "all" else ""
+league_label = f" ({league_val})" if league_val != "All" else ""
 middle_label = " in " if mode == MODE_SINGLE else ": "
-title        = f"{filter_str}{middle_label}{span_label}{mode_label}{team_suffix}{pos_suffix}"
+title = f"{filter_str}{middle_label}{span_label}{mode_label}{league_label}{team_suffix}{pos_suffix}"
+
 
 # ── GRAPHIC VIEW ──────────────────────────────────────────────────────────────
 

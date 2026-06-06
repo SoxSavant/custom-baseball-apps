@@ -7,6 +7,8 @@ import html
 import re
 from datetime import date
 
+from utils import TEAM_OPTIONS, LEAGUES
+
 st.set_page_config(page_title="Custom Hitting Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
@@ -62,9 +64,9 @@ st.caption(f"2026 data last updated: {last_updated}")
 from h_utils import (
     STAT_ALLOWLIST, format_stat, start_year,
     get_headshot, label_map, lower_better, load_final_year,
-    POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display,
+    POSITION_OPTIONS, normalize_team, get_team_display,
     filter_by_position, aggregate_player_group,
-    STAT_ROUND, STAT_DISPLAY_NAMES, LEAGUES
+    STAT_ROUND, STAT_DISPLAY_NAMES, 
 )
 from utils import get_dynamic_min_pa
 

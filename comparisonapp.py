@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import html
-import unicodedata
 from datetime import date
 
 st.set_page_config(page_title="Custom Hitter Comparison", layout="wide", page_icon="⚾")
