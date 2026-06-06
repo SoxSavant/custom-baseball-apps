@@ -173,6 +173,20 @@ TEAM_OPTIONS = {
     "TOR": "TOR", "WSN": "WSN",
 }
 
+LEAGUES = {
+    "All":[],
+    "AL": [
+        "BAL", "BOS", "CHW", "CLE", "DET",
+        "HOU", "KCR", "LAA", "MIN", "NYY",
+        "OAK", "SEA", "TBR", "TEX", "TOR"
+    ],
+    "NL": [
+        "ARI", "ATL", "CHC", "CIN", "COL",
+        "LAD", "MIA", "MIL", "NYM", "PHI",
+        "PIT", "SDP", "SFG", "STL", "WSN"
+    ]
+}
+
 TEAMS = {
     "ARI": "Arizona Diamondbacks",   "ATL": "Atlanta Braves",
     "BAL": "Baltimore Orioles",      "BOS": "Boston Red Sox",

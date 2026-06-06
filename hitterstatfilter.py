@@ -53,16 +53,19 @@ from h_utils import get_last_updated
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
-# ─────────────────────────────────────────────
-#  Constants
-# ─────────────────────────────────────────────
+
 MAX_DISPLAY = 30
 
 from h_utils import (STAT_ALLOWLIST, STAT_ROUND, RATE_STATS, format_stat, STAT_DEFAULTS, MAX_STATS,
-get_headshot, label_map, lower_better,  start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, 
-get_team_display, filter_by_position, load_final_year,aggregate_player_group)
+get_headshot, label_map, lower_better, start_year, POSITION_OPTIONS, TEAM_OPTIONS, normalize_team,
+get_team_display, filter_by_position, load_final_year, aggregate_player_group,
+STAT_DISPLAY_NAMES)
 
-
+PCT_STATS = {
+    "K%", "BB%", "Chase%", "Whiff%", "Swing%", "Z-Swing%",
+    "O-Contact%", "Z-Contact%", "Zone%", "Barrel%", "HardHit%",
+    "Sweet-Spot%", "Squared-Up%", "Z-Swing% - Chase%",
+}
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
@@ -85,7 +88,7 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
         df = load_final_year(year)
         if df is not None and not df.empty:
             if mode == MODE_SPLIT:
-                df = filter_by_position(df,position_val)
+                df = filter_by_position(df, position_val)
             frames.append(df)
 
     if not frames:
@@ -96,7 +99,6 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
     if mode == MODE_SPLIT:
         return combined
 
-    # MODE_MULTI: filter by position on raw rows first, then aggregate
     if "PlayerId" not in combined.columns:
         return combined
 
@@ -105,11 +107,6 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
         return pd.DataFrame()
 
     return aggregate_player_group(combined)
-
-
-# ─────────────────────────────────────────────
-#  Formatting
-# ─────────────────────────────────────────────
 
 
 def format_threshold(stat: str, val: float, op: str) -> str:
@@ -135,6 +132,7 @@ for key, default in [
     ("sc_top10",       False),
     ("sc_val_0",      160),
     ("sc_val_1",       .385),
+    ("sc_view",        "Graphic"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -142,6 +140,8 @@ for key, default in [
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
+    view_mode = st.radio("View", ["Graphic", "Database"], key="sc_view", horizontal=True)
+
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=1, horizontal=True, key="sc_num_stats")
 
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="sc_mode")
@@ -165,7 +165,7 @@ with col1:
     st.selectbox("Min Type", options=["PA", "Inn"], key="sc_min_type")
 
     if st.session_state["sc_min_type"] == "Inn":
-        st.number_input("Min Inn", min_value=0, max_value=20000, value= 200, key="sc_min_inn")
+        st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key="sc_min_inn")
     else:
         st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key="sc_min_pa")
 
@@ -207,21 +207,20 @@ with col1:
         help="Team filter unavailable for multi-year span" if team_disabled else None,
     )
 
-    if st.session_state["sc_min_type"] == "PA":
-        st.checkbox("Show Min PA", key="sc_show_min_pa")
-    else:
-        st.checkbox("Show Min Inn", key="sc_show_min_pa")
-    if st.session_state["sc_min_type"] == "PA":
-        st.checkbox("Show Player PA", key="sc_show_player_pa")
-    else:
-        st.checkbox("Show Player Inn", key="sc_show_player_pa")
-    
-    st.checkbox("Only display top 10", key="sc_top10")
+    if view_mode == "Graphic":
+        if st.session_state["sc_min_type"] == "PA":
+            st.checkbox("Show Min PA", key="sc_show_min_pa")
+        else:
+            st.checkbox("Show Min Inn", key="sc_show_min_pa")
+        if st.session_state["sc_min_type"] == "PA":
+            st.checkbox("Show Player PA", key="sc_show_player_pa")
+        else:
+            st.checkbox("Show Player Inn", key="sc_show_player_pa")
+        st.checkbox("Only display top 10", key="sc_top10")
 
-use_inn = st.session_state.get("sc_min_type") == "Inn"
+use_inn     = st.session_state.get("sc_min_type") == "Inn"
 min_pa_val  = int(st.session_state.get("sc_min_pa", 0))
 min_inn_val = int(st.session_state.get("sc_min_inn", 0))
-
 
 position_val = st.session_state["sc_position"]
 team_val     = "all" if team_disabled else st.session_state["sc_team"]
@@ -239,21 +238,19 @@ else:
     if min_pa_val > 0 and "PA" in df.columns:
         df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
 
-# Position filter — skip for MULTI (already applied pre-aggregation inside load_data)
 if mode == MODE_SINGLE:
     df = filter_by_position(df, position_val)
 
-# Team filter
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(normalize_team) == target]
 
-# Team display
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
 else:
     df["TeamDisplay"] = "N/A"
 
+# ── Build active filters & apply ─────────────────────────────────────────────
 
 active_filters = []
 for i in range(num_stats):
@@ -288,52 +285,7 @@ if not df.empty:
             asc = sort_stat in lower_better and sort_op == "<="
             df = df.sort_values(sort_stat, ascending=asc)
 
-    display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
-    if total_qualified > display_limit:
-        df = df.head(display_limit)
-
-cards = []
-for _, row in df.iterrows():
-    name = str(row.get("Name", "")).strip()
-    team = str(row.get("TeamDisplay", ""))
-
-    # In Split mode, append the season year to the team label
-    if mode == MODE_SPLIT and "Season" in row.index and pd.notna(row.get("Season")):
-        team = f"{team} ({int(row['Season'])})"
-
-    stat_lines = []
-    for stat, op, threshold in active_filters:
-        val = row.get(stat, np.nan)
-        if pd.notna(val):
-            lbl = label_map.get(stat, stat)
-            stat_lines.append(
-                f'<span class="stat-label">{lbl}:</span> '
-                f'<span class="stat-value">{html.escape(format_stat(stat, val))}</span>'
-            )
-
-    src = get_headshot(row)
-    pa_val = row.get("PA", np.nan)
-    inn_val = round(row.get("Inn", np.nan),1)
-    if st.session_state.get("sc_show_player_pa"):
-        if pd.notna(pa_val) and st.session_state.get("sc_min_type") == "PA":
-            player_pa_html = (
-            f'<div class="player-pa">{int(pa_val)} PA</div>'
-        )
-        elif pd.notna(inn_val) and st.session_state.get("sc_min_type") == "Inn":
-            player_pa_html = (
-            f'<div class="player-pa">{inn_val} Inn</div>'
-        )
-    else:
-        player_pa_html = ""
-    img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" style="object-fit:cover;display:block;margin:0 auto;"/>'
-    cards.append(f"""
-    <div class="player-card">
-      {img_html}
-      <div class="player-name">{html.escape(name)}</div>
-      <div class="player-team">{html.escape(team)}</div>
-      {'<div class="player-stat-line">' + " | ".join(stat_lines) + "</div>" if stat_lines else ""}
-      {player_pa_html}
-    </div>""")
+# ── Shared label/span strings ─────────────────────────────────────────────────
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
@@ -342,41 +294,88 @@ mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
 pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
 team_suffix  = f" ({team_val})" if team_val != "all" else ""
 middle_label = " in " if mode == MODE_SINGLE else ": "
-title = f"{filter_str}{middle_label}{span_label}{mode_label}{team_suffix}{pos_suffix}"
+title        = f"{filter_str}{middle_label}{span_label}{mode_label}{team_suffix}{pos_suffix}"
 
-display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
-overflow_note = (
-    f'<div class="overflow-note">Showing top {display_limit} of {total_qualified} qualifying players</div>'
-    if total_qualified > display_limit else ""
-)
-if st.session_state.get("sc_show_min_pa"):
-    if use_inn:
-        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
-    else:
-        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
-else:
-    min_pa_subtitle = ""
+# ── GRAPHIC VIEW ──────────────────────────────────────────────────────────────
 
-body = "".join(cards) if cards else '<div style="padding:2rem;color:#999;text-align:center;">No players matched all filters. Try adjusting your thresholds.</div>'
+with col2:
+    if view_mode == "Graphic":
+        display_limit = 10 if st.session_state.get("sc_top10") and total_qualified > 10 else MAX_DISPLAY
+        df_graphic = df.head(display_limit)
 
-grid_html = f"""
-<div class="leaderboard-card">
-    <div class="leaderboard-title">{html.escape(title)}</div>
-    {min_pa_subtitle}
-    {overflow_note}
-    <div class="players-grid">{body}</div>
-    <div class="footer">
-        <p>By: Sox_Savant</p>
-        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
-    </div>
-</div>
-"""
+        cards = []
+        for _, row in df_graphic.iterrows():
+            name = str(row.get("Name", "")).strip()
+            team = str(row.get("TeamDisplay", ""))
 
-card_count = len(cards)
-est_rows   = max(1, (card_count + 4) // 5)
-est_height = 180 + est_rows * 280 + 80
+            if mode == MODE_SPLIT and "Season" in row.index and pd.notna(row.get("Season")):
+                team = f"{team} ({int(row['Season'])})"
 
-full_html = f"""<!DOCTYPE html>
+            stat_lines = []
+            for stat, op, threshold in active_filters:
+                val = row.get(stat, np.nan)
+                if pd.notna(val):
+                    lbl = label_map.get(stat, stat)
+                    stat_lines.append(
+                        f'<span class="stat-label">{lbl}:</span> '
+                        f'<span class="stat-value">{html.escape(format_stat(stat, val))}</span>'
+                    )
+
+            src    = get_headshot(row)
+            pa_val  = row.get("PA", np.nan)
+            inn_val = round(row.get("Inn", np.nan), 1)
+            if st.session_state.get("sc_show_player_pa"):
+                if pd.notna(pa_val) and st.session_state.get("sc_min_type") == "PA":
+                    player_pa_html = f'<div class="player-pa">{int(pa_val)} PA</div>'
+                elif pd.notna(inn_val) and st.session_state.get("sc_min_type") == "Inn":
+                    player_pa_html = f'<div class="player-pa">{inn_val} Inn</div>'
+                else:
+                    player_pa_html = ""
+            else:
+                player_pa_html = ""
+
+            img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}" style="object-fit:cover;display:block;margin:0 auto;"/>'
+            cards.append(f"""
+            <div class="player-card">
+              {img_html}
+              <div class="player-name">{html.escape(name)}</div>
+              <div class="player-team">{html.escape(team)}</div>
+              {'<div class="player-stat-line">' + " | ".join(stat_lines) + "</div>" if stat_lines else ""}
+              {player_pa_html}
+            </div>""")
+
+        overflow_note = (
+            f'<div class="overflow-note">Showing top {display_limit} of {total_qualified} qualifying players</div>'
+            if total_qualified > display_limit else ""
+        )
+        if st.session_state.get("sc_show_min_pa"):
+            if use_inn:
+                min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+            else:
+                min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+        else:
+            min_pa_subtitle = ""
+
+        body = "".join(cards) if cards else '<div style="padding:2rem;color:#999;text-align:center;">No players matched all filters. Try adjusting your thresholds.</div>'
+
+        grid_html = f"""
+        <div class="leaderboard-card">
+            <div class="leaderboard-title">{html.escape(title)}</div>
+            {min_pa_subtitle}
+            {overflow_note}
+            <div class="players-grid">{body}</div>
+            <div class="footer">
+                <p>By: Sox_Savant</p>
+                <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
+            </div>
+        </div>
+        """
+
+        card_count = len(cards)
+        est_rows   = max(1, (card_count + 4) // 5)
+        est_height = 180 + est_rows * 280 + 80
+
+        full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
@@ -393,105 +392,83 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     margin: 0 auto;
     width: 100%;
     max-width: 900px;
-    box-sizing: border-box; /* Prevents padding from causing layout clipping */
+    box-sizing: border-box;
 }}
-.leaderboard-title {{
-    font-weight: 900;
-    font-size: 2.25rem;
-    margin-bottom: 1.2rem;
-    text-align: center;
-    line-height: 1.2;
-}}
-.leaderboard-subtitle, .overflow-note {{
-    text-align: center;
-    color: #888;
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-    margin-top: -0.5rem;
-}}
-.players-grid {{
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 2rem 1rem;
-}}
+.leaderboard-title {{ font-weight: 900; font-size: 2.25rem; margin-bottom: 1.2rem; text-align: center; line-height: 1.2; }}
+.leaderboard-subtitle, .overflow-note {{ text-align: center; color: #888; font-size: 1.1rem; margin-bottom: 1rem; margin-top: -0.5rem; }}
+.players-grid {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem 1rem; }}
 .player-card {{ flex: 0 0 155px; width: 155px; text-align: center; }}
-.player-card img {{
-    width: 155px; height: 155px;
-    object-fit: cover; border-radius: 6px;
-    border: 1px solid #e0e0e0; background: #f6f6f6;
-}}
+.player-card img {{ width: 155px; height: 155px; object-fit: cover; border-radius: 6px; border: 1px solid #e0e0e0; background: #f6f6f6; }}
 .player-name {{ font-weight: 800; font-size: 1rem; margin-top: 0.35rem; line-height: 1.2; }}
 .player-team {{ color: #666; font-size: 0.8rem; margin-bottom: 0.25rem; }}
 .player-stat-line {{ text-align: center; font-size: 0.95rem; margin-top: 0.15rem; }}
 .player-pa {{ color: #666; font-size: .9rem; }}
 .stat-label {{ color: #888; font-size: 0.85rem; }}
 .stat-value {{ font-weight: 800; font-size: 0.95rem; color: #1a1a1a; }}
-
-.footer {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 1.3rem -1rem 0 -1rem;
-    padding: 0 3rem;
-}}
-
-.footer p {{
-margin: 0;
-font-size: 1rem;
-color: #666;
-white-space: nowrap;
-}}
-
-/* This block now safely fires and forces scaling on phone screens */
+.footer {{ display: flex; justify-content: space-between; align-items: center; margin: 1.3rem -1rem 0 -1rem; padding: 0 3rem; }}
+.footer p {{ margin: 0; font-size: 1rem; color: #666; white-space: nowrap; }}
 @media (max-width: 600px) {{
-    .leaderboard-card {{
-        width: 100% !important;
-        padding: 1.5rem 0.5rem;
-    }}
-    .leaderboard-title {{
-        font-size: 1.4rem;
-        margin-bottom: 0.6rem;
-    }}
-    .leaderboard-subtitle, .overflow-note {{
-        font-size: 0.9rem;
-        margin-bottom: 0.8rem;
-    }}
-    .players-grid {{
-        gap: 1rem 0.35rem;
-    }}
-    .player-card {{
-        flex: 0 0 calc(20% - 0.3rem);
-        width: calc(20% - 0.3rem);
-    }}
-    .player-card img {{
-        width: 100%;
-        height: auto;
-        aspect-ratio: 1 / 1;
-    }}
-    .player-name {{ 
-        font-size: 0.65rem; 
-        white-space: nowrap; 
-        overflow: hidden; 
-        text-overflow: ellipsis; 
-    }}
+    .leaderboard-card {{ width: 100% !important; padding: 1.5rem 0.5rem; }}
+    .leaderboard-title {{ font-size: 1.4rem; margin-bottom: 0.6rem; }}
+    .leaderboard-subtitle, .overflow-note {{ font-size: 0.9rem; margin-bottom: 0.8rem; }}
+    .players-grid {{ gap: 1rem 0.35rem; }}
+    .player-card {{ flex: 0 0 calc(20% - 0.3rem); width: calc(20% - 0.3rem); }}
+    .player-card img {{ width: 100%; height: auto; aspect-ratio: 1 / 1; }}
+    .player-name {{ font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
     .player-team {{ font-size: 0.55rem; }}
     .player-stat-line {{ font-size: 0.65rem; }}
     .player-pa {{ font-size: 0.6rem; }}
     .stat-label {{ font-size: 0.6rem; }}
     .stat-value {{ font-size: 0.65rem; }}
-    .footer p {{
-        font-size: 0.65rem;
-    }}
-
-    .footer {{
-    padding: 0 2rem;
-    }}
+    .footer p {{ font-size: 0.65rem; }}
+    .footer {{ padding: 0 2rem; }}
 }}
 </style>
 </head>
 <body>{grid_html}</body>
 </html>"""
 
-with col2:
-    components.html(full_html, height=est_height, scrolling=True)
+        components.html(full_html, height=est_height, scrolling=True)
+
+    # ── DATABASE VIEW ─────────────────────────────────────────────────────────
+
+    else:
+        if df.empty:
+            st.info("No players matched all filters. Try adjusting your thresholds.")
+            st.stop()
+
+        filter_stats = [s for s, _, _ in active_filters]
+
+        if mode == MODE_SPLIT:
+            base_cols = [c for c in ["Name", "Team", "Season", "Pos"] if c in df.columns]
+        else:
+            base_cols = [c for c in ["Name", "Team", "Pos"] if c in df.columns]
+
+        stat_cols = [s for s in filter_stats if s in df.columns and s not in base_cols]
+        display   = df[base_cols + stat_cols].copy()
+        display   = display.reset_index(drop=True)
+        display.index += 1
+
+        PCT_STAT_SET = PCT_STATS | {s for s in stat_cols if "%" in s}
+
+        rename_map = {s: STAT_DISPLAY_NAMES.get(s, label_map.get(s, s)) for s in stat_cols}
+        display    = display.rename(columns=rename_map)
+
+        col_config: dict = {}
+        for s in stat_cols:
+            label = STAT_DISPLAY_NAMES.get(s, label_map.get(s, s))
+            decimals = STAT_ROUND.get(s, 1)
+            if s in PCT_STAT_SET:
+                col_config[label] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f%%")
+            else:
+                col_config[label] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f")
+
+        st.caption(f"{total_qualified} hitters – {title}")
+        st.dataframe(display, width="stretch", height=700, column_config=col_config)
+
+        st.markdown(
+            "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem;'>"
+            "Data: Baseball Reference · FanGraphs · Baseball Savant"
+            "</div>",
+            unsafe_allow_html=True,
+        )

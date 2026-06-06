@@ -64,7 +64,7 @@ from h_utils import (
     get_headshot, label_map, lower_better, load_final_year,
     POSITION_OPTIONS, TEAM_OPTIONS, normalize_team, get_team_display,
     filter_by_position, aggregate_player_group,
-    STAT_ROUND, STAT_DISPLAY_NAMES,
+    STAT_ROUND, STAT_DISPLAY_NAMES, LEAGUES
 )
 from utils import get_dynamic_min_pa
 
@@ -134,19 +134,15 @@ for key, default in [
     ("hl_sort_worst", False),
     ("hl_show_min_pa", True),
     ("hl_view", "Graphic"),
+    ("hl_league","All")
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ── Stat selector + view toggle ──────────────────────────────────────────────
+col1, col2 = st.columns([.5, 2])
 
-top_left, top_right = st.columns([3, 1])
-with top_left:
-    stat = st.selectbox(
-        "Stat", STAT_ALLOWLIST, key="hl_stat",
-        format_func=lambda x: label_map.get(x, x),
-    )
-with top_right:
+with col1:
+
     view_mode = st.radio(
         "View", ["Graphic", "Database"],
         key="hl_view",
@@ -154,9 +150,11 @@ with top_right:
         label_visibility="collapsed",
     )
 
-col1, col2 = st.columns([.5, 2])
+    stat = st.selectbox(
+        "Stat", STAT_ALLOWLIST, key="hl_stat",
+        format_func=lambda x: label_map.get(x, x),
+    )
 
-with col1:
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="hl_mode")
 
     if mode == MODE_SINGLE:
@@ -190,6 +188,8 @@ with col1:
     )
 
     team_disabled = (mode == MODE_MULTI)
+    league_disabled = (sel_start < 2013)
+
     st.selectbox(
         "Team",
         options=list(TEAM_OPTIONS.keys()),
@@ -197,6 +197,13 @@ with col1:
         key="hl_team",
         disabled=team_disabled,
         help="Team filter unavailable for multi-year span" if team_disabled else None,
+    )
+    st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        key="hl_league",
+        disabled=team_disabled or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible innacuracies" if league_disabled else None,
     )
 
     # Graphic-only controls
@@ -211,6 +218,7 @@ with col1:
 
 position_val = st.session_state.get("hl_position", "all")
 team_val     = "all" if team_disabled else st.session_state.get("hl_team", "all")
+league_val     = "All" if team_disabled or league_disabled else st.session_state.get("hl_league", "All")
 
 # ── Load & filter data (shared) ───────────────────────────────────────────────
 
@@ -236,6 +244,14 @@ if mode == MODE_SINGLE:
 if team_val != "all" and "Team" in df.columns:
     target = normalize_team(team_val)
     df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+
+if league_val != "All" and "Team" in df.columns:
+    league_teams = LEAGUES[league_val]
+    df = df[
+        df["Team"].astype(str).apply(
+            lambda t: normalize_team(t) in league_teams
+        )
+    ]
 
 if "Team" in df.columns:
     df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
@@ -295,14 +311,15 @@ with col2:
 
         span_label  = f"{sel_start}" if mode == MODE_SINGLE else f"{sel_start}–{sel_end}"
         title_label = label_map.get(stat, stat)
-        pos_suffix  = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
+        pos_label  = f"{POSITION_OPTIONS[position_val]}" if position_val != "all" else ""
         team_label  = TEAM_OPTIONS.get(team_val, "") if team_val != "all" else ""
+        league_label  = league_val if league_val != "All" else ""
         mode_label  = " Single Season" if mode == MODE_SPLIT else ""
         worst_label = "Worst " if sort_worst else ""
 
         title = re.sub(
             r"  +", " ",
-            f"{span_label}{mode_label} {team_label} {worst_label}{title_label} Leaders{pos_suffix}".strip(),
+            f"{span_label}{mode_label} {league_label} {team_label} {pos_label} {worst_label}{title_label} Leaders".strip(),
         )
 
         if st.session_state.get("hl_show_min_pa"):

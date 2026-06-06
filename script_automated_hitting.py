@@ -4,13 +4,14 @@ from io import StringIO
 import requests
 import time
 from utils import BREF_COOKIE, FG_COOKIE, strip_html, _browser_headers, s3, bucket
+import numpy as np
 
 localUpload = False
 
 upload = True
  
-startYear = 2007
-EndYear = 2026
+startYear = 1901
+EndYear = 1955
 
 MULTIPLY_100_IF_DECIMAL = {
     "Whiff%", "Chase%", "K%", "BB%", "Swing%", "Z-Swing%",
@@ -247,13 +248,23 @@ def fetch_fielding(year: int) -> pd.DataFrame:
 
     # Primary position = position with most innings
     valid = df.dropna(subset=["Inn"])
-    if not valid.empty:
-        pos = valid.loc[
-            valid.groupby("PlayerId")["Inn"].idxmax(),
-            ["PlayerId", "Pos"]
-        ].drop_duplicates("PlayerId")
-    else:
-        pos = df.groupby("PlayerId", as_index=False)["Pos"].first()
+
+    pos_by_inn = valid.loc[
+        valid.groupby("PlayerId")["Inn"].idxmax(),
+        ["PlayerId", "Pos"]
+    ].drop_duplicates("PlayerId")
+
+    pos_fallback = df.groupby("PlayerId", as_index=False)["Pos"].first()
+
+    pos = pos_fallback.merge(
+        pos_by_inn,
+        on="PlayerId",
+        how="left",
+        suffixes=("_fallback", "")
+    )
+
+    pos["Pos"] = pos["Pos"].fillna(pos["Pos_fallback"])
+    pos = pos[["PlayerId", "Pos"]]
 
     return agg.merge(pos, on="PlayerId", how="left")
 
@@ -318,10 +329,17 @@ for YEAR in range(startYear, EndYear + 1):
     final["wOBA-xwOBA"]        = final["wOBA"] - final["xwOBA"]
     final["Whiff%"]            = 1 - final["Whiff%"]
     final["Z-Swing% - Chase%"] = final["Z-Swing%"] - final["Chase%"]
-    final["DRS/1350"]          = (final["DRS"] / final["Inn"] * 1350).round(0)
-    final["OAA/1350"]          = (final["OAA"] / final["Inn"] * 1350).round(0)
-    final["FRV/1350"]          = (final["FRV"] / final["Inn"] * 1350).round(0)
-    final["FRM/1350"]          = (final["FRM"] / final["Inn"] * 1350).round(1)
+    final["OAA"] = pd.to_numeric(final["OAA"], errors="coerce")
+    final["FRV"] = pd.to_numeric(final["FRV"], errors="coerce")
+    final["DRS"] = pd.to_numeric(final["DRS"], errors="coerce")
+    final["FRM"] = pd.to_numeric(final["FRM"], errors="coerce")
+    final["Inn"] = pd.to_numeric(final["Inn"], errors="coerce")
+    inn = final["Inn"].replace(0, np.nan)
+
+    final["DRS/1350"] = (final["DRS"] / inn * 1350).round(0)
+    final["OAA/1350"] = (final["OAA"] / inn * 1350).round(0)
+    final["FRV/1350"] = (final["FRV"] / inn * 1350).round(0)
+    final["FRM/1350"] = (final["FRM"] / inn * 1350).round(1)
 
     for col in MULTIPLY_100_IF_DECIMAL:
         if col in final.columns:
