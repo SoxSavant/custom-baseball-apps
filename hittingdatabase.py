@@ -9,7 +9,7 @@ from h_utils import (
     filter_by_position,
     STAT_ALLOWLIST, STAT_ROUND,
     STAT_PRESETS_DATABASE, STAT_DISPLAY_NAMES, get_last_updated,
-    format_stat, aggregate_player_group
+     aggregate_player_group
 )
 from utils import get_dynamic_min_pa
 
@@ -208,10 +208,20 @@ with left_col:
         options=list(POSITION_OPTIONS.keys()),
         format_func=lambda x: POSITION_OPTIONS[x],
     )
+    team_disabled_multi = (year_mode == "Multi-Year Span")
     team = st.selectbox(
         "Team",
         options=list(TEAM_OPTIONS.keys()),
         format_func=lambda x: TEAM_OPTIONS[x],
+        disabled = team_disabled_multi
+    )
+    
+    league_disabled = (year_start < 2013)
+    league = st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        disabled=team_disabled_multi or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible inaccuracies" if league_disabled else None,
     )
     min_type = st.selectbox("Min Type", ["PA", "Inn"])
     if min_type == "PA":
@@ -359,6 +369,15 @@ with right_col:
     if team != "all" and "Team" in df.columns:
         target = normalize_team(team)
         df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+    
+    league_val = "All" if team_disabled_multi or league_disabled else league
+    if league_val != "All" and "Team" in df.columns:
+        league_teams = LEAGUES[league_val]
+        df = df[
+            df["Team"].astype(str).apply(
+                lambda t: normalize_team(t) in league_teams
+            )
+        ]
 
     if min_type == "PA":
         if min_pa > 0 and "PA" in df.columns:

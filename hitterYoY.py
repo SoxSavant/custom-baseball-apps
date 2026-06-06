@@ -176,6 +176,7 @@ for key, default in [
     ("rf_show_fallers",   False),
     ("rf_show_min_pa",    True),
     ("rf_show_player_pa", False),
+    ("rf_view", "Graphic"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -191,6 +192,7 @@ stat = st.selectbox(
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
+    view_mode = st.radio("View", ["Graphic", "Database"], key="rf_view", horizontal=True)
     st.selectbox("Start Year", options=list(range(current_year - 1, start_year - 1, -1)), key="rf_start_year")
     st.selectbox("End Year",   options=list(range(current_year,     start_year - 1, -1)), key="rf_end_year")
     start_year = st.session_state["rf_start_year"]
@@ -486,4 +488,50 @@ white-space: nowrap;
 """
 
 with col2:
-    components.html(full_html, height=850)
+    if view_mode == "Graphic":
+        components.html(full_html, height=850)
+
+    else:
+        df_full = load_risers_data(
+            start_year, end_year,
+            min_pa_start=min_pa_start_val, min_pa_end=min_pa_end_val,
+            min_inn_start=min_inn_start_val, min_inn_end=min_inn_end_val,
+            use_inn=use_inn,
+            position=position_val, team=team_val,
+        )
+
+        if df_full.empty or stat not in df_full.columns:
+            st.info("No data found. Try adjusting your filters or years.")
+            st.stop()
+
+        stat_lower = stat in lower_better
+        df_full = df_full.sort_values(by=stat, ascending=stat_lower)
+
+        from h_utils import STAT_ROUND
+        stat_label = label_map.get(stat, stat)
+        start_col  = f"{stat}_start"
+        end_col    = f"{stat}_end"
+        col_start  = f"{stat_label} ({start_year})"
+        col_end    = f"{stat_label} ({end_year})"
+        col_delta  = f"Δ {stat_label}"
+
+        base_cols = [c for c in ["Name", "Team"] if c in df_full.columns]
+        display = df_full[base_cols + [start_col, end_col, stat]].copy()
+        display = display.rename(columns={
+            start_col: col_start,
+            end_col:   col_end,
+            stat:      col_delta,
+        })
+        display = display.reset_index(drop=True)
+        display.index += 1
+
+        decimals = STAT_ROUND.get(stat, 1)
+        fmt = f"%.{decimals}f"
+        col_config = {
+            col_start: st.column_config.NumberColumn(col_start, format=fmt),
+            col_end:   st.column_config.NumberColumn(col_end,   format=fmt),
+            col_delta: st.column_config.NumberColumn(col_delta, format=fmt),
+        }
+
+        st.caption(f"{stat_label} — {int(start_year)} → {int(end_year)}")
+        st.dataframe(display, width="stretch", height=700, column_config=col_config)

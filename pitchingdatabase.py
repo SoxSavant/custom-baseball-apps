@@ -192,10 +192,19 @@ with left_col:
         valid_ends = list(range(current_year, year_start - 1, -1))
         year_end   = st.selectbox("To", valid_ends, index=0)
 
+    team_disabled_multi = (year_mode == "Multi-Year Span")
     team = st.selectbox(
         "Team",
         options=list(TEAM_OPTIONS.keys()),
         format_func=lambda x: TEAM_OPTIONS[x],
+        disabled = team_disabled_multi
+    )
+    league_disabled = (year_start < 2013)
+    league = st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        disabled=team_disabled_multi or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible inaccuracies" if league_disabled else None,
     )
     min_ip = st.number_input(
         "Min IP", min_value=0, max_value=5000,
@@ -329,6 +338,15 @@ with right_col:
     if team != "all" and "Team" in df.columns:
         target = normalize_team(team)
         df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+    
+    league_val = "All" if team_disabled_multi or league_disabled else league
+    if league_val != "All" and "Team" in df.columns:
+        league_teams = LEAGUES[league_val]
+        df = df[
+            df["Team"].astype(str).apply(
+                lambda t: normalize_team(t) in league_teams
+            )
+        ]
 
     if multi_year:
         df = aggregate_player_group(df)
