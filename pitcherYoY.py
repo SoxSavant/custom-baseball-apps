@@ -7,7 +7,7 @@ from datetime import date
 
 from utils import TEAM_OPTIONS
 
-st.set_page_config(page_title="Pitching Year-over-Year Improvers & Decliners", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Pitching Year-over-Year", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -44,7 +44,7 @@ st.markdown("""
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Pitching Year-over-Year Improvers & Decliners")
+    st.title("Pitching Year-over-Year")
 with meta_col:
     st.markdown(
         """
