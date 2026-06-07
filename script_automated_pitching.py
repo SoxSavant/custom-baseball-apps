@@ -9,11 +9,11 @@ localUpload = False
 
 upload = True
 
-startYear = 2026
+startYear = 2002
 EndYear = 2026
 
 MULTIPLY_100_IF_DECIMAL = {
-    "Whiff%", "Chase%", "K%", "BB%",
+    "Whiff%", "Chase%", "K%", "BB%", "GB%",
 }
 
 

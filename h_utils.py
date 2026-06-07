@@ -647,7 +647,7 @@ STAT_PRESETS_YOY = {
 
 STAT_PRESETS_DATABASE = {
     "Default": [
-         "fWAR", "bWAR", "HR", "wRC+", "xwOBA",
+         "fWAR", "bWAR", "fWAR-bWAR Avg", "HR", "wRC+", "xwOBA",
         "K%", "BB%", "BsR", "SB", "FRV", "DRS",
     ],
    
