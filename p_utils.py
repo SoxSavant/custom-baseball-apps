@@ -38,7 +38,7 @@ STAT_DISPLAY_NAMES = {
 
 STAT_ALLOWLIST = [
     "fWAR", "bWAR", "fWAR-bWAR Avg",
-    "ERA", "xERA", "FIP", "xFIP", "ERA-xERA","vFA", "K%", "BB%", "K-BB%", "IP", 
+    "ERA", "xERA", "xBA", "FIP", "xFIP", "ERA-xERA","vFA", "K%", "BB%", "K-BB%", "IP", 
     "Chase%", "Whiff%", "G", "GS",
     "Barrel%", "HardHit%", "EV", "GB%", "K/9","BB/9","K/BB","HR/9", "BABIP", "LOB%", "HR/FB",
     "SV", "AVG", "WHIP", "ERA-", "FIP-", "SIERA",
@@ -48,7 +48,7 @@ STAT_ALLOWLIST = [
 
 STAT_ROUND = {
     # 3 decimal places
-    "WHIP": 3, "BABIP": 3, "AVG": 3,
+    "WHIP": 3, "BABIP": 3, "AVG": 3, "xBA": 3,
 
     # 2 decimal places
     "ERA": 2, "xERA": 2, "FIP": 2, "xFIP": 2, "ERA-xERA": 2,
@@ -86,10 +86,11 @@ STAT_DEFAULTS = {
     "bWAR/200": 5.0,
     "ERA-xERA": 0.5,
     "vFA": 95.0,
+    "xBA": .250,
 }
 
 EVERY_STAT_PRESET = ["fWAR", "bWAR", "fWAR-bWAR Avg", "W-L", "vFA",
-        "ERA", "xERA", "FIP", "xFIP", "ERA-xERA","IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
+        "ERA", "xERA", "xBA", "FIP", "xFIP", "ERA-xERA","IP", "G", "GS", "SO", "BB", "HBP", "HR", "K/9",
         "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB", "QS", "CG", "ShO",
         "SV", "K%", "BB%", "K-BB%", "BB/9","HR/9","K/BB","AVG", "WHIP", "ERA-", "FIP-",
         "Barrel%", "HardHit%", "EV", "GB/FB", "GB%", "FB%", "SIERA",
@@ -101,7 +102,7 @@ SUM_STATS = {
     "G", "GS", "HR", "BB", "SO", "HBP", "QS", "CG", "ShO", "SV", "WPA", "W", "L", "fWAR", "bWAR", "TBF", "ER", "fWAR-bWAR Avg"
 }
 RATE_STATS = {
-    "ERA", "xERA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
+    "ERA", "xERA", "xBA", "FIP", "xFIP", "K/9", "BB/9", "HR/9", "BABIP", "LOB%", "HR/FB",
     "K%", "BB%", "K-BB%", "AVG", "WHIP", "Barrel%", "HardHit%", "EV",
     "GB/FB", "GB%", "FB%", "SIERA", "Chase%", "Whiff%", "Clutch",
     "ERA-", "FIP-", "vFA","BB/9","HR/9","K/BB","fWAR/200", "bWAR/200", "ERA-xERA",
@@ -121,7 +122,7 @@ label_map = {
 lower_better = {
     "ERA", "xERA", "FIP", "xFIP", "SIERA", "BB", "HBP", "HR",
     "BB/9", "HR/9", "BABIP", "HR/FB", "BB%", "AVG", "WHIP",
-    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "HR/9","BB/9","ERA-xERA"
+    "ERA-", "FIP-", "Barrel%", "HardHit%", "EV", "HR/9","BB/9","ERA-xERA", "xBA"
 }
 
 
@@ -386,7 +387,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"ERA-", "FIP-"}:
         return f"{int(round(float(val)))}"
 
-    if upper_stat in {"BABIP", "AVG"}:
+    if upper_stat in {"BABIP", "AVG", "XBA"}:
         return f"{float(val):.3f}".lstrip("0") or ".000"
     ALREADY_PCT_POINTS = {"Barrel%", "HardHit%"}
     if (
@@ -450,7 +451,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"BABIP", "AVG"}:
+    if upper_stat in {"BABIP", "AVG","XBA"}:
         v = float(val)
         formatted = f"{abs(v):.3f}".lstrip("0") or ".000"
         if show_sign and v > 0:
@@ -512,7 +513,7 @@ STAT_PRESETS = {
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "fWAR", "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "fWAR", "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Stat Mix": [
         "fWAR", "bWAR", "ERA", "xERA", "FIP", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
@@ -535,7 +536,7 @@ STAT_PRESETS_SAVANT = {
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "fWAR", "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "fWAR", "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Standard": [
         "fWAR", "bWAR", "ERA", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
@@ -549,7 +550,7 @@ STAT_PRESETS_YOY = {
         "ERA", "xERA", "FIP","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Statcast": [
-         "xERA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+         "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Stat Mix": [
         "fWAR", "bWAR", "GS", "IP", "ERA",  "FIP", 
@@ -574,7 +575,7 @@ STAT_PRESETS_DATABASE = {
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "ERA","xERA", "ERA-xERA","vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "ERA","xERA", "xBA", "ERA-xERA","vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
    
     "Standard": [

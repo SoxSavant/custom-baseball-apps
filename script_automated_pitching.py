@@ -9,8 +9,8 @@ localUpload = False
 
 upload = True
 
-startYear = 2002
-EndYear = 2026
+startYear = 1901
+EndYear = 2025
 
 MULTIPLY_100_IF_DECIMAL = {
     "Whiff%", "Chase%", "K%", "BB%", "GB%",
@@ -59,9 +59,10 @@ def fetch_xera(year: int) -> pd.DataFrame:
     r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
     r.raise_for_status()
     df = pd.read_csv(StringIO(r.text))
-    df = df[["player_id", "xera"]].rename(columns={"xera": "xERA_sv"})
+    df = df[["player_id", "xera","est_ba"]].rename(columns={"xera": "xERA_sv","est_ba":"xBA"})
     df["player_id"] = pd.to_numeric(df["player_id"], errors="coerce")
     df["xERA_sv"] = pd.to_numeric(df["xERA_sv"], errors="coerce")
+    df["xBA"] = pd.to_numeric(df["xBA"], errors="coerce")
     return df
 
 def fetch_fangraphs_pitching(year: int) -> pd.DataFrame:
