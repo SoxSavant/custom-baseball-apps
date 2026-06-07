@@ -430,7 +430,7 @@ with col2:
         end_col    = f"{stat}_end"
         col_start  = f"{stat_label} ({start_year})"
         col_end    = f"{stat_label} ({end_year})"
-        col_delta  = f"{stat_label} change"
+        col_delta  = f"Change in {stat_label}"
 
         base_cols = [c for c in ["Name", "Team"] if c in df_full.columns]
         display = df_full[base_cols + [start_col, end_col, stat]].copy()
