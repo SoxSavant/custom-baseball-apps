@@ -87,6 +87,7 @@ for key, default in [
     ("pc_show_ip",     False),
     ("ps_val_0",       4.00),
     ("ps_val_1",       3.00),
+    ("ps_view", "Graphic"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -95,6 +96,7 @@ for key, default in [
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
+    view_mode = st.radio("View", ["Graphic", "Database"], key="ps_view", horizontal=True)
     num_stats = st.radio("Number of stat filters", [1, 2, 3, 4], index=0, horizontal=True, key="ps_num_stats")
 
     st.selectbox("Start Year", options=list(range(current_year, start_year - 1, -1)), key="ps_start_year")
@@ -198,7 +200,8 @@ else:
         axis=1
     )
     
-    display_df = display_df.sort_values("season_count", ascending=False).head(MAX_DISPLAY)
+    display_df = display_df.sort_values("season_count", ascending=False)
+    display_df_graphic = display_df.head(MAX_DISPLAY)
 
 def format_threshold_label(stat, val, op):
     lbl = label_map.get(stat, stat)
@@ -206,7 +209,7 @@ def format_threshold_label(stat, val, op):
     return f"{formatted}+ {lbl}" if op == ">=" else f"≤ {formatted} {lbl}"
 
 cards = []
-for _, row in display_df.iterrows():
+for _, row in display_df_graphic.iterrows():
     name = str(row.get("Name", "")).strip()
     team = get_team_display(str(row.get("Team", "")))
     season_count = int(row.get("season_count", 0))
@@ -376,6 +379,51 @@ white-space: nowrap;
 </body>
 </html>"""
 
+est_height = 180 + (max(1, (len(cards) + 4) // 5)) * 310 + 80
+
 with col2:
-    est_height = 180 + (max(1, (len(cards) + 4) // 5)) * 310 + 80
-    components.html(full_html, height=est_height, scrolling=True)
+    if view_mode == "Graphic":
+        components.html(full_html, height=est_height, scrolling=True)
+
+    else:
+        if display_df.empty:
+            st.info("No players matched the filter. Try adjusting your threshold.")
+            st.stop()
+
+        rows = []
+        for _, row in display_df.iterrows():
+            name         = str(row.get("Name", "")).strip()
+            team_raw     = str(row.get("Team", ""))
+            team         = get_team_display(team_raw)
+            season_count = int(row.get("season_count", 0))
+            seasons_list = row.get("seasons", [])
+            seasons_str  = ", ".join(str(y) for y in seasons_list)
+            rows.append({
+                "Name":    name,
+                "Team":    team,
+                "Seasons": season_count,
+                "Years":   seasons_str,
+            })
+
+        db_df = pd.DataFrame(rows)
+        db_df.index += 1
+
+        st.caption(f"{page_title}")
+        st.dataframe(
+            db_df,
+            width="stretch",
+            height=700,
+            column_config={
+                "Name":    st.column_config.TextColumn("Name",    width="medium"),
+                "Team":    st.column_config.TextColumn("Team",    width="small"),
+                "Seasons": st.column_config.NumberColumn("Seasons", format="%d", width="small"),
+                "Years":   st.column_config.TextColumn("Years",   width="large"),
+            },
+        )
+
+        st.markdown(
+            "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem;'>"
+            "Data: Baseball Reference · FanGraphs · Baseball Savant"
+            "</div>",
+            unsafe_allow_html=True,
+        )
