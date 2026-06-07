@@ -154,7 +154,8 @@ def load_risers_data(
             e_val = pd.to_numeric(row_e.get(col, np.nan), errors="coerce")
             record[f"{col}_start"] = s_val
             record[f"{col}_end"]   = e_val
-            record[col] = e_val - s_val
+            decimal = STAT_ROUND.get(col,1)
+            record[col] = e_val.round(decimal) - s_val.round(decimal)
 
         rows.append(record)
 
