@@ -48,13 +48,16 @@ with meta_col:
         'Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a></div>',
         unsafe_allow_html=True,
     )
+
+from utils import TEAM_OPTIONS
+
 from p_utils import get_last_updated
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
 
 from p_utils import (
-    STAT_ALLOWLIST,  PCT_STATS, format_stat, STAT_DEFAULTS,
+    STAT_ALLOWLIST,  PCT_STATS, format_stat, STAT_DEFAULTS, normalize_team,
     get_headshot, label_map, lower_better, start_year,
     get_team_display,load_final_year, STAT_ROUND
 )
@@ -82,12 +85,13 @@ def load_all_seasons(start: int, end: int) -> pd.DataFrame:
 for key, default in [
     ("ps_start_year",  current_year - 10),
     ("ps_end_year",    current_year - 1),
-    ("ps_min_ip",      100),
+    ("ps_min_ip",      50),
     ("ps_show_min_ip", False),
     ("pc_show_ip",     False),
     ("ps_val_0",       4.00),
     ("ps_val_1",       3.00),
     ("ps_view", "Graphic"),
+    ("ps_team", "all"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -131,6 +135,13 @@ with col1:
                 f"Value {i+1}", step=step, key=f"ps_val_{i}",
                 label_visibility="collapsed", format=fmt,
             )
+        
+        st.selectbox(
+            "Team",
+            options=list(TEAM_OPTIONS.keys()),
+            format_func=lambda x: TEAM_OPTIONS[x],
+            key="ps_team",
+        )
 
     st.checkbox("Show min IP", key="ps_show_min_ip")
     st.checkbox("Show player IP",      key="pc_show_ip")
@@ -145,6 +156,7 @@ for i in range(num_stats):
 
 min_ip = int(st.session_state["ps_min_ip"])
 df_all = load_all_seasons(sel_start, sel_end)
+team_val = st.session_state.get("ps_team", "all")
 
 if df_all.empty:
     st.error(f"No data found for {sel_start}–{sel_end}.")
@@ -153,6 +165,11 @@ if df_all.empty:
 # IP Filter
 if min_ip > 0 and "IP" in df_all.columns:
     df_all = df_all[pd.to_numeric(df_all["IP"], errors="coerce").fillna(0) >= min_ip]
+
+if team_val != "all" and "Team" in df_all.columns:
+    target = normalize_team(team_val)
+    df_all = df_all[df_all["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+
 
 # Filter logic
 mask = pd.Series([True] * len(df_all), index=df_all.index)
@@ -179,6 +196,7 @@ qualifying_rows = df_all[mask]
 # Aggregation
 if qualifying_rows.empty:
     display_df = pd.DataFrame()
+    display_df_graphic = pd.DataFrame()
 else:
     grouped = (
         qualifying_rows
@@ -234,10 +252,10 @@ for _, row in display_df_graphic.iterrows():
       <div class="season-years">{html.escape(seasons_str)}</div>
       {ip_html}
     </div>""")
-
+team_label  = f" ({TEAM_OPTIONS.get(team_val, "")})" if team_val != "all" else ""
 filter_parts  = [format_threshold_label(s, v, op) for s, op, v in active_filters]
 threshold_str = ", ".join(filter_parts)
-page_title    = f"Most {threshold_str} Seasons: {sel_start}–{sel_end}"
+page_title    = f"Most {threshold_str} Seasons: {sel_start}–{sel_end} {team_label}"
 
 min_ip_subtitle = (
     f'<div class="leaderboard-subtitle">Min {min_ip} IP per season</div>'

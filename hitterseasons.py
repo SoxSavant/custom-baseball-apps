@@ -52,12 +52,12 @@ current_year = date.today().year
 last_updated = get_last_updated(current_year)
 st.caption(f"2026 data last updated: {last_updated}")
 from h_utils import (
-    STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, STAT_ROUND,
+    STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, STAT_ROUND, normalize_team,
     get_headshot, label_map, lower_better, start_year,
     POSITION_OPTIONS, get_team_display, filter_by_position, load_final_year
 )
 
-from utils import get_dynamic_min_pa
+from utils import TEAM_OPTIONS
 
 MAX_DISPLAY  = 10
 current_year = date.today().year
@@ -67,7 +67,6 @@ def update_stat_default(i):
     st.session_state[f"hs_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
     st.session_state[f"hs_op_{i}"]  = "<=" if stat in lower_better else ">="
 
-min_pa = get_dynamic_min_pa(current_year)
 
 def load_all_seasons(start: int, end: int) -> pd.DataFrame:
     frames = []
@@ -83,11 +82,13 @@ for key, default in [
     ("hs_start_year",  current_year - 10),
     ("hs_end_year",    current_year-1),
     ("hs_position",    "all"),
+    ("hs_min_pa", 300),
     ("hs_min_type","PA"),
-    ("hs_show_min_pa", True),
+    ("hs_show_min_pa", False),
     ("hs_val_0",       5.0),
     ("hs_val_1",       100),
     ("hs_view", "Graphic"),
+    ("hs_team", "all"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -109,7 +110,7 @@ with col1:
     if st.session_state["hs_min_type"] == "Inn":
         st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key="hs_min_inn")
     else:
-        st.number_input("Min PA", min_value=0, max_value=20000, value = min_pa, key="hs_min_pa")
+        st.number_input("Min PA", min_value=0, max_value=20000, key="hs_min_pa")
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
@@ -141,6 +142,13 @@ with col1:
         format_func=lambda x: POSITION_OPTIONS[x], key="hs_position",
     )
 
+    st.selectbox(
+        "Team",
+        options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x],
+        key="hs_team",
+    )
+
     if st.session_state["hs_min_type"] == "PA":
         st.checkbox("Show Min PA", key="hs_show_min_pa")
     else:
@@ -158,6 +166,7 @@ use_inn     = st.session_state.get("hs_min_type") == "Inn"
 min_pa_val  = int(st.session_state.get("hs_min_pa", 0))
 min_inn_val = int(st.session_state.get("hs_min_inn", 0))
 position = st.session_state["hs_position"]
+team_val = st.session_state.get("hs_team", "all")
 
 df_all = load_all_seasons(sel_start, sel_end)
 
@@ -171,6 +180,10 @@ if use_inn:
 else:
     if min_pa_val > 0 and "PA" in df_all.columns:
         df_all = df_all[pd.to_numeric(df_all["PA"], errors="coerce").fillna(0) >= min_pa_val]
+
+if team_val != "all" and "Team" in df_all.columns:
+    target = normalize_team(team_val)
+    df_all = df_all[df_all["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
 
 # Position filter
 df_all = filter_by_position(df_all, position)
@@ -198,6 +211,7 @@ qualifying_rows = df_all[mask]
 
 if qualifying_rows.empty:
     display_df = pd.DataFrame()
+    display_df_graphic = pd.DataFrame()
 else:
     # 1. Group to get counts, list of seasons, and count of unique teams
     grouped = (
@@ -271,8 +285,9 @@ threshold_str = ", ".join(filter_parts)
 span_label    = f"{sel_start}–{sel_end}"
 pos_val       = st.session_state["hs_position"]
 pos_suffix    = f" ({POSITION_OPTIONS[pos_val]})" if pos_val != "all" else ""
+team_label  = f" ({TEAM_OPTIONS.get(team_val, "")})" if team_val != "all" else ""
 
-page_title = f"Most {threshold_str} Seasons: {span_label}{pos_suffix}"
+page_title = f"Most {threshold_str} Seasons: {span_label}{pos_suffix} {team_label}"
 
 if st.session_state.get("hs_show_min_pa"):
     if use_inn:
