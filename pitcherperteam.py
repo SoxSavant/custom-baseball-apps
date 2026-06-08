@@ -57,9 +57,9 @@ st.caption(f"2026 data last updated: {last_updated}")
 from p_utils import (
     STAT_ALLOWLIST, RATE_STATS, format_stat, STAT_DEFAULTS, aggregate_player_group_single,
     label_map, lower_better, start_year, 
-    normalize_team, get_team_display, load_final_year, TEAMS, STAT_ROUND
+    normalize_team, get_team_display, load_final_year, STAT_ROUND
 )
-from utils import get_dynamic_min_ip, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url
+from utils import get_dynamic_min_ip, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url, TEAMS
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
