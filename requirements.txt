@@ -8,3 +8,4 @@ requests
 reportlab
 Pillow
 boto3
+dotenv
