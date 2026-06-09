@@ -291,9 +291,9 @@ page_title = f"Most {threshold_str} Seasons: {span_label}{pos_suffix} {team_labe
 
 if st.session_state.get("hs_show_min_pa"):
     if use_inn:
-        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn per season</div>'
     else:
-        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA per season</div>'
 else:
     min_pa_subtitle = ""
 
