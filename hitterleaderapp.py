@@ -134,7 +134,7 @@ for key, default in [
     ("hl_mode", MODE_SINGLE),
     ("hl_show_player_pa", False),
     ("hl_sort_worst", False),
-    ("hl_show_min_pa", True),
+    ("hl_show_min_pa", False),
     ("hl_view", "Graphic"),
     ("hl_league","All")
 ]:

@@ -108,7 +108,7 @@ for key, default in [
     ("pl_team",           "all"),
     ("pl_mode",           MODE_SINGLE),
     ("pl_sort_worst",     False),
-    ("pl_show_min_ip",    True),
+    ("pl_show_min_ip",    False),
     ("pl_show_player_ip", False),
     ("pl_view",           "Graphic"),
     ("pl_league","All")
