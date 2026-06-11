@@ -618,7 +618,7 @@ STAT_PRESETS_YOY = {
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Stat Mix": [
-        "fWAR", "bWAR", "G", "PA", "HR", "wRC+", "xwOBA",
+        "fWAR", "bWAR", "HR", "wRC+", "xwOBA",
         "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
     ],
     "Stat Mix Rate Basis": [
