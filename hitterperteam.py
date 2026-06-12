@@ -120,7 +120,7 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
 
 for key, default in [
     ("tc_year",           current_year),
-    ("tc_start_year",     current_year - 1),
+    ("tc_start_year",     current_year),
     ("tc_end_year",       current_year),
     ("tc_mode",           MODE_SINGLE),
     ("tc_position",       "all"),
@@ -128,8 +128,8 @@ for key, default in [
     ("tc_show_player_pa", False),
     ("tc_show_all_teams", False),
     ("tc_leaders_only",False),
-    ("tc_collapse_split", True),
-    ("tc_val_0",          .350),
+    ("tc_collapse_split", False),
+    ("tc_val_0",          .800),
     ("tc_val_1",          125),
     ("tc_min_type", "PA"),
 ]:
@@ -144,6 +144,11 @@ for div in ALL_DIVISIONS:
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
+
+    view_mode = st.radio(
+        "View", options=["Graphic", "Database"], horizontal=True, key="tc_view_mode"
+    )
+
     num_stats = st.radio(
         "Number of stat filters", [1, 2, 3, 4],
         index=0, horizontal=True, key="tc_num_stats",
@@ -162,8 +167,6 @@ with col1:
         s_year = st.session_state["tc_year"]
         e_year = st.session_state["tc_year"]
 
-        if "tc_last_year" not in st.session_state:
-            st.session_state.tc_last_year = s_year
     else:
         st.selectbox("Start Year", options=list(range(current_year, start_year - 1, -1)), key="tc_start_year")
         st.selectbox("End Year",   options=list(range(current_year, start_year - 1, -1)), key="tc_end_year")
@@ -180,7 +183,7 @@ with col1:
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
-        default_stat  = "xwOBA" if i == 0 else "wRC+" if i == 1 else STAT_ALLOWLIST[0]
+        default_stat  = "OPS" if i == 0 else STAT_ALLOWLIST[0]
         default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
 
         new_stat = st.selectbox(
@@ -715,5 +718,70 @@ white-space: nowrap;
 <body>{grid_html}</body>
 </html>"""
 
+db_team_groups = []
+if mode == MODE_SPLIT and not collapse_split:
+    for (abbrev, year) in [k for k in qualifying_by_team_year if get_team_division(k[0]) in active_divisions]:
+        norm = normalize_team(abbrev)
+        data = qualifying_by_team_year.get((norm, year))
+        if data and data["player_count"] > 0:
+            db_team_groups.append(data)
+else:
+    for abbrev in [a for a in qualifying_by_team if get_team_division(a) in active_divisions]:
+        norm = normalize_team(abbrev)
+        data = qualifying_by_team.get(norm)
+        if data and data["player_count"] > 0:
+            db_team_groups.append(data)
+
+db_team_groups.sort(key=lambda x: (
+    -x["player_count"],
+    x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
+    x["abbrev"],
+))
+
 with col2:
-    components.html(full_html, height=est_height, scrolling=True)
+    if view_mode == "Graphic":
+        components.html(full_html, height=est_height, scrolling=True)
+
+    else:
+            if not db_team_groups:
+                st.info("No teams matched all filters. Try adjusting your thresholds.")
+            else:
+                db_rows = []
+                for tg in db_team_groups:
+                    team_label = tg["abbrev"]
+                    if tg.get("year") is not None:
+                        team_label = f"{team_label} – {tg['year']}"
+
+                    names = []
+                    for _, prow in tg["players"].iterrows():
+                        name = str(prow.get("Name", "")).strip()
+                        if collapse_split and mode == MODE_SPLIT and "Season" in prow.index and pd.notna(prow.get("Season")):
+                            name = f"{name} ({int(prow['Season'])})"
+                        names.append(name)
+
+                    db_rows.append({
+                        "Team":    team_label,
+                        "Count":   tg["player_count"],
+                        "Players": ", ".join(names),
+                    })
+
+                db_df = pd.DataFrame(db_rows)
+                db_df.index += 1
+
+                st.caption(title_text)
+                st.dataframe(
+                    db_df,
+                    width="stretch",
+                    height=700,
+                    column_config={
+                        "Team":    st.column_config.TextColumn("Team",    width="small"),
+                        "Count":   st.column_config.NumberColumn("Count", width="small"),
+                        "Players": st.column_config.TextColumn("Players", width="large"),
+                    },
+                )
+                st.markdown(
+                    "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem;'>"
+                    "Data: Baseball Reference · FanGraphs · Baseball Savant"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
