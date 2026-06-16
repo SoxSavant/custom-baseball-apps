@@ -1,5 +1,4 @@
 from datetime import date
-from p_utils import normalize_team
 import re
 import boto3
 import os
@@ -10,6 +9,13 @@ load_dotenv()
 
 BREF_COOKIE = os.getenv("BREF_COOKIE", "")
 FG_COOKIE   = os.getenv("FG_COOKIE", "")
+
+TEAM_ALIASES = {"ATH": "OAK", "ATH/OAK": "OAK", "OAK/ATH": "OAK"}
+
+def normalize_team(team: str) -> str:
+    t = str(team).strip()
+    return TEAM_ALIASES.get(t, t)
+
 
 
 TEAM_OPTIONS = {
@@ -170,7 +176,6 @@ def _browser_headers(cookie_string: str) -> dict:
             "q=0.9,image/avif,image/webp,*/*;q=0.8"
         ),
         "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
         "Sec-Fetch-Dest": "document",
