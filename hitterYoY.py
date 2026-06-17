@@ -58,7 +58,7 @@ with meta_col:
 from h_utils import get_last_updated
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
-st.caption(f"2026 data last updated: {last_updated}")
+st.caption(f"{current_year} data last updated: {last_updated}")
 from h_utils import (STAT_ALLOWLIST, start_year, get_headshot, label_map, lower_better, STAT_ROUND,
 format_stat_yoy, POSITION_OPTIONS, normalize_team, get_team_display, filter_by_position, load_final_year)
 

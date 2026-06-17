@@ -224,7 +224,7 @@ with meta_col:
 from p_utils import get_last_updated, STAT_ROUND
 current_year = date.today().year
 last_updated = get_last_updated(current_year)
-st.caption(f"2026 data last updated: {last_updated}")
+st.caption(f"{current_year} data last updated: {last_updated}")
 
 from p_utils import (STAT_ALLOWLIST, TRUTHY_STRINGS, STAT_PRESETS,
 get_headshot, label_map, lower_better, start_year, format_stat, load_final_year,
