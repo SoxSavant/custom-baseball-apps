@@ -765,12 +765,8 @@ with right_col:
         min_pa_end = st.number_input(f"Min PA ({int(end_yr)})", min_value=0, max_value=700, value=100, step=25)
 
     if run_leaderboard:
-        scan_stats = [
-            s for s in STAT_PRESETS_YOY.get(
-                st.session_state.get(STAT_PRESET_KEY, DEFAULT_PRESET), []
-            )
-            if s in stat_options
-        ]
+        scan_stats = stats_order
+        
 
         with st.spinner(f"Scanning all players for {int(start_yr)}→{int(end_yr)}..."):
             df_start = load_final_year(start_yr)
