@@ -148,38 +148,56 @@ with col2:
 
     x_flip = x_stat in lower_better
     y_flip = y_stat in lower_better
-    df["_plot_x"] = -df[x_stat] if x_flip else df[x_stat]
-    df["_plot_y"] = -df[y_stat] if y_flip else df[y_stat]
 
-    x_axis_label = f"{x_label} (reversed)" if x_flip else x_label
-    y_axis_label = f"{y_label} (reversed)" if y_flip else y_label
+    # 1. Use the original POSITIVE stats for plotting so the axis ticks look correct
+    df["_plot_x"] = df[x_stat]
+    df["_plot_y"] = df[y_stat]
 
-    r = np.corrcoef(df["_plot_x"], df["_plot_y"])[0, 1]
+    x_axis_label = x_label
+    y_axis_label = y_label
+
+    # 2. For Math/Correlation: Account for 'lower is better' so r and slope don't flip backwards
+    stats_x_for_math = -df[x_stat] if x_flip else df[x_stat]
+    stats_y_for_math = -df[y_stat] if y_flip else df[y_stat]
+    
+    r = np.corrcoef(stats_x_for_math, stats_y_for_math)[0, 1]
     r_squared = r ** 2
-    slope, intercept = np.polyfit(df["_plot_x"], df["_plot_y"], 1)
+    
+    # Calculate math slope using the flipped logic
+    math_slope, math_intercept = np.polyfit(stats_x_for_math, stats_y_for_math, 1)
 
+    # 3. Create the scatter plot using the POSITIVE numbers
     fig = px.scatter(
         df,
         x="_plot_x",
         y="_plot_y",
         hover_name="Name" if "Name" in df.columns else None,
+        # Hover data simplifies since we are using native positive values
         hover_data={
-            "_disp_x": True,
-            "_disp_y": True,
-            "_plot_x": False,
-            "_plot_y": False,
+            "_plot_x": True,
+            "_plot_y": True,
         },
-        labels={"_plot_x": x_axis_label, "_plot_y": y_axis_label, "_disp_x": x_label, "_disp_y": y_label},
+        labels={"_plot_x": x_axis_label, "_plot_y": y_axis_label},
     )
     fig.update_traces(marker=dict(size=8, opacity=0.65, color="#2c3e50"))
 
+    # 4. Draw the Trendline using native plot coordinates
+    # We figure out if the trendline should look visually positive or negative
+    # If one (and only one) axis is flipped, the visual slope direction inverts
+    visual_slope_direction = -1 if (x_flip ^ y_flip) else 1
+    plot_slope, plot_intercept = np.polyfit(df["_plot_x"], df["_plot_y"], 1)
+    
     x_range = np.array([df["_plot_x"].min(), df["_plot_x"].max()])
-    y_range = slope * x_range + intercept
+    
+    # Use standard polyfit for the visual line orientation
+    y_range = plot_slope * x_range + plot_intercept
+    
     fig.add_trace(go.Scatter(
         x=x_range, y=y_range, mode="lines",
         line=dict(color="#c0392b", width=2),
         name="Trend", hoverinfo="skip",
     ))
+    
     fig.update_layout(
         title=dict(text=f"{year} {x_label} vs {y_label}", font=dict(color="#1a1a1a", size=22), x=0.5, xanchor="center"),
         height=650,
@@ -194,7 +212,7 @@ with col2:
             gridcolor="#e6e6e6",
             zerolinecolor="#e6e6e6",
             linecolor="#1a1a1a",
-            autorange="reversed" if x_flip else True,
+            autorange="reversed" if x_flip else True
         ),
         yaxis=dict(
             title=dict(font=dict(color="#1a1a1a", size = 18)),
@@ -202,7 +220,7 @@ with col2:
             gridcolor="#e6e6e6",
             zerolinecolor="#e6e6e6",
             linecolor="#1a1a1a",
-            autorange="reversed" if y_flip else True,
+            autorange="reversed" if y_flip else True
         ),
     )
     st.markdown("""
@@ -224,7 +242,7 @@ with col2:
     m2.metric("R²", f"{r_squared:.3f}")
     m3.metric("Sample Size", f"{len(df)}")
 
-    st.caption(f"Trend line: y = {slope:.4f}x + {intercept:.4f}")
+    st.caption(f"Trend line: y = {math_slope:.4f}x + {math_intercept:.4f}")
 
     pdf_buffer = BytesIO()
     fig.update_layout(margin=dict(l=80, r=40, t=60, b=100))
