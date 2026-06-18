@@ -199,7 +199,7 @@ with col2:
     ))
     
     fig.update_layout(
-        title=dict(text=f"<b>{year} {x_label} vs {y_label}</b><br><span style='font-size:14px; color:#0;'>Minimum {min_val} {qualifier_col}</span>", font=dict(color="#1a1a1a", size=22), x=0.5, xanchor="center"),
+        title=dict(text=f"<b>{x_label} vs {y_label} ({year}) </b><br><span style='font-size:14px; color:#0;'>Minimum {min_val} {qualifier_col}</span>", font=dict(color="#1a1a1a", size=22), x=0.5, xanchor="center"),
         height=650,
         plot_bgcolor="white",
         paper_bgcolor="white",
