@@ -10,4 +10,4 @@ Pillow
 boto3
 dotenv
 plotly
-kaleido
+kaleido==0.1.0.post1
