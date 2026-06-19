@@ -82,19 +82,19 @@ for key, default in [
 col1, col2 = st.columns([.5, 2])
 
 with col1:
-    domain = st.radio("Domain", ["Hitting", "Pitching"], key="cr_domain", horizontal=True)
+    domain = st.radio("", ["Hitting", "Pitching"], key="cr_domain", horizontal=True)
 
     if domain == "Hitting":
         from h_utils import (
             STAT_ALLOWLIST, format_stat, start_year, label_map,
-            load_final_year, STAT_ROUND, lower_better, aggregate_player_group,
+            load_final_year,  lower_better, aggregate_player_group,
             POSITION_OPTIONS, normalize_team, filter_by_position,
         )
         min_type_default = "PA"
     else:
         from p_utils import (
             STAT_ALLOWLIST, format_stat, start_year, label_map,
-            load_final_year, STAT_ROUND, lower_better, aggregate_player_group,
+            load_final_year, lower_better, aggregate_player_group,
             normalize_team,
         )
         min_type_default = "IP"
@@ -163,7 +163,7 @@ with col1:
     )
 
     st.checkbox("Show player names", key="cr_show_names")
-    st.text_input("Search player", key="cr_search", placeholder="e.g. Judge")
+    st.text_input("Search player", key="cr_search")
 
 
 def load_data(s_year, e_year, mode, position="all"):
