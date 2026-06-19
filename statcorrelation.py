@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from datetime import date
 from io import BytesIO
 
-from utils import get_dynamic_min_pa, get_dynamic_min_ip
+from utils import get_dynamic_min_pa, get_dynamic_min_ip, TEAM_OPTIONS, LEAGUES
 
 st.set_page_config(page_title="Stat Correlation", layout="wide", page_icon="⚾")
 
@@ -44,7 +44,7 @@ st.markdown("""
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Stat Correlation Finder")
+    st.title("Stat Correlation")
 with meta_col:
     st.markdown(
         """
@@ -57,12 +57,24 @@ with meta_col:
 
 current_year = date.today().year
 
+MODE_SINGLE = "Single Season"
+MODE_SPLIT  = "Split Seasons"
+MODE_MULTI  = "Multi-Year Span"
+
 for key, default in [
     ("cr_domain", "Hitting"),
     ("cr_year", current_year),
+    ("cr_start_year", current_year - 1),
+    ("cr_end_year", current_year),
+    ("cr_mode", MODE_SINGLE),
     ("cr_min_type", "PA"),
     ("cr_min_pa", get_dynamic_min_pa(current_year)/2),
     ("cr_min_ip", 0),
+    ("cr_show_names", True),
+    ("cr_search", ""),
+    ("cr_position", "all"),
+    ("cr_team", "all"),
+    ("cr_league", "All"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -75,13 +87,15 @@ with col1:
     if domain == "Hitting":
         from h_utils import (
             STAT_ALLOWLIST, format_stat, start_year, label_map,
-            load_final_year, STAT_ROUND, lower_better,
+            load_final_year, STAT_ROUND, lower_better, aggregate_player_group,
+            POSITION_OPTIONS, normalize_team, filter_by_position,
         )
         min_type_default = "PA"
     else:
         from p_utils import (
             STAT_ALLOWLIST, format_stat, start_year, label_map,
-            load_final_year, STAT_ROUND, lower_better,
+            load_final_year, STAT_ROUND, lower_better, aggregate_player_group,
+            normalize_team,
         )
         min_type_default = "IP"
 
@@ -93,8 +107,17 @@ with col1:
         st.session_state["cr_min_ip"] = get_dynamic_min_ip(current_year)/2
         st.session_state.cr_last_domain = domain
 
-    st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key="cr_year")
-    year = st.session_state["cr_year"]
+    mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="cr_mode")
+
+    if mode == MODE_SINGLE:
+        st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key="cr_year")
+        sel_start = st.session_state["cr_year"]
+        sel_end = st.session_state["cr_year"]
+    else:
+        st.selectbox("Start Year", options=list(range(current_year, start_year - 1, -1)), key="cr_start_year")
+        st.selectbox("End Year",   options=list(range(current_year, start_year - 1, -1)), key="cr_end_year")
+        sel_start = st.session_state["cr_start_year"]
+        sel_end   = max(st.session_state["cr_end_year"], sel_start)
 
     x_stat = st.selectbox(
         "X Stat", STAT_ALLOWLIST, key="cr_x_stat",
@@ -112,17 +135,99 @@ with col1:
     else:
         st.number_input("Min IP", min_value=0, max_value=5000, key="cr_min_ip")
 
-df = load_final_year(year)
+    if domain == "Hitting":
+        st.selectbox(
+            "Position",
+            options=list(POSITION_OPTIONS.keys()),
+            format_func=lambda x: POSITION_OPTIONS[x],
+            key="cr_position",
+        )
+
+    team_disabled = (mode == MODE_MULTI)
+    league_disabled = (sel_start < 2013)
+
+    st.selectbox(
+        "Team",
+        options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x],
+        key="cr_team",
+        disabled=team_disabled,
+        help="Team filter unavailable for multi-year span" if team_disabled else None,
+    )
+    st.selectbox(
+        "League",
+        options=LEAGUES.keys(),
+        key="cr_league",
+        disabled=team_disabled or league_disabled,
+        help="League filter unavailable for years before 2013 due to possible innacuracies" if league_disabled else None,
+    )
+
+    st.checkbox("Show player names", key="cr_show_names")
+    st.text_input("Search player", key="cr_search", placeholder="e.g. Judge")
+
+
+def load_data(s_year, e_year, mode, position="all"):
+    if mode == MODE_SINGLE:
+        return load_final_year(s_year)
+
+    frames = []
+    for yr in range(s_year, e_year + 1):
+        d = load_final_year(yr)
+        if d is not None and not d.empty:
+            if mode == MODE_SPLIT and domain == "Hitting":
+                d = filter_by_position(d, position)
+            d["Season"] = yr
+            frames.append(d)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+
+    if mode == MODE_SPLIT:
+        return combined
+
+    if domain == "Hitting":
+        combined = filter_by_position(combined, position)
+        if combined.empty:
+            return pd.DataFrame()
+
+    return aggregate_player_group(combined)
+
+
+position_val = st.session_state.get("cr_position", "all") if domain == "Hitting" else "all"
+
+df = load_data(sel_start, sel_end, mode, position_val)
 if df is None or df.empty:
-    st.error(f"No data found for {year}.")
+    st.error(f"No data found for {sel_start}–{sel_end}.")
     st.stop()
 
 if domain == "Hitting":
     qualifier_col = "PA"
     min_val = int(st.session_state.get("cr_min_pa", 0))
+
+    if mode == MODE_SINGLE:
+        df = filter_by_position(df, position_val)
 else:
     qualifier_col = "IP"
     min_val = int(st.session_state.get("cr_min_ip", 0))
+
+team_disabled = (mode == MODE_MULTI)
+league_disabled = (sel_start < 2013)
+team_val = "all" if team_disabled else st.session_state.get("cr_team", "all")
+league_val = "All" if team_disabled or league_disabled else st.session_state.get("cr_league", "All")
+
+if team_val != "all" and "Team" in df.columns:
+    target = normalize_team(team_val)
+    df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) == target)]
+
+if league_val != "All" and "Team" in df.columns:
+    league_teams = LEAGUES[league_val]
+    df = df[df["Team"].astype(str).apply(lambda t: normalize_team(t) in league_teams)]
+
+if df.empty:
+    st.error("No players match the selected filters.")
+    st.stop()
 
 if min_val > 0 and qualifier_col in df.columns:
     df = df[pd.to_numeric(df[qualifier_col], errors="coerce").fillna(0) >= min_val]
@@ -149,80 +254,144 @@ with col2:
     x_flip = x_stat in lower_better
     y_flip = y_stat in lower_better
 
-    # 1. Use the original POSITIVE stats for plotting so the axis ticks look correct
     df["_plot_x"] = df[x_stat]
     df["_plot_y"] = df[y_stat]
 
     x_axis_label = x_label
     y_axis_label = y_label
 
-    # 2. For Math/Correlation: Account for 'lower is better' so r and slope don't flip backwards
     stats_x_for_math = -df[x_stat] if x_flip else df[x_stat]
     stats_y_for_math = -df[y_stat] if y_flip else df[y_stat]
-    
+
     r = np.corrcoef(stats_x_for_math, stats_y_for_math)[0, 1]
     r_squared = r ** 2
-    
-    # Calculate math slope using the flipped logic
+
     math_slope, math_intercept = np.polyfit(stats_x_for_math, stats_y_for_math, 1)
 
-    # 3. Create the scatter plot using the POSITIVE numbers
+    hover_data = {
+        "_disp_x": True,
+        "_disp_y": True,
+        "_plot_x": False,
+        "_plot_y": False,
+    }
+    labels = {"_plot_x": x_axis_label, "_plot_y": y_axis_label, "_disp_x": x_label, "_disp_y": y_label}
+
+    if mode == MODE_SPLIT and "Season" in df.columns:
+        hover_data["Season"] = True
+
+    show_names = st.session_state.get("cr_show_names", False)
+
+    if show_names and "Name" in df.columns:
+        if mode == MODE_SPLIT and "Season" in df.columns:
+            df["_label_text"] = df["Name"].astype(str) + " (" + df["Season"].astype(str) + ")"
+        else:
+            df["_label_text"] = df["Name"].astype(str)
+        hover_data["_label_text"] = False
+    scatter_mode = "markers+text" if show_names else "markers"
+
     fig = px.scatter(
         df,
         x="_plot_x",
         y="_plot_y",
         hover_name="Name" if "Name" in df.columns else None,
-        # Hover data simplifies since we are using native positive values
-        hover_data={
-            "_plot_x": True,
-            "_plot_y": True,
-        },
-        labels={"_plot_x": x_axis_label, "_plot_y": y_axis_label},
+        hover_data=hover_data,
+        labels=labels,
+        text="_label_text" if show_names and "_label_text" in df.columns else None,
     )
-    fig.update_traces(marker=dict(size=8, opacity=0.65, color="#2c3e50"))
+    fig.update_traces(
+        marker=dict(size=8, opacity=0.65, color="#2c3e50"),
+        mode=scatter_mode,
+        textposition="top center",
+        textfont=dict(size=10, color="#1a1a1a"),
+        selector=dict(type="scatter"),
+    )
 
-    # 4. Draw the Trendline using native plot coordinates
-    # We figure out if the trendline should look visually positive or negative
-    # If one (and only one) axis is flipped, the visual slope direction inverts
-    visual_slope_direction = -1 if (x_flip ^ y_flip) else 1
+    search_term = st.session_state.get("cr_search", "").strip().lower()
+    if search_term and "Name" in df.columns:
+        matches = df[df["Name"].astype(str).str.lower().str.contains(search_term, na=False)]
+        if not matches.empty:
+            if mode == MODE_SPLIT and "Season" in matches.columns:
+                match_text = matches["Name"].astype(str) + " (" + matches["Season"].astype(str) + ")"
+            else:
+                match_text = matches["Name"].astype(str)
+            fig.add_trace(go.Scatter(
+                x=matches["_plot_x"], y=matches["_plot_y"],
+                mode="markers+text",
+                text=match_text,
+                textposition="top center",
+                textfont=dict(size=11, color="#c0392b"),
+                marker=dict(size=13, color="#e67e22", line=dict(width=2, color="#c0392b")),
+                name="Search match",
+                customdata=matches[["_disp_x", "_disp_y"]].values if {"_disp_x", "_disp_y"}.issubset(matches.columns) else None,
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    + x_label + ": %{customdata[0]}<br>"
+                    + y_label + ": %{customdata[1]}<extra></extra>"
+                ) if {"_disp_x", "_disp_y"}.issubset(matches.columns) else None,
+            ))
+        else:
+            st.caption(f"No players matching \"{search_term}\" in current filters.")
+
     plot_slope, plot_intercept = np.polyfit(df["_plot_x"], df["_plot_y"], 1)
-    
+
     x_range = np.array([df["_plot_x"].min(), df["_plot_x"].max()])
-    
-    # Use standard polyfit for the visual line orientation
     y_range = plot_slope * x_range + plot_intercept
-    
+
     fig.add_trace(go.Scatter(
         x=x_range, y=y_range, mode="lines",
         line=dict(color="#c0392b", width=2),
         name="Trend", hoverinfo="skip",
     ))
-    
+
+    span_label = f"{sel_start}" if mode == MODE_SINGLE else f"{sel_start}–{sel_end}"
+    qualifier_label = f"Minimum {min_val} {qualifier_col}"
+
+    extra_bits = []
+    if domain == "Hitting" and position_val != "all":
+        extra_bits.append(POSITION_OPTIONS[position_val])
+    if not team_disabled and team_val != "all":
+        extra_bits.append(TEAM_OPTIONS[team_val])
+    if not (team_disabled or league_disabled) and league_val != "All":
+        extra_bits.append(league_val)
+    if extra_bits:
+        qualifier_label += " · " + " · ".join(extra_bits)
+
+    mode_label = {MODE_SINGLE: "", MODE_SPLIT: "Split Seasons", MODE_MULTI: "Multi-Year Span"}[mode]
+
+    title_main = f"{x_label} vs {y_label} - {span_label}"
+    if mode_label:
+        title_main += f" - {mode_label}"
+
     fig.update_layout(
-        title=dict(text=f"<b>{x_label} vs {y_label} ({year}) </b><br><span style='font-size:14px; color:#0;'>Minimum {min_val} {qualifier_col}</span>", font=dict(color="#1a1a1a", size=22), x=0.5, xanchor="center"),
+        title=dict(
+            text=f"<b>{title_main}</b><br><span style='font-size:14px; color:#0;'>{qualifier_label}</span>",
+            font=dict(color="#1a1a1a", size=22), x=0.5, xanchor="center",
+        ),
         height=650,
         plot_bgcolor="white",
         paper_bgcolor="white",
         font=dict(color="#1a1a1a"),
         margin=dict(l=80, r=40, t=60, b=40),
         legend=dict(font=dict(color="#1a1a1a")),
+        showlegend=False,
         xaxis=dict(
-            title=dict(font=dict(color="#1a1a1a", size = 18)),
-            tickfont=dict(color="#1a1a1a", size = 15),
+            title=dict(font=dict(color="#1a1a1a", size=18)),
+            tickfont=dict(color="#1a1a1a", size=15),
             gridcolor="#e6e6e6",
             zerolinecolor="#e6e6e6",
             linecolor="#1a1a1a",
-            autorange="reversed" if x_flip else True
+            autorange="reversed" if x_flip else True,
         ),
         yaxis=dict(
-            title=dict(font=dict(color="#1a1a1a", size = 18)),
-            tickfont=dict(color="#1a1a1a", size = 15),
+            title=dict(font=dict(color="#1a1a1a", size=18)),
+            tickfont=dict(color="#1a1a1a", size=15),
             gridcolor="#e6e6e6",
             zerolinecolor="#e6e6e6",
             linecolor="#1a1a1a",
-            autorange="reversed" if y_flip else True
+            autorange="reversed" if y_flip else True,
         ),
     )
+
     st.markdown("""
 <style>
 [data-testid="stPlotlyChart"] {
@@ -244,7 +413,6 @@ with col2:
 
     st.caption(f"Trend line: y = {math_slope:.4f}x + {math_intercept:.4f}")
 
-    pdf_buffer = BytesIO()
     fig.update_layout(margin=dict(l=80, r=40, t=60, b=100))
     pdf_buffer = BytesIO()
     fig.write_image(pdf_buffer, format="pdf", width=1200, height=700)
@@ -253,10 +421,9 @@ with col2:
     st.download_button(
         "Download as PDF",
         data=pdf_buffer,
-        file_name=f"{year} {x_label} vs {y_label}.pdf",
+        file_name=f"{span_label} {x_label} vs {y_label}.pdf",
         mime="application/pdf",
     )
-
 
     st.markdown(
         "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem; margin-bottom:3rem;'>"
