@@ -363,9 +363,9 @@ with right_col:
             df = df[mask]
 
     if year_mode == "Split Season":
-        base_cols = [c for c in ["Name", "Year"] if c in df.columns]
+        base_cols = [c for c in ["Name", "Team","Year"] if c in df.columns]
     else:
-        base_cols = [c for c in ["Name",] if c in df.columns]
+        base_cols = [c for c in ["Name","Team"] if c in df.columns]
 
     default_sort = next((s for s in selected_stats if s in df.columns), None)
 
