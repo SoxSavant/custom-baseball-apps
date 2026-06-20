@@ -271,6 +271,12 @@ def aggregate_player_group(df: pd.DataFrame) -> pd.DataFrame:
     oaa  = pd.to_numeric(result.get("OAA"),  errors="coerce")
     frv  = pd.to_numeric(result.get("FRV"),  errors="coerce")
     frm  = pd.to_numeric(result.get("FRM"),  errors="coerce")
+    so = pd.to_numeric(result.get("SO"), errors="coerce")
+
+    if "K%" in result.columns:
+        result["K%"] = so / pa.replace(0, float("nan"))
+    if "BB%" in result.columns:
+        result["BB%"] = bb / pa.replace(0, float("nan"))
 
     if "AVG" in result.columns:
         result["AVG"] = h / ab.replace(0, float("nan"))
@@ -335,15 +341,19 @@ def aggregate_player_group_single(grp: pd.DataFrame) -> dict:
             pa_stat_total = pa_stat.sum()
             result[col] = (series * pa_stat).sum(skipna=True) / pa_stat_total if pa_stat_total > 0 else float("nan")
 
-    h, ab, bb, hbp, sf, tb, fwar, bwar, drs, oaa, frv, frm = (
+    h, ab, bb, hbp, sf, tb, fwar, bwar, drs, oaa, frv, frm, so = (
         pd.to_numeric(result.get(c), errors="coerce")
-        for c in ("H", "AB", "BB", "HBP", "SF", "TB", "fWAR", "bWAR", "DRS", "OAA", "FRV", "FRM")
+        for c in ("H", "AB", "BB", "HBP", "SF", "TB", "fWAR", "bWAR", "DRS", "OAA", "FRV", "FRM","SO")
     )
 
     if pd.notna(ab) and ab > 0 and pd.notna(h):
         result["AVG"] = h / ab
     if pd.notna(ab) and ab > 0 and pd.notna(tb):
         result["SLG"] = tb / ab
+    if pd.notna(pa_total) and pa_total > 0 and pd.notna(so):
+        result["K%"] = so / pa_total
+    if pd.notna(pa_total) and pa_total > 0 and pd.notna(bb):
+        result["BB%"] = bb / pa_total
     if pd.notna(pa_total) and pa_total > 0 and pd.notna(fwar):
         result["fWAR/650"] = fwar / pa_total * 650
     if pd.notna(pa_total) and pa_total > 0 and pd.notna(bwar):
