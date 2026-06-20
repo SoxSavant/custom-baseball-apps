@@ -384,6 +384,8 @@ with col2:
         xaxis=dict(
             title=dict(font=dict(color="#1a1a1a", size=18)),
             tickfont=dict(color="#1a1a1a", size=15),
+            showgrid=True,
+            nticks=10,
             gridcolor="#e6e6e6",
             zerolinecolor="#e6e6e6",
             linecolor="#1a1a1a",
@@ -392,6 +394,8 @@ with col2:
         yaxis=dict(
             title=dict(font=dict(color="#1a1a1a", size=18)),
             tickfont=dict(color="#1a1a1a", size=15),
+            showgrid=True,
+            nticks=10,
             gridcolor="#e6e6e6",
             zerolinecolor="#e6e6e6",
             linecolor="#1a1a1a",
