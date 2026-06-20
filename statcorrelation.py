@@ -281,22 +281,29 @@ with col2:
 
     show_names = st.session_state.get("cr_show_names", False)
 
-    if show_names and "Name" in df.columns:
-        if mode == MODE_SPLIT and "Season" in df.columns:
-            df["_label_text"] = df["Name"].astype(str) + " (" + df["Season"].astype(str) + ")"
+    search_term = st.session_state.get("cr_search", "").strip().lower()
+    is_match = pd.Series(False, index=df.index)
+    if search_term and "Name" in df.columns:
+        is_match = df["Name"].astype(str).str.lower().str.contains(search_term, na=False)
+
+    df_main = df[~is_match].copy()
+
+    if show_names and "Name" in df_main.columns:
+        if mode == MODE_SPLIT and "Season" in df_main.columns:
+            df_main["_label_text"] = df_main["Name"].astype(str) + " (" + df_main["Season"].astype(str) + ")"
         else:
-            df["_label_text"] = df["Name"].astype(str)
+            df_main["_label_text"] = df_main["Name"].astype(str)
         hover_data["_label_text"] = False
     scatter_mode = "markers+text" if show_names else "markers"
 
     fig = px.scatter(
-        df,
+        df_main,
         x="_plot_x",
         y="_plot_y",
-        hover_name="Name" if "Name" in df.columns else None,
+        hover_name="Name" if "Name" in df_main.columns else None,
         hover_data=hover_data,
         labels=labels,
-        text="_label_text" if show_names and "_label_text" in df.columns else None,
+        text="_label_text" if show_names and "_label_text" in df_main.columns else None,
     )
     fig.update_traces(
         marker=dict(size=8, opacity=0.65, color="#2c3e50"),
@@ -306,25 +313,25 @@ with col2:
         selector=dict(type="scatter"),
     )
 
-    search_term = st.session_state.get("cr_search", "").strip().lower()
     if search_term and "Name" in df.columns:
-        matches = df[df["Name"].astype(str).str.lower().str.contains(search_term, na=False)]
+        matches = df[is_match]
         if not matches.empty:
             if mode == MODE_SPLIT and "Season" in matches.columns:
-                match_text = matches["Name"].astype(str) + " (" + matches["Season"].astype(str) + ")"
+                match_label = matches["Name"].astype(str) + " (" + matches["Season"].astype(str) + ")"
             else:
-                match_text = matches["Name"].astype(str)
+                match_label = matches["Name"].astype(str)
+            match_text = "<b>" + match_label + "</b>"
             fig.add_trace(go.Scatter(
                 x=matches["_plot_x"], y=matches["_plot_y"],
                 mode="markers+text",
                 text=match_text,
                 textposition="top center",
-                textfont=dict(size=11, color="#c0392b"),
-                marker=dict(size=13, color="#e67e22", line=dict(width=2, color="#c0392b")),
+                textfont=dict(size=13, color="#1e75aa"),
+                marker=dict(size=16, color="#007AFF", line=dict(width=2, color="#6a1b9a")),
                 name="Search match",
                 customdata=matches[["_disp_x", "_disp_y"]].values if {"_disp_x", "_disp_y"}.issubset(matches.columns) else None,
                 hovertemplate=(
-                    "<b>%{text}</b><br>"
+                    "%{text}<br>"
                     + x_label + ": %{customdata[0]}<br>"
                     + y_label + ": %{customdata[1]}<extra></extra>"
                 ) if {"_disp_x", "_disp_y"}.issubset(matches.columns) else None,
@@ -356,9 +363,9 @@ with col2:
     if extra_bits:
         qualifier_label += " · " + " · ".join(extra_bits)
 
-    mode_label = {MODE_SINGLE: "", MODE_SPLIT: "Split Seasons", MODE_MULTI: "Multi-Year Span"}[mode]
+    mode_label = {MODE_SINGLE: "", MODE_SPLIT: "Split Seasons", MODE_MULTI: ""}[mode]
 
-    title_main = f"{x_label} vs {y_label} - {span_label}"
+    title_main = f"{x_label} vs {y_label} ({span_label})"
     if mode_label:
         title_main += f" - {mode_label}"
 
