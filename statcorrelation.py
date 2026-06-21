@@ -79,6 +79,7 @@ for key, default in [
     ("cr_position", "all"),
     ("cr_team", "all"),
     ("cr_league", "All"),
+    ("cr_highlight_team", "all"),  
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -139,6 +140,21 @@ with col1:
     else:
         st.number_input("Min IP", min_value=0, max_value=5000, key="cr_min_ip")
 
+
+    team_disabled = (mode == MODE_MULTI)
+    league_disabled = (sel_start < 2013)
+
+
+    st.checkbox("Show player names", key="cr_show_names")
+    st.text_input("Search players (separate by commas)", key="cr_search")
+    st.selectbox(
+        "Highlight Team",
+        options=list(TEAM_OPTIONS.keys()),
+        format_func=lambda x: TEAM_OPTIONS[x],
+        key="cr_highlight_team",
+        disabled=team_disabled,
+        help="Team highlight unavailable for multi-year span" if team_disabled else None,
+    )
     if domain == "Hitting":
         st.selectbox(
             "Position",
@@ -146,10 +162,6 @@ with col1:
             format_func=lambda x: POSITION_OPTIONS[x],
             key="cr_position",
         )
-
-    team_disabled = (mode == MODE_MULTI)
-    league_disabled = (sel_start < 2013)
-
     st.selectbox(
         "Team",
         options=list(TEAM_OPTIONS.keys()),
@@ -165,9 +177,6 @@ with col1:
         disabled=team_disabled or league_disabled,
         help="League filter unavailable for years before 2013 due to possible innacuracies" if league_disabled else None,
     )
-
-    st.checkbox("Show player names", key="cr_show_names")
-    st.text_input("Search player", key="cr_search")
 
 
 def load_data(s_year, e_year, mode, position="all"):
@@ -285,10 +294,22 @@ with col2:
 
     show_names = st.session_state.get("cr_show_names", False)
 
-    search_term = st.session_state.get("cr_search", "").strip().lower()
+    search_raw = st.session_state.get("cr_search", "").strip().lower()
+    search_terms = [t.strip() for t in search_raw.split(",") if t.strip()]
+
+    highlight_team_val = st.session_state.get("cr_highlight_team", "all")
+
     is_match = pd.Series(False, index=df.index)
-    if search_term and "Name" in df.columns:
-        is_match = df["Name"].astype(str).str.lower().str.contains(search_term, na=False)
+
+    if search_terms and "Name" in df.columns:
+        name_mask = pd.Series(False, index=df.index)
+        for term in search_terms:
+            name_mask |= df["Name"].astype(str).str.lower().str.contains(term, na=False)
+        is_match |= name_mask
+
+    if highlight_team_val != "all" and "Team" in df.columns:
+        target_team = normalize_team(highlight_team_val)
+        is_match |= df["Team"].astype(str).apply(lambda t: normalize_team(t) == target_team)
 
     df_main = df[~is_match].copy()
 
@@ -317,7 +338,7 @@ with col2:
         selector=dict(type="scatter"),
     )
 
-    if search_term and "Name" in df.columns:
+    if (search_terms or highlight_team_val != "all") and "Name" in df.columns:
         matches = df[is_match]
         if not matches.empty:
             if mode == MODE_SPLIT and "Season" in matches.columns:
@@ -325,6 +346,7 @@ with col2:
             else:
                 match_label = matches["Name"].astype(str)
             match_text = "<b>" + match_label + "</b>"
+
             fig.add_trace(go.Scatter(
                 x=matches["_plot_x"], y=matches["_plot_y"],
                 mode="markers+text",
@@ -332,7 +354,7 @@ with col2:
                 textposition="top center",
                 textfont=dict(size=13, color="#1e75aa"),
                 marker=dict(size=16, color="#007AFF", line=dict(width=2, color="#6a1b9a")),
-                name="Search match",
+                name="Highlighted",
                 customdata=matches[["_disp_x", "_disp_y"]].values if {"_disp_x", "_disp_y"}.issubset(matches.columns) else None,
                 hovertemplate=(
                     "%{text}<br>"
@@ -340,8 +362,6 @@ with col2:
                     + y_label + ": %{customdata[1]}<extra></extra>"
                 ) if {"_disp_x", "_disp_y"}.issubset(matches.columns) else None,
             ))
-        else:
-            st.caption(f"No players matching \"{search_term}\" in current filters.")
 
     plot_slope, plot_intercept = np.polyfit(df["_plot_x"], df["_plot_y"], 1)
 
