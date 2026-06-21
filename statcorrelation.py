@@ -55,7 +55,11 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
+from h_utils import get_last_updated
 current_year = date.today().year
+h_last_updated = get_last_updated(current_year)
+st.caption(f"{current_year} data last updated: {h_last_updated}")
+
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
