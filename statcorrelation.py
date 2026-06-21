@@ -363,7 +363,7 @@ with col2:
     if extra_bits:
         qualifier_label += " · " + " · ".join(extra_bits)
 
-    mode_label = {MODE_SINGLE: "", MODE_SPLIT: "Split Seasons", MODE_MULTI: ""}[mode]
+    mode_label = {MODE_SINGLE: "", MODE_SPLIT: "Single Season", MODE_MULTI: ""}[mode]
 
     title_main = f"{x_label} vs {y_label} ({span_label})"
     if mode_label:
