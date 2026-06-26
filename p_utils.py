@@ -513,7 +513,7 @@ STAT_PRESETS = {
         "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
     "Stat Mix": [
-        "ERA", "xERA", "FIP", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+        "ERA", "xERA", "xBA", "FIP", "xFIP", "EV", "Chase%", "Whiff%", "K%", "BB%", "K-BB%","Barrel%", "HardHit%", "GB%","SIERA",
     ],
     "Standard": [
         "fWAR", "bWAR", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
@@ -533,7 +533,10 @@ STAT_PRESETS_SAVANT = {
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
-        "fWAR", "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+         "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
+    "Stat Mix": [
+         "ERA", "xERA", "FIP","xFIP",  "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%", "SIERA",
     ],
     "Standard": [
         "fWAR", "bWAR", "ERA", "GS", "IP", "AVG", "WHIP", "HR/9", "K/BB",
