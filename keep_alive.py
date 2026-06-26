@@ -24,6 +24,7 @@ APPS = [
     "https://pitching-database.streamlit.app/",
     "https://compositedatabase.streamlit.app/",
     "https://stat-correlation.streamlit.app/",
+    "https://compositedatabase-withoutbp.streamlit.app/",
 ]
 
 def wake_app(url):
