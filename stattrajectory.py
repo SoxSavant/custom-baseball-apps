@@ -53,6 +53,11 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
+from h_utils import get_last_updated
+current_year = date.today().year
+h_last_updated = get_last_updated(current_year)
+st.caption(f"{current_year} data last updated: {h_last_updated}")
+
 # ── session state defaults ─────────────────────────────────────────────────────
 for key, default in [
     ("ct_domain",     "Hitting"),
@@ -70,7 +75,7 @@ for key, default in [
         st.session_state[key] = default
 
 # ── domain toggle + conditional imports ───────────────────────────────────────
-col_left, col_right = st.columns([1, 1.8])
+col_left, col_right = st.columns([1, 2])
 
 with col_left:
     domain = st.radio(
@@ -105,8 +110,6 @@ else:
 
 ALL_YEARS = list(range(current_year, start_year - 1, -1))
 
-last_updated = get_last_updated(current_year)
-st.caption(f"{current_year} data last updated: {last_updated}")
 
 # ── data helpers ───────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
