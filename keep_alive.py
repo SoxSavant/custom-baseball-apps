@@ -25,6 +25,7 @@ APPS = [
     "https://compositedatabase.streamlit.app/",
     "https://stat-correlation.streamlit.app/",
     "https://compositedatabase2.streamlit.app/",
+    "https://stat-trajectory.streamlit.app/",
 ]
 
 def wake_app(url):
