@@ -431,7 +431,7 @@ with col_right:
                 all_seasons.update(c["Season"].dropna().tolist())
             yr_min, yr_max = int(min(all_seasons)), int(max(all_seasons))
             player_labels = ", ".join(name for name, _ in careers)
-            st.caption(f"{player_labels} · {yr_min}–{yr_max}")
+    
 
             fig = build_chart(careers, selected_stats)
             st.plotly_chart(fig, width='stretch')
