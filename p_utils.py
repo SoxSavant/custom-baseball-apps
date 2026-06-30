@@ -184,6 +184,13 @@ def outs_to_ip(outs: float) -> float:
     remainder = int(round(float(outs) % 3))
     return innings + remainder / 10
 
+def resolve_player_id(name: str, start_year: int, end_year: int) -> int | None:
+    for year in range(end_year, start_year - 1, -1):
+        pid = get_player_id_by_name(name, year)
+        if pid is not None:
+            return pid
+    return None
+
 
 def get_player_id_by_name(name: str, year: int) -> int | None:
     df = load_final_year(year)
