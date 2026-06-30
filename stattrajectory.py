@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 from datetime import date
 
 # ── page config ────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Career Trajectory", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Stat Trajectory", layout="wide", page_icon="⚾")
 
 st.markdown("""
 <style>
@@ -38,13 +38,13 @@ ZERO_STATS = {
 
 LINE_COLORS = ["#7EB8F7", "#F28B50", "#72D195", "#C97DD4"]
 
-HITTING_DEFAULTS = ["wRC+", "xwOBA"]
-PITCHING_DEFAULTS = ["ERA", "FIP"]
+HITTING_DEFAULTS = ["fWAR",]
+PITCHING_DEFAULTS = ["ERA"]
 
 # ── header ─────────────────────────────────────────────────────────────────────
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Career Trajectory")
+    st.title("Stat Trajectory")
 with meta_col:
     st.markdown(
         '<div class="mobile-meta" style="text-align:right; font-size:1rem; padding-top:0.6rem;">'
@@ -59,10 +59,12 @@ for key, default in [
     ("ct_start_year", 2018),
     ("ct_end_year",   current_year),
     ("ct_stats",      HITTING_DEFAULTS),
+    ("ct_mode",       "Cumulative"),  
     ("ct_player_1",   "Shohei Ohtani"),
     ("ct_player_2",   ""),
     ("ct_player_3",   ""),
     ("ct_player_4",   ""),
+    ("ct_combine_ohtani_war", True),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -112,7 +114,7 @@ def load_year_cached(year: int, dom: str) -> pd.DataFrame | None:
     return load_final_year(year)
 
 
-def get_player_career(player_id: int, yr_start: int, yr_end: int) -> pd.DataFrame:
+def get_player_career(player_id: int, yr_start: int, yr_end: int, mode: str) -> pd.DataFrame:
     seasons = []
     for yr in range(yr_start, yr_end + 1):
         df = load_year_cached(yr, domain)
@@ -121,16 +123,108 @@ def get_player_career(player_id: int, yr_start: int, yr_end: int) -> pd.DataFram
         match = df[df["PlayerId"] == player_id].copy()
         if match.empty:
             continue
-        if len(match) > 1:
-            agg = aggregate_player_group(match)
-            agg["Season"] = yr
-            seasons.append(agg)
-        else:
-            match["Season"] = yr
-            seasons.append(match)
+        match["Season"] = yr
+        seasons.append(match)
+
     if not seasons:
         return pd.DataFrame()
-    return pd.concat(seasons, ignore_index=True).sort_values("Season")
+
+    if mode == "Split Season":
+        result = []
+        for match in seasons:
+            yr = match["Season"].iloc[0]
+            if len(match) > 1:
+                agg = aggregate_player_group(match)
+                agg["Season"] = yr
+                result.append(agg)
+            else:
+                result.append(match)
+        return pd.concat(result, ignore_index=True).sort_values("Season")
+
+    # Multi-Year Span: each point = rolling aggregate from yr_start through that year
+    result = []
+    accumulated = []
+    for match in seasons:
+        yr = match["Season"].iloc[0]
+        accumulated.append(match)
+        combined = pd.concat(accumulated, ignore_index=True)
+        agg = aggregate_player_group(combined)
+        agg["Season"] = yr
+        result.append(agg)
+    return pd.concat(result, ignore_index=True).sort_values("Season")
+
+def _is_ohtani(name: str) -> bool:
+    return "ohtani" in name.strip().lower()
+
+
+@st.cache_data(show_spinner=False)
+def get_ohtani_combined_war(yr_start: int, yr_end: int) -> dict:
+    import h_utils as hu
+    import p_utils as pu
+
+    h_pid = hu.resolve_player_id("Shohei Ohtani", yr_start, yr_end)
+    p_pid = pu.resolve_player_id("Shohei Ohtani", yr_start, yr_end)
+
+    per_season = {}
+    for yr in range(yr_start, yr_end + 1):
+        h_fwar = h_bwar = p_fwar = p_bwar = 0.0
+
+        if h_pid:
+            h_df = hu.load_final_year(yr)
+            if h_df is not None and not h_df.empty:
+                rows = h_df[h_df["PlayerId"] == h_pid]
+                if not rows.empty:
+                    if "fWAR" in rows.columns:
+                        h_fwar = float(pd.to_numeric(rows["fWAR"], errors="coerce").fillna(0).sum())
+                    if "bWAR" in rows.columns:
+                        h_bwar = float(pd.to_numeric(rows["bWAR"], errors="coerce").fillna(0).sum())
+
+        if p_pid:
+            p_df = pu.load_final_year(yr)
+            if p_df is not None and not p_df.empty:
+                rows = p_df[p_df["PlayerId"] == p_pid]
+                if not rows.empty:
+                    if "fWAR" in rows.columns:
+                        p_fwar = float(pd.to_numeric(rows["fWAR"], errors="coerce").fillna(0).sum())
+                    if "bWAR" in rows.columns:
+                        p_bwar = float(pd.to_numeric(rows["bWAR"], errors="coerce").fillna(0).sum())
+
+        total_fwar = h_fwar + p_fwar
+        total_bwar = h_bwar + p_bwar
+        per_season[yr] = {
+            "fWAR":         total_fwar,
+            "bWAR":         total_bwar,
+            "fWAR-bWAR AVG": (total_fwar + total_bwar) / 2,
+        }
+
+    return per_season
+
+
+def apply_combined_ohtani_war(career: pd.DataFrame, yr_start: int, yr_end: int, mode: str) -> pd.DataFrame:
+    career = career.copy()
+    per_season = get_ohtani_combined_war(yr_start, yr_end)
+
+    if mode == "Cumulative":
+        cum_fwar = cum_bwar = 0.0
+        source = {}
+        for yr in sorted(per_season):
+            cum_fwar += per_season[yr]["fWAR"]
+            cum_bwar += per_season[yr]["bWAR"]
+            source[yr] = {
+                "fWAR":          cum_fwar,
+                "bWAR":          cum_bwar,
+                "fWAR-bWAR AVG": (cum_fwar + cum_bwar) / 2,
+            }
+    else:
+        source = per_season
+
+    for col in ("fWAR", "bWAR", "fWAR-bWAR AVG"):
+        if col in career.columns:
+            career[col] = career["Season"].map(
+                lambda s, c=col: source.get(int(s), {}).get(c, np.nan)
+            )
+
+    return career
 
 # ── shared chart styling ───────────────────────────────────────────────────────
 LIGHT_LAYOUT = dict(
@@ -161,24 +255,24 @@ def apply_xaxis_seasons(fig, all_seasons, n_rows):
         tickmode="array",
         tickvals=all_seasons,
         ticktext=[str(int(s)) for s in all_seasons],
-        tickangle=-45,
-        tickfont=dict(size=10, color="#000000"),
+        tickangle=0,
+        tickfont=dict(size=11, color="#000000"),
         **AXIS_STYLE,
     )
     bottom_key = "xaxis" if n_rows == 1 else f"xaxis{n_rows}"
-    fig.update_layout(**{bottom_key: dict(title=dict(text="Season", font=dict(size=13, color="#000000")))})
+    fig.update_layout(**{bottom_key: dict(title=dict(text="Season", font=dict(size=14, color="#000000")))})
 
 
 # ── chart: up to 4 players × up to 4 stats ────────────────────────────────────
 def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go.Figure:
     n = len(stats)
-    v_spacing = 0.0 if n == 1 else (0.15 if n == 2 else 0.07)
+    v_spacing = 0.1
 
     fig = make_subplots(
         rows=n, cols=1,
         shared_xaxes=True,
         vertical_spacing=v_spacing,
-        subplot_titles=[label_map.get(s, s) for s in stats],
+    
     )
 
     all_seasons = set()
@@ -226,8 +320,8 @@ def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go
         axis_key = "yaxis" if i == 1 else f"yaxis{i}"
         fig.update_layout(**{
             axis_key: dict(
-                title=dict(text=stat_label, font=dict(size=13, color="#000000")),
-                tickfont=dict(size=10, color="#000000"),
+                title=dict(text=stat_label, font=dict(size=16, color="#000000")),
+                tickfont=dict(size=12, color="#000000"),
                 **AXIS_STYLE,
                 **yaxis_fmt(stat),
             )
@@ -236,24 +330,21 @@ def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go
     apply_xaxis_seasons(fig, all_seasons, n)
 
     # legend only needed when more than one player
-    show_legend = len(careers) > 1
+    show_legend = True
     fig.update_layout(
-        height=max(300, 280 * n),
+        height=700,
         showlegend=show_legend,
         legend=dict(
             orientation="h",
-            yanchor="bottom", y=1.07,
+            yanchor="bottom", y=1.05,
             xanchor="left", x=0,
-            font=dict(size=12, color="#000000"),
+            font=dict(size=13, color="#000000"),
         ),
-        margin=dict(l=65, r=30, t=50 if not show_legend else 50, b=55),
+        margin=dict(l=65, r=30, t=50, b=55),
         **LIGHT_LAYOUT,
     )
     fig.update_xaxes(**AXIS_STYLE)
     fig.update_yaxes(**AXIS_STYLE)
-    for ann in fig.layout.annotations:
-        ann.font.size = 13
-        ann.font.color = "#000000"
 
     return fig
 
@@ -277,12 +368,21 @@ with col_left:
     yr_start = min(sel_start, sel_end)
     yr_end   = max(sel_start, sel_end)
 
+    mode = st.radio(
+        "Mode", ["Split Season", "Cumulative"],
+        key="ct_mode", horizontal=True,
+    )
+
     st.markdown("**Players**")
     p1 = st.text_input("Player 1", key="ct_player_1")
     p2 = st.text_input("Player 2", key="ct_player_2")
     p3 = st.text_input("Player 3", key="ct_player_3")
     p4 = st.text_input("Player 4", key="ct_player_4")
     player_names_input = [p1, p2, p3, p4]
+
+    ohtani_in_inputs = any(_is_ohtani(n) for n in player_names_input if n.strip())
+    if ohtani_in_inputs:
+        st.checkbox("Combine Ohtani's WAR", key="ct_combine_ohtani_war")
 
     st.markdown("**Stats**")
     selected_stats = st.multiselect(
@@ -314,11 +414,13 @@ with col_right:
             if not pid:
                 st.warning(f"Could not find **{name}** — skipping.")
                 continue
-            career = get_player_career(pid, yr_start, yr_end)
+            career = get_player_career(pid, yr_start, yr_end, st.session_state["ct_mode"])
             if career.empty:
                 st.warning(f"No data for **{name}** in {yr_start}–{yr_end} — skipping.")
                 continue
             display_name = str(career["Name"].iloc[-1]).strip() if "Name" in career.columns else name
+            if st.session_state.get("ct_combine_ohtani_war") and _is_ohtani(name):
+                career = apply_combined_ohtani_war(career, yr_start, yr_end, st.session_state["ct_mode"])
             careers.append((display_name, career))
 
         if not careers:
