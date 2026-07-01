@@ -76,9 +76,19 @@ for key, default in [
     ("ct_year_mode",    "Calendar Years"),
     ("ct_career_start", 1),
     ("ct_career_end",   10),
+    ("ct_pending_clear_slot", None),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
+
+# Apply any pending "clear this player slot" request BEFORE the text_input
+# widgets below are instantiated. Streamlit forbids writing to a widget's
+# session_state key once that widget has already been created in the same
+# run, so the clear has to happen here, on the run right after the button
+# click triggered a rerun.
+if st.session_state["ct_pending_clear_slot"] is not None:
+    slot = st.session_state.pop("ct_pending_clear_slot")
+    st.session_state[f"ct_player_{slot}"] = ""
 
 # ── domain toggle + conditional imports ───────────────────────────────────────
 col_left, col_right = st.columns([1, 2])
@@ -415,11 +425,13 @@ with col_left:
         with cy_col1:
             career_start = st.number_input(
                 "From Career Year", min_value=1, max_value=25,
+                value=st.session_state.get("ct_career_start", 1),
                 key="ct_career_start", step=1,
             )
         with cy_col2:
             career_end = st.number_input(
                 "To Career Year", min_value=1, max_value=25,
+                value=st.session_state.get("ct_career_end", 10),
                 key="ct_career_end", step=1,
             )
         career_start, career_end = min(career_start, career_end), max(career_start, career_end)
@@ -453,7 +465,7 @@ with col_left:
     with remove_col:
         if num_players > 1:
             if st.button("Remove Player", key="ct_remove_player", width="stretch"):
-                st.session_state[f"ct_player_{num_players}"] = ""
+                st.session_state["ct_pending_clear_slot"] = num_players
                 st.session_state["ct_num_players"] = num_players - 1
                 st.rerun()
 
@@ -534,7 +546,7 @@ with col_right:
             player_labels = ", ".join(name for name, _ in careers)
 
             x_col = "CareerYear" if year_mode == "Career Years" else "Season"
-            x_title = "Career Years" if year_mode == "Career Years" else "Season"
+            x_title = "Career Year" if year_mode == "Career Years" else "Season"
 
             fig = build_chart(
                 careers, selected_stats,
