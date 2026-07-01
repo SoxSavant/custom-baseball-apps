@@ -36,7 +36,7 @@ ZERO_STATS = {
     "oWAR", "dWAR", "Off", "Def", "BsR", "UZR", "UZR/150",
 }
 
-LINE_COLORS = ["#7EB8F7", "#F28B50", "#72D195", "#C97DD4"]
+LINE_COLORS = ["#7EB8F7", "#F28B50", "#72D195", "#C97DD4", "#BD0F0F", "#DDD31E"]
 
 HITTING_DEFAULTS = ["fWAR",]
 PITCHING_DEFAULTS = ["ERA"]
@@ -69,6 +69,9 @@ for key, default in [
     ("ct_player_2",   ""),
     ("ct_player_3",   ""),
     ("ct_player_4",   ""),
+    ("ct_player_5",   ""),
+    ("ct_player_6",   ""),
+    ("ct_num_players", 1),
     ("ct_combine_ohtani_war", True),
 ]:
     if key not in st.session_state:
@@ -377,11 +380,29 @@ with col_left:
     )
 
     st.markdown("**Players**")
-    p1 = st.text_input("Player 1", key="ct_player_1")
-    p2 = st.text_input("Player 2", key="ct_player_2")
-    p3 = st.text_input("Player 3", key="ct_player_3")
-    p4 = st.text_input("Player 4", key="ct_player_4")
-    player_names_input = [p1, p2, p3, p4]
+    num_players = st.session_state["ct_num_players"]
+
+    player_names_input = []
+    for i in range(1, 7):
+        p_key = f"ct_player_{i}"
+        if i <= num_players:
+            player_names_input.append(st.text_input(f"Player {i}", key=p_key))
+        else:
+            # not rendered this run, but keep whatever value it last held
+            player_names_input.append(st.session_state.get(p_key, ""))
+
+    add_col, remove_col = st.columns(2)
+    with add_col:
+        if num_players < 6:
+            if st.button("Add Player", key="ct_add_player", width="stretch"):
+                st.session_state["ct_num_players"] = num_players + 1
+                st.rerun()
+    with remove_col:
+        if num_players > 1:
+            if st.button("Remove Player", key="ct_remove_player", width="stretch"):
+                st.session_state[f"ct_player_{num_players}"] = ""
+                st.session_state["ct_num_players"] = num_players - 1
+                st.rerun()
 
     ohtani_in_inputs = any(_is_ohtani(n) for n in player_names_input if n.strip())
     if ohtani_in_inputs:
