@@ -64,7 +64,7 @@ for key, default in [
     ("ct_start_year", 2018),
     ("ct_end_year",   current_year),
     ("ct_stats",      HITTING_DEFAULTS),
-    ("ct_mode",       "Cumulative"),  
+    ("ct_mode",       "Cumulative"),
     ("ct_player_1",   "Shohei Ohtani"),
     ("ct_player_2",   ""),
     ("ct_player_3",   ""),
@@ -73,6 +73,9 @@ for key, default in [
     ("ct_player_6",   ""),
     ("ct_num_players", 1),
     ("ct_combine_ohtani_war", True),
+    ("ct_year_mode",    "Calendar Years"),
+    ("ct_career_start", 1),
+    ("ct_career_end",   10),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -118,6 +121,18 @@ ALL_YEARS = list(range(current_year, start_year - 1, -1))
 @st.cache_data(show_spinner=False)
 def load_year_cached(year: int, dom: str) -> pd.DataFrame | None:
     return load_final_year(year)
+
+
+@st.cache_data(show_spinner=False)
+def find_debut_year(player_id: int, dom: str) -> int | None:
+    """First year (searching from the earliest available data) the player appears."""
+    for yr in range(start_year, current_year + 1):
+        df = load_year_cached(yr, dom)
+        if df is None or df.empty:
+            continue
+        if player_id in df["PlayerId"].values:
+            return yr
+    return None
 
 
 def get_player_career(player_id: int, yr_start: int, yr_end: int, mode: str) -> pd.DataFrame:
@@ -256,35 +271,50 @@ def yaxis_fmt(stat: str) -> dict:
     return dict(tickformat=f".{decimals}f", ticksuffix="")
 
 
-def apply_xaxis_seasons(fig, all_seasons, n_rows):
+def apply_xaxis(fig, all_x_vals, n_rows, x_title):
     fig.update_xaxes(
         tickmode="array",
-        tickvals=all_seasons,
-        ticktext=[str(int(s)) for s in all_seasons],
+        tickvals=all_x_vals,
+        ticktext=[str(int(s)) for s in all_x_vals],
         tickangle=0,
         tickfont=dict(size=11, color="#000000"),
         **AXIS_STYLE,
     )
     bottom_key = "xaxis" if n_rows == 1 else f"xaxis{n_rows}"
-    fig.update_layout(**{bottom_key: dict(title=dict(text="Season", font=dict(size=14, color="#000000")))})
+    fig.update_layout(**{bottom_key: dict(title=dict(text=x_title, font=dict(size=14, color="#000000")))})
 
 
 # ── chart: up to 4 players × up to 4 stats ────────────────────────────────────
-def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go.Figure:
+def build_chart(
+    careers: list[tuple[str, pd.DataFrame]],
+    stats: list[str],
+    x_col: str = "Season",
+    x_title: str = "Season",
+    mode: str = "Cumulative",
+) -> go.Figure:
     n = len(stats)
-    v_spacing = 0.1
+    v_spacing = 0.12
+
+    subplot_titles = []
+    for stat in stats:
+        stat_label = label_map.get(stat, stat)
+        if mode == "Cumulative":
+            subplot_titles.append(f"Cumulative {stat_label}")
+        else:
+            subplot_titles.append(f"{stat_label} by Year")
 
     fig = make_subplots(
         rows=n, cols=1,
         shared_xaxes=True,
         vertical_spacing=v_spacing,
-    
+        subplot_titles=subplot_titles,
     )
+    fig.update_annotations(font=dict(size=15, color="#000000"))
 
-    all_seasons = set()
+    all_x_vals = set()
     for _, career in careers:
-        all_seasons.update(career["Season"].dropna().tolist())
-    all_seasons = sorted(all_seasons)
+        all_x_vals.update(career[x_col].dropna().tolist())
+    all_x_vals = sorted(all_x_vals)
 
     for i, stat in enumerate(stats, start=1):
         stat_label = label_map.get(stat, stat)
@@ -303,7 +333,7 @@ def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go
 
             fig.add_trace(
                 go.Scatter(
-                    x=career["Season"].tolist(),
+                    x=career[x_col].tolist(),
                     y=y_raw,
                     mode="lines+markers",
                     name=player_name,
@@ -333,7 +363,7 @@ def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go
             )
         })
 
-    apply_xaxis_seasons(fig, all_seasons, n)
+    apply_xaxis(fig, all_x_vals, n, x_title)
 
     # legend only needed when more than one player
     show_legend = True
@@ -357,22 +387,45 @@ def build_chart(careers: list[tuple[str, pd.DataFrame]], stats: list[str]) -> go
 
 # ── left panel controls ────────────────────────────────────────────────────────
 with col_left:
-    yr_col1, yr_col2 = st.columns(2)
-    with yr_col1:
-        sel_start = st.selectbox(
-            "Start Year", options=ALL_YEARS,
-            key="ct_start_year",
-        )
-    with yr_col2:
-        sel_end = st.selectbox(
-            "End Year", options=ALL_YEARS,
-            index=ALL_YEARS.index(st.session_state["ct_end_year"])
-                  if st.session_state["ct_end_year"] in ALL_YEARS else 0,
-            key="ct_end_year",
-        )
+    year_mode = st.radio(
+        "Compare by", ["Calendar Years", "Career Years"],
+        key="ct_year_mode", horizontal=True,
+    )
 
-    yr_start = min(sel_start, sel_end)
-    yr_end   = max(sel_start, sel_end)
+    if year_mode == "Calendar Years":
+        yr_col1, yr_col2 = st.columns(2)
+        with yr_col1:
+            sel_start = st.selectbox(
+                "Start Year", options=ALL_YEARS,
+                key="ct_start_year",
+            )
+        with yr_col2:
+            sel_end = st.selectbox(
+                "End Year", options=ALL_YEARS,
+                index=ALL_YEARS.index(st.session_state["ct_end_year"])
+                      if st.session_state["ct_end_year"] in ALL_YEARS else 0,
+                key="ct_end_year",
+            )
+
+        yr_start = min(sel_start, sel_end)
+        yr_end   = max(sel_start, sel_end)
+        career_start = career_end = None
+    else:
+        cy_col1, cy_col2 = st.columns(2)
+        with cy_col1:
+            career_start = st.number_input(
+                "From Career Year", min_value=1, max_value=25,
+                key="ct_career_start", step=1,
+            )
+        with cy_col2:
+            career_end = st.number_input(
+                "To Career Year", min_value=1, max_value=25,
+                key="ct_career_end", step=1,
+            )
+        career_start, career_end = min(career_start, career_end), max(career_start, career_end)
+        # Placeholder bounds — each player's actual window is resolved
+        # individually below based on their own debut year.
+        yr_start, yr_end = start_year, current_year
 
     mode = st.radio(
         "Mode", ["Split Season", "Cumulative"],
@@ -433,18 +486,42 @@ with col_right:
         for name in player_names_input:
             if not name.strip():
                 continue
-            with st.spinner(f"Loading {name}…"):
-                pid = resolve_player_id(name.strip(), yr_start, yr_end)
-            if not pid:
-                st.warning(f"Could not find **{name}** — skipping.")
-                continue
-            career = get_player_career(pid, yr_start, yr_end, st.session_state["ct_mode"])
+
+            if year_mode == "Calendar Years":
+                with st.spinner(f"Loading {name}…"):
+                    pid = resolve_player_id(name.strip(), yr_start, yr_end)
+                if not pid:
+                    st.warning(f"Could not find **{name}** — skipping.")
+                    continue
+                p_yr_start, p_yr_end = yr_start, yr_end
+                debut_year = None
+            else:
+                with st.spinner(f"Loading {name}…"):
+                    pid = resolve_player_id(name.strip(), start_year, current_year)
+                if not pid:
+                    st.warning(f"Could not find **{name}** — skipping.")
+                    continue
+                debut_year = find_debut_year(pid, domain)
+                if debut_year is None:
+                    st.warning(f"Could not determine a debut year for **{name}** — skipping.")
+                    continue
+                p_yr_start = debut_year + career_start - 1
+                if p_yr_start > current_year:
+                    st.warning(f"**{name}** doesn't have data for Career Year {career_start} yet — skipping.")
+                    continue
+                p_yr_end = min(debut_year + career_end - 1, current_year)
+
+            career = get_player_career(pid, p_yr_start, p_yr_end, st.session_state["ct_mode"])
             if career.empty:
-                st.warning(f"No data for **{name}** in {yr_start}–{yr_end} — skipping.")
+                st.warning(f"No data for **{name}** in the selected range — skipping.")
                 continue
             display_name = str(career["Name"].iloc[-1]).strip() if "Name" in career.columns else name
             if st.session_state.get("ct_combine_ohtani_war") and _is_ohtani(name):
-                career = apply_combined_ohtani_war(career, yr_start, yr_end, st.session_state["ct_mode"])
+                career = apply_combined_ohtani_war(career, p_yr_start, p_yr_end, st.session_state["ct_mode"])
+
+            if year_mode == "Career Years":
+                career["CareerYear"] = career["Season"] - debut_year + 1
+
             careers.append((display_name, career))
 
         if not careers:
@@ -455,16 +532,25 @@ with col_right:
                 all_seasons.update(c["Season"].dropna().tolist())
             yr_min, yr_max = int(min(all_seasons)), int(max(all_seasons))
             player_labels = ", ".join(name for name, _ in careers)
-    
 
-            fig = build_chart(careers, selected_stats)
+            x_col = "CareerYear" if year_mode == "Career Years" else "Season"
+            x_title = "Career Years" if year_mode == "Career Years" else "Season"
+
+            fig = build_chart(
+                careers, selected_stats,
+                x_col=x_col, x_title=x_title,
+                mode=st.session_state["ct_mode"],
+            )
             st.plotly_chart(fig, width='stretch')
 
             with st.expander("Season data"):
                 for player_name, career in careers:
                     st.markdown(f"**{player_name}**")
-                    display_cols = ["Season"] + [s for s in selected_stats if s in career.columns]
-                    tbl = career[display_cols].copy().set_index("Season")
+                    index_col = "CareerYear" if year_mode == "Career Years" else "Season"
+                    extra_cols = ["Season"] if year_mode == "Career Years" else []
+                    display_cols = [index_col] + extra_cols + [s for s in selected_stats if s in career.columns]
+                    tbl = career[display_cols].copy().set_index(index_col)
+                    tbl.index.name = "Career Years" if year_mode == "Career Years" else "Season"
                     col_config = {}
                     for s in selected_stats:
                         if s not in career.columns:
