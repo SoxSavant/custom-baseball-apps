@@ -299,7 +299,7 @@ def build_chart(
     for stat in stats:
         stat_label = label_map.get(stat, stat)
         if mode == "Cumulative":
-            subplot_titles.append(f"Cumulative {stat_label}")
+            subplot_titles.append(f"{stat_label}")
         else:
             subplot_titles.append(f"{stat_label} by Year")
 
