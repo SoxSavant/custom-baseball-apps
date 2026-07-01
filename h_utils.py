@@ -571,8 +571,8 @@ def get_player_id_by_name(name: str, year: int) -> int | None:
 
 STAT_PRESETS = {
     "Default": [
-        "fWAR", "bWAR", "G", "PA", "HR", "wRC+", "xwOBA",
-        "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
+        "fWAR", "bWAR", "G", "PA", "HR", "OPS", "wRC+", "xwOBA",
+        "K%", "BB%",  "BsR", "SB", "FRV", "DRS",
     ],
    
     "Statcast": [
