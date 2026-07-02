@@ -7,7 +7,7 @@ from datetime import date
 
 from utils import TEAM_OPTIONS, LEAGUES
 
-st.set_page_config(page_title="Pitcher Stat Filter Leaderboard", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Pitcher Stat Filter", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -43,7 +43,7 @@ st.markdown("""
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Pitcher Stat Filter Leaderboard")
+    st.title("Pitcher Stat Filter")
 with meta_col:
     st.markdown(
         '<div class="mobile-meta" style="text-align:right;font-size:1rem;padding-top:0.6rem;">'
