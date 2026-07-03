@@ -559,6 +559,9 @@ STAT_PRESETS_YOY = {
     "Statcast": [
          "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
     ],
+    "Luck": [
+         "ERA","xERA", "EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "LOB%", "BABIP",
+    ],
     "Stat Mix": [
         "fWAR", "bWAR", "GS", "IP", "ERA",  "FIP", 
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
