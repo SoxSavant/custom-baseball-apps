@@ -37,7 +37,7 @@ jobs:
       - name: Wake apps
         uses: nick-invision/retry@v3
         with:
-          timeout_minutes: 10
-          max_attempts: 3
+          timeout_minutes: 20
+          max_attempts: 2
           retry_wait_seconds: 30
           command: python keep_alive.py
