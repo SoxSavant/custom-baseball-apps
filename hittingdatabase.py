@@ -362,6 +362,9 @@ with right_col:
 
     if multi_year:
         df = aggregate_player_group(df)
+        for pct_col in ("K%", "BB%"):
+            if pct_col in df.columns:
+                df[pct_col] = df[pct_col] * 100
 
     if position != "all" and year_mode != "Split Season":
         df = filter_by_position(df, position)
