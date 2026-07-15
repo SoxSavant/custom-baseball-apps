@@ -331,7 +331,7 @@ with left_col:
 
 years_desc = list(range(current_year, start_year-1, -1)) 
 MAX_PLAYERS = 5
-default_names = ["Yordan Alvarez", "Matt Olson", "", "", ""]
+default_names = ["Pete Crow-Armstrong", "Bobby Witt Jr.", "", "", ""]
 
 prev_count = st.session_state.get("comp_prev_player_count", 2)
 if player_count > prev_count:
