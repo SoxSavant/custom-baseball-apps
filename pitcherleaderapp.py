@@ -333,7 +333,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 <body>{grid_html}</body>
 </html>
 """
-        components.html(full_html, height=800)
+        st.iframe(full_html, height=800)
 
     # ── DATABASE VIEW ─────────────────────────────────────────────────────────
 

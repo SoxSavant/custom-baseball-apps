@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import html
@@ -739,7 +738,7 @@ db_team_groups.sort(key=lambda x: (
 
 with col2:
     if view_mode == "Graphic":
-        components.html(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height, scrolling=True)
 
     else:
             if not db_team_groups:

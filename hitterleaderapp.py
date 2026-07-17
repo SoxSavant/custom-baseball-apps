@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import unicodedata
@@ -438,7 +437,7 @@ html, body {{
 <body>{grid_html}</body>
 </html>
 """
-        components.html(full_html, height=800)
+        st.iframe(full_html, height=800)
 
     # ── DATABASE VIEW ─────────────────────────────────────────────────────────
 

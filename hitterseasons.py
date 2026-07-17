@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import html
 from datetime import date
@@ -446,7 +445,7 @@ white-space: nowrap;
 
 with col2:
     if view_mode == "Graphic":
-        components.html(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height, scrolling=True)
 
     else:
         if display_df.empty:

@@ -617,4 +617,4 @@ with col2:
     else:
         num_rows = 1
     card_height = 220 * num_rows + 400
-    components.html(full_html, height=card_height)
+    st.iframe(full_html, height=card_height)

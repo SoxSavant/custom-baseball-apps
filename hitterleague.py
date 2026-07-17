@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import unicodedata
@@ -718,4 +717,4 @@ with col2:
     else:
         num_rows = 1
     card_height = 220 * num_rows + 400
-    components.html(full_html, height=card_height)
+    st.iframe(full_html, height=card_height)

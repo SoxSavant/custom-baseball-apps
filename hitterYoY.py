@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import unicodedata
@@ -185,15 +184,15 @@ for key, default in [
 if st.session_state.get("rf_stat") not in STAT_ALLOWLIST:
     st.session_state["rf_stat"] = "wRC+"
 
-stat = st.selectbox(
-    "Stat", STAT_ALLOWLIST, key="rf_stat",
-    format_func=lambda x: label_map.get(x, x),
-)
 
 col1, col2 = st.columns([0.5, 2])
 
 with col1:
     view_mode = st.radio("View", ["Graphic", "Database"], key="rf_view", horizontal=True)
+    stat = st.selectbox(
+    "Stat", STAT_ALLOWLIST, key="rf_stat",
+    format_func=lambda x: label_map.get(x, x),
+)
     st.selectbox("Start Year", options=list(range(current_year - 1, start_year - 1, -1)), key="rf_start_year")
     st.selectbox("End Year",   options=list(range(current_year,     start_year - 1, -1)), key="rf_end_year")
     start_year = st.session_state["rf_start_year"]
@@ -490,7 +489,7 @@ white-space: nowrap;
 
 with col2:
     if view_mode == "Graphic":
-        components.html(full_html, height=850)
+        st.iframe(full_html, height=850)
 
     else:
         df_full = load_risers_data(

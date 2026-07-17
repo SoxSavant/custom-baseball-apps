@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import html
@@ -404,7 +403,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 <body>{grid_html}</body>
 </html>"""
 
-        components.html(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height, scrolling=True)
 
     # ── DATABASE VIEW ─────────────────────────────────────────────────────────
 

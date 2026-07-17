@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import html
@@ -743,7 +742,7 @@ with right_col:
     # ── Original card ────────────────────────────────────────────────────
     row_count = len(rows_html)
     card_height = 295 + row_count * 40
-    components.html(card_html, height=card_height)
+    st.iframe(card_html, height=card_height)
     st.caption("Screenshot to save")
     st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
 
