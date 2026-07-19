@@ -403,7 +403,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
 <body>{grid_html}</body>
 </html>"""
 
-        st.iframe(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height)
 
     # ── DATABASE VIEW ─────────────────────────────────────────────────────────
 

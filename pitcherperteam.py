@@ -738,7 +738,7 @@ db_team_groups.sort(key=lambda x: (
 
 with col2:
     if view_mode == "Graphic":
-        st.iframe(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height)
 
     else:
             if not db_team_groups:

@@ -400,7 +400,7 @@ est_height = 180 + (max(1, (len(cards) + 4) // 5)) * 310 + 80
 
 with col2:
     if view_mode == "Graphic":
-        st.iframe(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height)
 
     else:
         if display_df.empty:
