@@ -445,7 +445,7 @@ white-space: nowrap;
 
 with col2:
     if view_mode == "Graphic":
-        st.iframe(full_html, height=est_height, scrolling=True)
+        st.iframe(full_html, height=est_height)
 
     else:
         if display_df.empty:
