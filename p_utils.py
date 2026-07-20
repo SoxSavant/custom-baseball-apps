@@ -51,7 +51,7 @@ STAT_ROUND = {
 
     # 2 decimal places
     "ERA": 2, "xERA": 2, "FIP": 2, "xFIP": 2, "ERA-xERA": 2,
-    "SIERA": 2, "K/9": 2, "BB/9": 2, "HR/9": 2, "HR/FB": 2, "K/BB": 2,
+    "SIERA": 2, "K/9": 2, "BB/9": 2, "HR/9": 2,"K/BB": 2,
     "WPA": 2, "Clutch": 2,
 
     # 1 decimal place
@@ -60,7 +60,7 @@ STAT_ROUND = {
     "EV": 1, "vFA": 1, "IP": 1,
     "K%": 1, "BB%": 1, "K-BB%": 1,
     "Chase%": 1, "Whiff%": 1,
-    "Barrel%": 1, "HardHit%": 1, "GB%": 1, "LOB%": 1,
+    "Barrel%": 1, "HardHit%": 1, "GB%": 1, "LOB%": 1, "HR/FB":1,
 
     # 0 decimal places
     "ERA-": 0, "FIP-": 0,
@@ -380,7 +380,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"WPA", "CLUTCH"}:
         return f"{float(val):.2f}"
 
-    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB", "HR/FB","ERA-XERA"}:
+    if upper_stat in {"ERA", "FIP", "XFIP", "XERA", "SIERA", "K/9", "BB/9", "HR/9", "GB/FB","ERA-XERA"}:
         return f"{float(val):.2f}"
 
     if upper_stat == "WHIP":
@@ -397,7 +397,7 @@ def format_stat(stat: str, val) -> str:
         return f"{float(val):.3f}".lstrip("0") or ".000"
     ALREADY_PCT_POINTS = {"Barrel%", "HardHit%"}
     if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
+        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat or "HR/FB" in stat
         or "Chase" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
@@ -465,7 +465,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         return f"-{formatted}" if v < 0 else formatted
 
     if (
-        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat
+        "Barrel" in stat or "Hard" in stat or "K%" in stat or "BB%" in stat or "HR/FB" in stat
         or "Chase" in stat or "Whiff" in stat or "%" in stat
     ):
         v = float(val)
