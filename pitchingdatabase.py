@@ -212,6 +212,9 @@ with left_col:
     )
     search = st.text_input("Search players (separate by commas)")
 
+    
+    show_team_col = st.checkbox("Show Team", value=True, key="hdb_show_team")
+
     st.divider()
     st.markdown("### Stats")
 
@@ -363,9 +366,12 @@ with right_col:
             df = df[mask]
 
     if year_mode == "Split Season":
-        base_cols = [c for c in ["Name", "Team","Year"] if c in df.columns]
+        base_cols = [c for c in ["Name","Year"] if c in df.columns]
     else:
-        base_cols = [c for c in ["Name","Team"] if c in df.columns]
+        base_cols = [c for c in ["Name"] if c in df.columns]
+    
+    if show_team_col:
+        base_cols.append("Team")
 
     default_sort = next((s for s in selected_stats if s in df.columns), None)
 
