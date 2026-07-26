@@ -605,9 +605,11 @@ STAT_PRESETS_SAVANT = {
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Stat Mix": [
-        "fWAR","bWAR","wRC+","xwOBA","HardHit%","K%","BB%","DRS","FRV","BsR"
+        "fWAR", "bWAR", "G", "PA", "HR", "OPS", "wRC+",
+        "K%", "BB%",  "BsR", "SB", "FRV", "DRS",
     ],
     "Fielding": ["DRS", "FRV", "OAA", "Def"],
+    
     "Standard": [
         "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
         "2B", "3B", "HR", "XBH", "RBI", "SB","K%", "BB%",
@@ -624,26 +626,20 @@ STAT_PRESETS_YOY = {
         "BatSpd","Squared-Up%",
         "Chase%", "Whiff%", "K%", "BB%",
     ],
-    "Stat Mix": [
-        "fWAR", "bWAR", "HR", "wRC+", "xwOBA",
-        "K%", "BB%", "Off", "Def", "BsR", "SB", "FRV", "DRS",
+   "Stat Mix": [
+        "fWAR", "bWAR", "G", "PA", "HR", "OPS", "wRC+",
+        "K%", "BB%",  "BsR", "SB", "FRV", "DRS",
     ],
-    "Stat Mix Rate Basis": [
-        "fWAR/650", "bWAR/650", "wRC+", "xwOBA", "EV", "Barrel%", "HardHit%", "Sweet-Spot%",
-        "K%", "BB%", "FRV/1350", "DRS/1350",
-    ],
-
     "Standard": [
-        "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
-        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+        "fWAR", "bWAR", "PA", "AVG", "OBP", "SLG", "OPS",
+         "HR", "XBH", "RBI", "SB", "R",
         "K%", "BB%", "DRS",
     ],
     "Fielding": [
         "DRS", "FRV", "OAA", "Def"
     ],
-    "Fielding Rates": [
-        "DRS/1350", "FRV/1350", "OAA/1350",
-    ],
+    "Fielding Rates": ["DRS/1350", "FRV/1350", "OAA/1350"],
+   
     "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": [
         "fWAR",
@@ -655,7 +651,7 @@ STAT_PRESETS_YOY = {
 STAT_PRESETS_DATABASE = {
     "Default": [
          "fWAR", "bWAR", "fWAR-bWAR Avg", "HR", "wRC+", "xwOBA",
-        "K%", "BB%", "BsR", "SB", "FRV", "DRS",
+        "K%", "BB%", "BsR", "SB", "OAA", "FRV", "DRS",
     ],
    
     "Statcast": [
