@@ -25,6 +25,7 @@ APPS = [
     "https://stat-correlation.streamlit.app/",
     "https://compositedatabase2.streamlit.app/",
     "https://stat-trajectory.streamlit.app/",
+    "http://warleaders.streamlit.app/",
 ]
 
 WAKE_BUTTON_SELECTOR = "button:has-text('get this app back up')"
