@@ -4,7 +4,7 @@ import numpy as np
 import html
 from datetime import date
 
-from utils import TEAMS, LEAGUES
+from utils import TEAMS
 
 st.set_page_config(page_title="Hitters Per Team Leaderboard", layout="wide", page_icon="⚾")
 

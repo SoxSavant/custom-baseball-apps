@@ -1,0 +1,856 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import unicodedata
+import html
+import re
+from datetime import date
+import h_utils
+import p_utils
+
+from utils import TEAMS
+
+st.set_page_config(page_title="Players Per Team", layout="wide", page_icon="⚾")
+
+st.markdown(
+    """
+    <style>
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+    [data-testid="stToolbar"] {visibility: hidden;}
+    [data-testid="stDecoration"] {display: none;}
+    [data-testid="stStatusWidget"] {display: none;}
+    .viewerBadge_link__qRi_k {display: none;}
+    .stSelectbox div[data-baseweb="select"],
+    .stNumberInput > div { max-width: 200px; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown("""
+<style>
+    @media only screen and (max-width: 600px) {
+        [data-testid="stAppViewContainer"] h1 {
+            font-size: 1.8rem !important;
+        }
+        .mobile-meta {
+            font-size: 0.8rem !important;
+            padding-top: 0.3rem !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+title_col, meta_col = st.columns([3, 1])
+with title_col:
+    st.title("Players Per Team")
+with meta_col:
+    st.markdown(
+        """
+        <div class="mobile-meta" style="text-align: right; font-size: 1rem; padding-top: 0.6rem;">
+            Built by <a href="https://twitter.com/Sox_Savant" target="_blank">@Sox_Savant</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+type_mode = st.radio("Type", ["Hitting", "Pitching"], horizontal=True, key="cc_mode", label_visibility="collapsed")
+is_hitting = (type_mode == "Hitting")
+U = h_utils if is_hitting else p_utils
+prefix = "hcc" if is_hitting else "pcc"
+
+current_year = date.today().year
+last_updated = U.get_last_updated(current_year)
+st.caption(f"{current_year} data last updated: {last_updated}")
+
+
+
+from h_utils import (
+     POSITION_OPTIONS,
+    filter_by_position, 
+)
+
+STAT_ALLOWLIST = U.STAT_ALLOWLIST
+STAT_DEFAULTS = U.STAT_DEFAULTS
+RATE_STATS = U.RATE_STATS
+TRUTHY_STRINGS = U.TRUTHY_STRINGS
+get_headshot = U.get_headshot
+label_map = U.label_map
+lower_better = U.lower_better
+start_year = U.start_year
+format_stat = U.format_stat
+load_final_year = U.load_final_year
+aggregate_player_group_single = U.aggregate_player_group_single
+STAT_ROUND = U.STAT_ROUND
+STAT_DISPLAY_NAMES = U.STAT_DISPLAY_NAMES
+normalize_team = U.normalize_team
+get_team_display = U.get_team_display
+
+
+
+from utils import get_dynamic_min_pa, TEAM_MLB_IDS,  ALL_DIVISIONS, get_team_division, get_team_logo_url, get_dynamic_min_ip
+
+min_pa = get_dynamic_min_pa(current_year)
+min_ip = int(get_dynamic_min_ip(current_year))
+
+MODE_SINGLE = "Single Season"
+MODE_SPLIT  = "Split Seasons"
+MODE_MULTI  = "Multi-Year Span"
+
+current_year = date.today().year
+MAX_TEAMS    = 9
+
+def update_stat_default(i):
+    stat = st.session_state[f"{prefix}_stat_{i}"]
+    st.session_state[f"{prefix}_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
+    st.session_state[f"{prefix}_op_{i}"]  = "<=" if stat in lower_better else ">="
+
+def format_threshold(stat: str, val: float, op: str) -> str:
+    lbl       = label_map.get(stat, stat)
+    formatted = format_stat(stat, val).rstrip("%")
+    return f"{formatted}+ {lbl}" if op == ">=" else f"≤ {formatted} {lbl}"
+
+
+def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> pd.DataFrame:
+    if mode == MODE_SINGLE:
+        return load_final_year(start_yr)
+
+    frames = []
+    for year in range(start_yr, end_yr + 1):
+        df = load_final_year(year)
+        if df is not None and not df.empty:
+            if mode == MODE_SPLIT and is_hitting:
+                df = filter_by_position(df,position_val)
+            frames.append(df)
+
+    if not frames:
+        return pd.DataFrame()
+
+    combined = pd.concat(frames, ignore_index=True)
+
+    if mode == MODE_SPLIT:
+        return combined
+
+    # MODE_MULTI: aggregate each player per team across years
+    combined = filter_by_position(combined, position)
+    if combined.empty or "PlayerId" not in combined.columns:
+        return combined
+
+    if "Team" in combined.columns:
+        combined["TeamNorm"] = combined["Team"].astype(str).apply(normalize_team)
+        combined = combined[combined["Team"].astype(str).str.strip() != "- - -"]
+
+    grouped_rows = []
+    group_cols = ["PlayerId", "TeamNorm"] if "TeamNorm" in combined.columns else ["PlayerId"]
+    for _, grp in combined.groupby(group_cols):
+        grouped_rows.append(aggregate_player_group_single(grp))
+
+    return pd.DataFrame(grouped_rows)
+
+for key, default in [
+    (f"{prefix}_year",           current_year),
+    (f"{prefix}_start_year",     current_year),
+    (f"{prefix}_end_year",       current_year),
+    (f"{prefix}_mode",           MODE_SINGLE),
+    (f"{prefix}_position",       "all"),
+    (f"{prefix}_show_min_pa",    True),
+    (f"{prefix}_show_player_pa", False),
+    (f"{prefix}_show_all_teams", False),
+    (f"{prefix}_leaders_only",False),
+    (f"{prefix}_collapse_split", False),
+    (f"{prefix}_val_0",          2.0),
+    (f"{prefix}_val_1",          2.0),
+    (f"{prefix}_min_type", "PA"),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
+
+for div in ALL_DIVISIONS:
+    key = f"{prefix}_div_{div}"
+    if key not in st.session_state:
+        st.session_state[key] = True
+
+col1, col2 = st.columns([0.5, 2])
+
+with col1:
+
+    view_mode = st.radio(
+        "View", options=["Graphic", "Database"], horizontal=True, key=f"{prefix}_view_mode"
+    )
+
+    num_stats = st.radio(
+        "Number of stat filters", [1, 2, 3, 4],
+        index=0, horizontal=True, key=f"{prefix}_num_stats",
+    )
+
+    mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key=f"{prefix}_mode")
+
+    if mode == MODE_MULTI:
+        st.caption("Multi-year excludes seasons of players who switched teams mid-season in any year of the span.")
+
+    if mode == MODE_SPLIT:
+        st.checkbox("One card per team", key=f"{prefix}_collapse_split")
+
+    if mode == MODE_SINGLE:
+        st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key=f"{prefix}_year")
+        s_year = st.session_state[f"{prefix}_year"]
+        e_year = st.session_state[f"{prefix}_year"]
+
+    else:
+        start_options = list(range(current_year, start_year - 1, -1))
+        current_start_val = st.session_state.get(f"{prefix}_start_year", current_year - 1)
+        st.selectbox(
+            "Start Year", options=start_options,
+            index=start_options.index(current_start_val) if current_start_val in start_options else 0,
+            key=f"{prefix}_start_year",
+        )
+        st.selectbox("End Year",   options=list(range(current_year, start_year - 1, -1)), key=f"{prefix}_end_year")
+        s_year = st.session_state[f"{prefix}_start_year"]
+        e_year = max(st.session_state[f"{prefix}_end_year"], s_year)
+
+ 
+    if is_hitting:
+        st.selectbox("Min Type", options=["PA", "Inn"], key=f"{prefix}_min_type")
+  
+
+        if st.session_state[f"{prefix}_min_type"] == "Inn":
+            st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key=f"{prefix}_min_inn")
+        else:
+            st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key=f"{prefix}_min_pa")
+    else:
+
+        st.number_input("Min IP", min_value=0, max_value=50000, value=min_ip, key=f"{prefix}_min_ip")
+
+    for i in range(num_stats):
+        st.markdown(f"**Stat {i+1}**")
+        default_stat  = "fWAR" if i == 0 else STAT_ALLOWLIST[0]
+        default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
+
+        new_stat = st.selectbox(
+            f"Stat {i+1}", STAT_ALLOWLIST,
+            key=f"{prefix}_stat_{i}",
+            index=default_index,
+            format_func=lambda x: label_map.get(x, x),
+            label_visibility="collapsed",
+            on_change=update_stat_default,
+            args=(i,),
+        )
+
+        op_col, val_col = st.columns([1, 2])
+        with op_col:
+            st.selectbox("Op", [">=", "<="], key=f"{prefix}_op_{i}", index=0, label_visibility="collapsed")
+        with val_col:
+            decimals = STAT_ROUND.get(new_stat, 0)
+            step = 10 ** -decimals if decimals > 0 else 1.0
+            fmt = f"%.{decimals}f"
+            st.number_input(
+                f"Value {i+1}", step=step, key=f"{prefix}_val_{i}",
+                label_visibility="collapsed", format=fmt,
+            )
+
+    if is_hitting:
+        st.selectbox(
+            "Position", options=list(POSITION_OPTIONS.keys()),
+            format_func=lambda x: POSITION_OPTIONS[x], key=f"{prefix}_position",
+        )
+    # min type
+    if is_hitting:
+        if st.session_state[f"{prefix}_min_type"] == "PA":
+            st.checkbox("Show Min PA", key=f"{prefix}_show_min_pa")
+        else:
+            st.checkbox("Show Min Inn", key=f"{prefix}_show_min_pa")
+        # showing min type
+        if st.session_state[f"{prefix}_min_type"] == "PA":
+            st.checkbox("Show Player PA", key=f"{prefix}_show_player_pa")
+        else:
+            st.checkbox("Show Player Inn", key=f"{prefix}_show_player_pa")
+    else:
+        st.checkbox("Show Min IP", key = f"{prefix}_show_min_ip")
+        st.checkbox("Show Player IP", key = f"{prefix}_show_player_ip")
+
+    st.checkbox("Show all 30 teams",  key=f"{prefix}_show_all_teams")
+    st.checkbox("Only show leaders", key = f"{prefix}_leaders_only")
+
+    st.markdown("**Divisions**")
+    for div in ALL_DIVISIONS:
+        st.checkbox(div, key=f"{prefix}_div_{div}")
+
+
+use_inn     = st.session_state.get(f"{prefix}_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get(f"{prefix}_min_pa", 0))
+min_inn_val = int(st.session_state.get(f"{prefix}_min_inn", 0))
+min_ip_val = int(st.session_state.get(f"{prefix}_min_ip", 0))
+
+
+position_val = st.session_state[f"{prefix}_position"]
+
+df = load_data(s_year, e_year, mode, position=position_val)
+
+if df is None or df.empty:
+    st.error(f"No data found for {s_year}–{e_year}.")
+    st.stop()
+
+if is_hitting:
+    if use_inn:
+        if min_inn_val > 0 and "Inn" in df.columns:
+            df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn_val]
+    else:
+        if min_pa_val > 0 and "PA" in df.columns:
+            df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+else:
+    if min_ip_val > 0 and "IP" in df.columns:
+        df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip_val]
+
+if mode == MODE_SINGLE and is_hitting:
+    df = filter_by_position(df, position_val)
+
+if "Team" in df.columns:
+    df["TeamDisplay"] = df["Team"].astype(str).apply(get_team_display)
+else:
+    df["TeamDisplay"] = "N/A"
+
+
+active_filters = []
+for i in range(num_stats):
+    stat = st.session_state.get(f"{prefix}_stat_{i}")
+    op   = st.session_state.get(f"{prefix}_op_{i}", ">=")
+    val  = float(st.session_state.get(f"{prefix}_val_{i}", 0.0))
+    if stat:
+        active_filters.append((stat, op, val))
+
+if not df.empty and active_filters:
+    mask = pd.Series([True] * len(df), index=df.index)
+    for stat, op, val in active_filters:
+        if stat not in df.columns:
+            continue
+        col_vals    = pd.to_numeric(df[stat], errors="coerce")
+        decimals = STAT_ROUND.get(stat, 0)
+        col_vals = col_vals.round(decimals)
+        compare_val = val
+        if stat in RATE_STATS:
+            median_col = col_vals.median()
+            if pd.notna(median_col) and median_col <= 1 and val > 1:
+                compare_val = val / 100
+        mask = mask & (col_vals >= compare_val if op == ">=" else col_vals <= compare_val)
+    df = df[mask]
+
+if "Team" in df.columns:
+    df = df[df["TeamDisplay"] != "2+ Teams"]
+
+total_qualified = len(df)
+
+
+show_all_teams   = st.session_state.get(f"{prefix}_show_all_teams", False)
+collapse_split   = st.session_state.get(f"{prefix}_collapse_split", True)
+active_divisions = [div for div in ALL_DIVISIONS if st.session_state.get(f"{prefix}_div_{div}", True)]
+
+sort_stat = active_filters[0][0] if active_filters else None
+sort_op   = active_filters[0][1] if active_filters else ">="
+sort_asc_tiebreak = sort_stat in lower_better and sort_op == "<=" if sort_stat else False
+
+team_groups = []
+
+def build_team_group(team_abbrev, grp, year=None, show_year_on_row=False):
+    avg_val = np.nan
+    if sort_stat and sort_stat in grp.columns:
+        avg_val = pd.to_numeric(grp[sort_stat], errors="coerce").mean()
+    player_df = grp.copy()
+    if sort_stat and sort_stat in player_df.columns:
+        asc = sort_stat in lower_better and sort_op == "<="
+        player_df = player_df.sort_values(sort_stat, ascending=asc)
+    norm = normalize_team(team_abbrev)
+    return {
+        "abbrev":           team_abbrev,
+        "full_name":        TEAMS.get(norm, team_abbrev),
+        "player_count":     len(player_df),
+        "avg_val":          avg_val,
+        "players":          player_df,
+        "year":             year,
+        "show_year_on_row": show_year_on_row,
+    }
+
+if mode == MODE_SPLIT and not collapse_split:
+    # One card per team+year
+    group_keys = ["TeamDisplay", "Season"] if "Season" in df.columns else ["TeamDisplay"]
+    qualifying_by_team_year: dict = {}
+    if not df.empty and "TeamDisplay" in df.columns:
+        for keys, grp in df.groupby(group_keys):
+            team_abbrev = keys[0] if isinstance(keys, tuple) else keys
+            year = int(keys[1]) if isinstance(keys, tuple) and len(keys) > 1 else None
+            key  = (normalize_team(team_abbrev), year)
+            qualifying_by_team_year[key] = build_team_group(team_abbrev, grp, year=year)
+
+    if show_all_teams:
+        years    = list(range(s_year, e_year + 1))
+        all_keys = [(a, y) for a in TEAM_MLB_IDS for y in years if get_team_division(a) in active_divisions]
+    else:
+        all_keys = [k for k in qualifying_by_team_year if get_team_division(k[0]) in active_divisions]
+
+    for (abbrev, year) in all_keys:
+        norm = normalize_team(abbrev)
+        data = qualifying_by_team_year.get((norm, year), build_team_group(abbrev, pd.DataFrame(), year=year))
+        team_groups.append(data)
+
+    team_groups.sort(key=lambda x: (
+        -x["player_count"],
+        x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
+        x["abbrev"], x["year"] or 0,
+    ))
+    if st.session_state.get(f"{prefix}_leaders_only") and team_groups:
+        top_count = team_groups[0]["player_count"]
+        team_groups = [tg for tg in team_groups if tg["player_count"] == top_count]
+    elif not show_all_teams:
+        team_groups = team_groups[:MAX_TEAMS]
+
+else:
+    # Single season, multi-year span, OR collapsed split — one card per team
+    show_year_on_row = False
+
+    qualifying_by_team: dict = {}
+    if not df.empty and "TeamDisplay" in df.columns:
+        for team_abbrev, grp in df.groupby("TeamDisplay"):
+            norm = normalize_team(team_abbrev)
+            qualifying_by_team[norm] = build_team_group(team_abbrev, grp, show_year_on_row=show_year_on_row)
+
+    all_abbrevs = list(TEAM_MLB_IDS) if show_all_teams else list(qualifying_by_team)
+    all_abbrevs = [a for a in all_abbrevs if get_team_division(a) in active_divisions]
+
+    for abbrev in all_abbrevs:
+        norm = normalize_team(abbrev)
+        data = qualifying_by_team.get(norm, build_team_group(abbrev, pd.DataFrame(), show_year_on_row=show_year_on_row))
+        team_groups.append(data)
+
+    team_groups.sort(key=lambda x: (
+        -x["player_count"],
+        x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
+        x["abbrev"],
+    ))
+    if st.session_state.get(f"{prefix}_leaders_only") and team_groups:
+        top_count = team_groups[0]["player_count"]
+        team_groups = [tg for tg in team_groups if tg["player_count"] == top_count]
+    elif not show_all_teams:
+        team_groups = team_groups[:MAX_TEAMS]
+
+filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
+filter_str   = ", ".join(filter_parts)
+span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
+if mode == MODE_SPLIT and collapse_split: # ex NYY (eight individual judge seasons), BOS (5 mookie seasons, 3 devers)
+    mode_label   = " (Combined Single Seasons)"
+elif mode == MODE_SPLIT: # ex NYY - 2019, BOS - 2018
+     mode_label   = " (Single Season)"
+else:
+    mode_label = " "
+pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
+middle_label = " – " if mode == MODE_SINGLE else ": "
+if is_hitting:
+    title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+else:
+    title_text   = f"Most Pitchers with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+
+if is_hitting:
+    if st.session_state.get(f"{prefix}_show_min_pa"):
+        if use_inn:
+            min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+        else:
+            min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+    else:
+        min_pa_subtitle = ""
+else:
+    if st.session_state.get(f"{prefix}_show_min_ip"):
+        min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
+    else:
+        min_pa_subtitle = ""
+
+show_player_pa = st.session_state.get(f"{prefix}_show_player_pa", False)
+show_player_ip = st.session_state.get(f"{prefix}_show_player_ip", False)
+
+team_card_html = ""
+if not team_groups:
+    team_card_html = '<div style="padding:2rem;color:#999;text-align:center;">No teams matched all filters. Try adjusting your thresholds.</div>'
+else:
+    for rank, tg in enumerate(team_groups, start=1):
+        abbrev           = tg["abbrev"]
+        count            = tg["player_count"]
+        logo_url         = get_team_logo_url(abbrev)
+        show_year_on_row = tg.get("show_year_on_row", False)
+        season_word      = "season" if show_year_on_row else "player"
+        player_word      = season_word if count == 1 else f"{season_word}s"
+        year             = tg.get("year")
+        year_label       = f" – {year}" if year is not None else ""
+
+        logo_img = (
+            f'<img src="{html.escape(logo_url)}" alt="{html.escape(abbrev)}" '
+            f'style="object-fit:contain;display:block;"/>'
+            if logo_url else
+            f'<div display:flex;align-items:center;'
+            f'justify-content:center;font-size:10px;font-weight:700;color:#888;">'
+            f'{html.escape(abbrev)}</div>'
+        )
+
+        player_rows_html = ""
+        for _, prow in tg["players"].iterrows():
+            pname = str(prow.get("Name", "")).strip() 
+
+            if collapse_split and mode == MODE_SPLIT and "Season" in prow.index and pd.notna(prow.get("Season")):
+                pname = f'{html.escape(pname)} <span style="color:#aaa;font-weight:400;font-size:0.85rem;">– {int(prow["Season"])}</span>'
+            else:
+                pname = html.escape(pname)
+
+            stat_parts = []
+            for stat, op, threshold in active_filters:
+                val = prow.get(stat, np.nan)
+                if pd.notna(val):
+                    lbl = label_map.get(stat, stat)
+                    stat_parts.append(
+                        f'<span class="p-stat-label">{html.escape(lbl)}</span>'
+                        f'<span class="p-stat-val">{html.escape(format_stat(stat, val))}</span>'
+                    )
+
+            pa_html = ""
+            if is_hitting:
+                if show_player_pa: # showing player pa or Inn
+                    if st.session_state[f"{prefix}_min_type"] == "PA":
+                        pa_val = prow.get("PA", np.nan)
+                        if pd.notna(pa_val):
+                            pa_html = f'<span class="p-pa">{int(pa_val)}</span>'
+                    else:
+                        pa_val = round(prow.get("Inn", np.nan), 1)
+                        if pd.notna(pa_val):
+                            pa_html = f'<span class="p-pa">{pa_val}</span>'
+            else:
+                if show_player_ip:
+                    ip_val = prow.get("IP", np.nan)
+                    if pd.notna(ip_val):
+                        pa_html = f'<span class = "p-pa">{int(ip_val)}</span>'
+
+
+            stats_joined = "".join(stat_parts)
+            player_rows_html += f"""
+            <div class="player-row">
+                <span class="p-name">{pname}</span>
+                <span class="p-stats-right">{stats_joined}{pa_html}</span>
+            </div>"""
+
+        # Display OAK as ATH in card since that's the current team name
+        display_abbrev = "ATH" if normalize_team(abbrev) == "OAK" else abbrev
+
+        team_card_html += f"""
+        <div class="team-card">
+            <div class="team-header">
+                <div class="team-logo-wrap">{logo_img}</div>
+                <div class="team-meta">
+                    <div class="team-abbrev-label">{html.escape(display_abbrev)}{html.escape(year_label)}</div>
+                    <div class="team-badge">{count} {player_word}</div>
+                </div>
+                <div class="team-rank">#{rank}</div>
+            </div>
+            <div class="player-list">{player_rows_html}</div>
+        </div>"""
+
+num_teams_shown     = len(team_groups)
+total_players_shown = sum(tg["player_count"] for tg in team_groups)
+
+grid_html = f"""
+<div class="leaderboard-card">
+    <div class="leaderboard-title">{html.escape(title_text)}</div>
+    {min_pa_subtitle}
+    <div class="teams-grid">{team_card_html}</div>
+    <div class="footer">
+        <p>By: Sox_Savant</p>
+        <p>Data: FanGraphs • Baseball Reference • Baseball Savant</p>
+    </div>
+</div>
+"""
+
+cards_per_row   = 3
+num_rows        = max(1, -(-num_teams_shown // cards_per_row))
+avg_players     = total_players_shown / max(num_teams_shown, 1)
+card_height_est = 90 + avg_players * 26
+est_height      = 220 + int(num_rows * card_height_est) + 80
+
+full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+html, body {{
+    background: transparent;
+    font-family: "Source Sans Pro", sans-serif;
+    margin: 0; padding: 0;
+}}
+.leaderboard-card {{
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 12px;
+    padding: 2.5rem 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    margin: 0 auto;
+    width: 100%;
+    max-width: 900px;
+    box-sizing: border-box;
+}}
+.leaderboard-title {{
+    font-weight: 900;
+    font-size: 2rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+    line-height: 1.2;
+    color: #111;
+}}
+.leaderboard-subtitle {{
+    text-align: center;
+    color: #6d7075;
+    font-size: 1.1rem;
+    margin-bottom: -0.2rem;
+    margin-top: 0;
+}}
+.teams-grid {{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 1.25rem;
+}}
+.team-card {{
+    border: 1px solid #e8e8e8;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+}}
+.team-header {{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px 8px;
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+}}
+.team-logo-wrap {{
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}}
+.team-meta {{
+    flex: 1;
+    min-width: 0;
+}}
+.team-abbrev-label {{
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #333;
+    line-height: 1.1;
+}}
+.team-badge {{
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2e7d32;
+    margin-top: 2px;
+}}
+.team-rank {{
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ccc;
+    flex-shrink: 0;
+    align-self: flex-start;
+}}
+.player-list {{
+    padding: 4px 8px 6px;
+    display: flex;
+    flex-direction: column;
+}}
+.player-row {{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid #f4f4f4;
+    gap: 4px;
+}}
+.player-row:last-child {{ border-bottom: none; }}
+.p-name {{
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}}
+.p-stats-right {{
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}}
+.p-stat-label {{
+    color: #aaa;
+    font-size: .85rem;
+    white-space: nowrap;
+}}
+.p-stat-val {{
+    font-weight: 800;
+    font-size: 1rem;
+    color: #111;
+    white-space: nowrap;
+    margin-right: 5px;
+}}
+.p-pa {{
+    color: #ccc;
+    font-size: 0.9rem;
+    margin-left: 2px;
+}}
+.footer {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 1.3rem -1rem 0 -1rem;
+    padding: 0 3rem;
+}}
+
+.footer p {{
+margin: 0;
+font-size: 1rem;
+color: #666;
+white-space: nowrap;
+}}
+
+/* Compact Screenshot Rules for Small Screens */
+@media (max-width: 600px) {{
+    .leaderboard-card {{
+        padding: 1rem 0.5rem;
+    }}
+    .leaderboard-title {{
+        font-size: 1.2rem;
+    }}
+    .leaderboard-subtitle {{
+        font-size: 0.8rem;
+    }}
+    .teams-grid {{
+        grid-template-columns: repeat(3, 1fr); /* Locks the 3-column grid layout */
+        gap: 4px; /* Tighter gutters */
+    }}
+    .team-header {{
+        padding: 4px 4px 3px;
+        gap: 4px;
+    }}
+   .team-logo-wrap {{
+            width: 18px !important; 
+            height: 18px !important;
+        }}
+    .team-logo-wrap img {{
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+        }}
+    .team-abbrev-label {{
+        font-size: 0.7rem; /* Scales text down dynamically */
+    }}
+    .team-badge {{
+        font-size: 0.5rem;
+    }}
+    .team-rank {{
+        font-size: 0.65rem;
+    }}
+    .player-list {{
+        padding: 2px 4px;
+    }}
+    .p-name, .p-stat-val {{
+        font-size: 0.5rem;
+    }}
+    .p-stat-label, .p-pa {{
+        font-size: 0.5rem;
+    }}
+     .footer p {{
+        font-size: 0.7rem;
+    }}
+    .footer {{
+    margin-top: 1rem;
+    }}
+     .leaderboard-subtitle {{
+    margin-bottom: -0.7rem;
+}}
+}}
+</style>
+</head>
+<body>{grid_html}</body>
+</html>"""
+
+db_team_groups = []
+if mode == MODE_SPLIT and not collapse_split:
+    for (abbrev, year) in [k for k in qualifying_by_team_year if get_team_division(k[0]) in active_divisions]:
+        norm = normalize_team(abbrev)
+        data = qualifying_by_team_year.get((norm, year))
+        if data and data["player_count"] > 0:
+            db_team_groups.append(data)
+else:
+    for abbrev in [a for a in qualifying_by_team if get_team_division(a) in active_divisions]:
+        norm = normalize_team(abbrev)
+        data = qualifying_by_team.get(norm)
+        if data and data["player_count"] > 0:
+            db_team_groups.append(data)
+
+db_team_groups.sort(key=lambda x: (
+    -x["player_count"],
+    x["avg_val"] if sort_asc_tiebreak else -x["avg_val"] if not np.isnan(x["avg_val"]) else 0,
+    x["abbrev"],
+))
+
+with col2:
+    if view_mode == "Graphic":
+        st.iframe(full_html, height=est_height)
+
+    else:
+            if not db_team_groups:
+                st.info("No teams matched all filters. Try adjusting your thresholds.")
+            else:
+                db_rows = []
+                for tg in db_team_groups:
+                    team_label = tg["abbrev"]
+                    if tg.get("year") is not None:
+                        team_label = f"{team_label} – {tg['year']}"
+
+                    names = []
+                    for _, prow in tg["players"].iterrows():
+                        name = str(prow.get("Name", "")).strip()
+                        if collapse_split and mode == MODE_SPLIT and "Season" in prow.index and pd.notna(prow.get("Season")):
+                            name = f"{name} ({int(prow['Season'])})"
+                        names.append(name)
+
+                    db_rows.append({
+                        "Team":    team_label,
+                        "Count":   tg["player_count"],
+                        "Players": ", ".join(names),
+                    })
+
+                db_df = pd.DataFrame(db_rows)
+                db_df.index += 1
+
+                st.caption(title_text)
+                st.dataframe(
+                    db_df,
+                    width="stretch",
+                    height=700,
+                    column_config={
+                        "Team":    st.column_config.TextColumn("Team",    width="small"),
+                        "Count":   st.column_config.NumberColumn("Count", width="small"),
+                        "Players": st.column_config.TextColumn("Players", width="large"),
+                    },
+                )
+                st.markdown(
+                    "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem;'>"
+                    "Data: Baseball Reference · FanGraphs · Baseball Savant"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
