@@ -72,6 +72,12 @@ RATE_STATS = {
     "DRS/1350", "OAA/1350","FRV/1350","FRM/1350", "Z-Swing% - Chase%"
 }
 
+PCT_STATS = {
+    "K%", "BB%", "Chase%", "Whiff%", "Swing%", "Z-Swing%",
+    "O-Contact%", "Z-Contact%", "Zone%", "Barrel%", "HardHit%",
+    "Sweet-Spot%", "Squared-Up%", "Z-Swing% - Chase%",
+}
+
 MAX_STATS = {"maxEV"}
 
 EVERY_STAT_PRESET = [

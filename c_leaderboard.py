@@ -5,10 +5,12 @@ import unicodedata
 import html
 import re
 from datetime import date
+import h_utils
+import p_utils
 
 from utils import TEAM_OPTIONS, LEAGUES
 
-st.set_page_config(page_title="Custom Hitting Leaderboard", layout="wide", page_icon="⚾")
+st.set_page_config(page_title="Custom Leaderboard", layout="wide", page_icon="⚾")
 
 st.markdown(
     """
@@ -44,7 +46,7 @@ st.markdown("""
 
 title_col, meta_col = st.columns([3, 1])
 with title_col:
-    st.title("Custom Hitter Leaderboard")
+    st.title("Custom Leaderboard")
 with meta_col:
     st.markdown(
         """
@@ -55,31 +57,38 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-from h_utils import get_last_updated
+type_mode = st.radio("Type", ["Hitting", "Pitching"], horizontal=True, key="cc_mode", label_visibility="collapsed")
+is_hitting = (type_mode == "Hitting")
+U = h_utils if is_hitting else p_utils
+prefix = "hcc" if is_hitting else "pcc"
+
 current_year = date.today().year
-last_updated = get_last_updated(current_year)
+last_updated = U.get_last_updated(current_year)
 st.caption(f"{current_year} data last updated: {last_updated}")
 
+STAT_ALLOWLIST = U.STAT_ALLOWLIST
+STAT_PRESETS = U.STAT_PRESETS
+TRUTHY_STRINGS = U.TRUTHY_STRINGS
+get_headshot = U.get_headshot
+label_map = U.label_map
+lower_better = U.lower_better
+start_year = U.start_year
+format_stat = U.format_stat
+load_final_year = U.load_final_year
+aggregate_player_group = U.aggregate_player_group
+STAT_ROUND = U.STAT_ROUND
+STAT_DISPLAY_NAMES = U.STAT_DISPLAY_NAMES
+
 from h_utils import (
-    STAT_ALLOWLIST, format_stat, start_year,
-    get_headshot, label_map, lower_better, load_final_year,
     POSITION_OPTIONS, normalize_team, get_team_display,
-    filter_by_position, aggregate_player_group,
-    STAT_ROUND, STAT_DISPLAY_NAMES, 
+    filter_by_position, 
 )
-from utils import get_dynamic_min_pa
+from utils import get_dynamic_min_pa,get_dynamic_min_ip
 
 MODE_SINGLE = "Single Season"
 MODE_SPLIT  = "Split Seasons"
 MODE_MULTI  = "Multi-Year Span"
 
-current_year = date.today().year
-
-PCT_STATS = {
-    "K%", "BB%", "Chase%", "Whiff%", "Swing%", "Z-Swing%",
-    "O-Contact%", "Z-Contact%", "Zone%", "Barrel%", "HardHit%",
-    "Sweet-Spot%", "Squared-Up%", "Z-Swing% - Chase%",
-}
 
 
 def normalize_name(raw: str) -> str:
@@ -102,7 +111,8 @@ def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.
         df = load_final_year(year)
         if df is not None and not df.empty:
             if mode == MODE_SPLIT:
-                df = filter_by_position(df, position_val)
+                if is_hitting:
+                    df = filter_by_position(df, position)
             frames.append(df)
 
     if not frames:
@@ -113,7 +123,8 @@ def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.
     if mode == MODE_SPLIT:
         return combined
 
-    combined = filter_by_position(combined, position)
+    if is_hitting:
+        combined = filter_by_position(combined, position)
     if combined.empty:
         return pd.DataFrame()
 
@@ -121,21 +132,24 @@ def load_data(s_year: int, e_year: int, mode: str, position: str = "all") -> pd.
 
 
 min_pa = get_dynamic_min_pa(current_year)
+min_ip = get_dynamic_min_ip(current_year)
 
 for key, default in [
-    ("hl_year", current_year),
-    ("hl_start_year", current_year - 1),
-    ("hl_end_year", current_year),
-    ("hl_stat", "fWAR"),
-    ("hl_min_type", "PA"),
-    ("hl_position", "all"),
-    ("hl_team", "all"),
-    ("hl_mode", MODE_SINGLE),
-    ("hl_show_player_pa", False),
-    ("hl_sort_worst", False),
-    ("hl_show_min_pa", False),
-    ("hl_view", "Graphic"),
-    ("hl_league","All")
+    (f"{prefix}_year", current_year),
+    (f"{prefix}_start_year", current_year - 1),
+    (f"{prefix}_end_year", current_year),
+    (f"{prefix}_stat", "fWAR"),
+    (f"{prefix}_min_type", "PA"),
+    (f"{prefix}_position", "all"),
+    (f"{prefix}_team", "all"),
+    (f"{prefix}_mode", MODE_SINGLE),
+    (f"{prefix}_show_player_pa", False),
+    (f"{prefix}_sort_worst", False),
+    (f"{prefix}_show_min_pa", False),
+    (f"{prefix}_view", "Graphic"),
+    (f"{prefix}_league","All"),
+    (f"{prefix}_min_ip", min_ip)
+
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -144,55 +158,64 @@ col1, col2 = st.columns([.5, 2])
 
 with col1:
 
+
+
     view_mode = st.radio(
         "View", ["Graphic", "Database"],
-        key="hl_view",
+        key=f"{prefix}_view",
         horizontal=True,
         label_visibility="collapsed",
     )
 
     stat = st.selectbox(
-        "Stat", STAT_ALLOWLIST, key="hl_stat",
+        "Stat", STAT_ALLOWLIST, key=f"{prefix}_stat",
         format_func=lambda x: label_map.get(x, x),
     )
 
-    mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="hl_mode")
+    mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key=f"{prefix}_mode")
 
     if mode == MODE_SINGLE:
-        st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key="hl_year")
-        sel_start = st.session_state["hl_year"]
-        sel_end   = st.session_state["hl_year"]
+        st.selectbox("Year", options=list(range(current_year, start_year - 1, -1)), key=f"{prefix}_year")
+        sel_start = st.session_state[f"{prefix}_year"]
+        sel_end   = st.session_state[f"{prefix}_year"]
 
-        if "last_year" not in st.session_state:
+        if f"{prefix}_last_year" not in st.session_state:
             st.session_state.last_year = sel_start
         if sel_start != st.session_state.last_year:
-            st.session_state["hl_min_pa"] = get_dynamic_min_pa(sel_start)
+            st.session_state[f"{prefix}_min_pa"] = get_dynamic_min_pa(sel_start)
             st.session_state.last_year = sel_start
     else:
         start_options = list(range(current_year, start_year - 1, -1))
-        current_start_val = st.session_state.get("hl_start_year", current_year - 1)
+        current_start_val = st.session_state.get(f"{prefix}_start_year", current_year - 1)
         st.selectbox(
             "Start Year", options=start_options,
             index=start_options.index(current_start_val) if current_start_val in start_options else 0,
-            key="hl_start_year",
+            key=f"{prefix}_start_year",
         )
-        st.selectbox("End Year",   options=list(range(current_year, start_year - 1, -1)), key="hl_end_year")
-        sel_start = st.session_state["hl_start_year"]
-        sel_end   = max(st.session_state["hl_end_year"], sel_start)
+        st.selectbox("End Year",   options=list(range(current_year, start_year - 1, -1)), key=f"{prefix}_end_year")
+        sel_start = st.session_state[f"{prefix}_start_year"]
+        sel_end   = max(st.session_state[f"{prefix}_end_year"], sel_start)
 
-    st.selectbox("Min Type", options=["PA", "Inn"], key="hl_min_type")
+    if is_hitting:
+        st.selectbox("Min Type", options=["PA", "Inn"], key=f"{prefix}_min_type")
+  
 
-    if st.session_state["hl_min_type"] == "Inn":
-        st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key="hl_min_inn")
+        if st.session_state[f"{prefix}_min_type"] == "Inn":
+            st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key=f"{prefix}_min_inn")
+        else:
+            st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key=f"{prefix}_min_pa")
     else:
-        st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key="hl_min_pa")
 
-    st.selectbox(
-        "Position",
-        options=list(POSITION_OPTIONS.keys()),
-        format_func=lambda x: POSITION_OPTIONS[x],
-        key="hl_position",
-    )
+        st.number_input("Min IP", min_value=0, max_value=5000, key=f"{prefix}_min_ip")
+
+    
+    if is_hitting:
+        st.selectbox(
+            "Position",
+            options=list(POSITION_OPTIONS.keys()),
+            format_func=lambda x: POSITION_OPTIONS[x],
+            key=f"{prefix}_position",
+        )
 
     team_disabled = (mode == MODE_MULTI)
     league_disabled = (sel_start < 2013)
@@ -201,31 +224,37 @@ with col1:
         "Team",
         options=list(TEAM_OPTIONS.keys()),
         format_func=lambda x: TEAM_OPTIONS[x],
-        key="hl_team",
+        key=f"{prefix}_team",
         disabled=team_disabled,
         help="Team filter unavailable for multi-year span" if team_disabled else None,
     )
     st.selectbox(
         "League",
         options=LEAGUES.keys(),
-        key="hl_league",
+        key=f"{prefix}_league",
         disabled=team_disabled or league_disabled,
         help="League filter unavailable for years before 2013 due to possible innacuracies" if league_disabled else None,
     )
 
+    if is_hitting:
     # Graphic-only controls
-    if view_mode == "Graphic":
-        st.checkbox("Show worst", key="hl_sort_worst")
-        if st.session_state["hl_min_type"] == "PA":
-            st.checkbox("Show Min PA",    key="hl_show_min_pa")
-            st.checkbox("Show Player PA", key="hl_show_player_pa")
-        else:
-            st.checkbox("Show Min Inn",    key="hl_show_min_pa")
-            st.checkbox("Show Player Inn", key="hl_show_player_pa")
+        if view_mode == "Graphic":
+            st.checkbox("Show worst", key=f"{prefix}_sort_worst")
+            if st.session_state[f"{prefix}_min_type"] == "PA":
+                st.checkbox("Show Min PA",    key=f"{prefix}_show_min_pa")
+                st.checkbox("Show Player PA", key=f"{prefix}_show_player_pa")
+            else:
+                st.checkbox("Show Min Inn",    key=f"{prefix}_show_min_pa")
+                st.checkbox("Show Player Inn", key=f"{prefix}_show_player_pa")
+    else:
+        if view_mode == "Graphic":
+            st.checkbox("Show worst",     key=f"{prefix}_sort_worst")
+            st.checkbox("Show min IP",    key=f"{prefix}_show_min_ip")
+            st.checkbox("Show player IP", key=f"{prefix}_show_player_ip")
 
-position_val = st.session_state.get("hl_position", "all")
-team_val     = "all" if team_disabled else st.session_state.get("hl_team", "all")
-league_val     = "All" if team_disabled or league_disabled else st.session_state.get("hl_league", "All")
+position_val = st.session_state.get(f"{prefix}_position", "all")
+team_val     = "all" if team_disabled else st.session_state.get(f"{prefix}_team", "all")
+league_val     = "All" if team_disabled or league_disabled else st.session_state.get(f"{prefix}_league", "All")
 
 # ── Load & filter data (shared) ───────────────────────────────────────────────
 
@@ -234,18 +263,23 @@ if df is None or df.empty:
     st.error(f"No data found for {sel_start}–{sel_end}.")
     st.stop()
 
-use_inn     = st.session_state.get("hl_min_type") == "Inn"
-min_pa_val  = int(st.session_state.get("hl_min_pa", 0))
-min_inn_val = int(st.session_state.get("hl_min_inn", 0))
+use_inn     = st.session_state.get(f"{prefix}_min_type") == "Inn"
+min_pa_val  = int(st.session_state.get(f"{prefix}_min_pa", 0))
+min_ip_val  = int(st.session_state.get(f"{prefix}_min_ip", 0))
+min_inn_val = int(st.session_state.get(f"{prefix}_min_inn", 0))
 
 if use_inn:
     if min_inn_val > 0 and "Inn" in df.columns:
         df = df[pd.to_numeric(df["Inn"], errors="coerce").fillna(0) >= min_inn_val]
 else:
-    if min_pa_val > 0 and "PA" in df.columns:
-        df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+    if is_hitting:
+        if min_pa_val > 0 and "PA" in df.columns:
+            df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
+    else:
+        if min_ip_val > 0 and "IP" in df.columns:
+            df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip_val]
 
-if mode == MODE_SINGLE:
+if mode == MODE_SINGLE and is_hitting:
     df = filter_by_position(df, position_val)
 
 if team_val != "all" and "Team" in df.columns:
@@ -277,7 +311,7 @@ stat_lower_better = stat in lower_better
 
 with col2:
     if view_mode == "Graphic":
-        sort_worst = st.session_state.get("hl_sort_worst", False)
+        sort_worst = st.session_state.get(f"{prefix}_sort_worst", False)
         ascending  = (stat_lower_better and not sort_worst) or (not stat_lower_better and sort_worst)
         df_graphic = df.sort_values(by=stat, ascending=ascending).dropna(subset=[stat]).head(10)
 
@@ -295,15 +329,25 @@ with col2:
             pa_val  = row.get("PA", np.nan)
             inn_val = round(row.get("Inn", np.nan), 1)
 
-            if st.session_state.get("hl_show_player_pa"):
-                if pd.notna(pa_val) and st.session_state.get("hl_min_type") == "PA":
-                    player_pa_html = f'<div class="player-pa">{int(pa_val)} PA</div>'
-                elif pd.notna(inn_val) and st.session_state.get("hl_min_type") == "Inn":
-                    player_pa_html = f'<div class="player-pa">{inn_val} Inn</div>'
+
+            if is_hitting:
+                if st.session_state.get(f"{prefix}_show_player_pa"):
+                    if pd.notna(pa_val) and st.session_state.get(f"{prefix}_min_type") == "PA":
+                        player_pa_html = f'<div class="player-pa">{int(pa_val)} PA</div>'
+                    elif pd.notna(inn_val) and st.session_state.get(f"{prefix}_min_type") == "Inn":
+                        player_pa_html = f'<div class="player-pa">{inn_val} Inn</div>'
+                    else:
+                        player_pa_html = ""
                 else:
                     player_pa_html = ""
             else:
-                player_pa_html = ""
+                if st.session_state.get(f"{prefix}_show_player_ip"):
+                    ip_val  = row.get("IP", np.nan)
+                    player_pa_html = f'<div class="player-ip">{format_stat("IP", ip_val)} IP</div>'
+                else:
+                    player_pa_html = ""
+          
+            
 
             img_html = f'<img src="{html.escape(src)}" alt="{html.escape(name)}"/>'
             cards.append(f'''
@@ -329,13 +373,21 @@ with col2:
             f"{span_label}{mode_label} {league_label} {team_label} {pos_label} {worst_label}{title_label} Leaders".strip(),
         )
 
-        if st.session_state.get("hl_show_min_pa"):
-            if use_inn:
-                min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+        if is_hitting:
+            if st.session_state.get(f"{prefix}_show_min_pa"):
+                if use_inn:
+                    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_inn_val} Inn</div>'
+                else:
+                    min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
             else:
-                min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
+                min_pa_subtitle = ""
         else:
-            min_pa_subtitle = ""
+            if st.session_state.get(f"{prefix}_show_min_ip"):
+                min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
+            else:
+                min_pa_subtitle = ""
+                
+            
 
         grid_html = f"""
         <div class="leaderboard-card">
