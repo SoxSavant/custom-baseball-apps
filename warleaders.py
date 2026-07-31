@@ -195,7 +195,13 @@ with col1:
         st.selectbox("Year", options=list(range(current_year, START_YEAR - 1, -1)), key="wl_year")
         sel_start = sel_end = st.session_state["wl_year"]
     else:
-        st.selectbox("Start Year", options=list(range(current_year, START_YEAR - 1, -1)), key="wl_start_year")
+        start_options = list(range(current_year, START_YEAR - 1, -1))
+        current_start_val = st.session_state.get("wl_start_year", current_year - 1)
+        st.selectbox(
+            "Start Year", options=start_options,
+            index=start_options.index(current_start_val) if current_start_val in start_options else 0,
+            key="wl_start_year",
+        )
         st.selectbox("End Year", options=list(range(current_year, START_YEAR - 1, -1)), key="wl_end_year")
         sel_start = st.session_state["wl_start_year"]
         sel_end = max(st.session_state["wl_end_year"], sel_start)
