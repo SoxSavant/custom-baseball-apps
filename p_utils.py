@@ -607,4 +607,78 @@ def get_last_updated(year: int) -> str:
         return last_modified.strftime("%B %d, %Y")
     except Exception:
         return "unknown"
+
+def load_risers_data(
+    start_year: int, end_year: int,
+    min_ip_start: int = 0, min_ip_end: int = 0, team: str = "all"
+) -> pd.DataFrame:
+    df_s = load_final_year(start_year)
+    df_e = load_final_year(end_year)
+
+    if df_s is None or df_s.empty or df_e is None or df_e.empty:
+        return pd.DataFrame()
+
+    # Min IP filter
+    if min_ip_start > 0:
+        df_s = df_s[pd.to_numeric(df_s.get("IP", 0), errors="coerce").fillna(0) >= min_ip_start]
+    if min_ip_end > 0:
+        df_e = df_e[pd.to_numeric(df_e.get("IP", 0), errors="coerce").fillna(0) >= min_ip_end]
+
+    # Team filter on end year only
+    if team != "all" and "Team" in df_e.columns:
+        target = normalize_team(team)
+        df_e = df_e[df_e["Team"].astype(str).apply(normalize_team) == target]
+
+    if "PlayerId" not in df_s.columns or "PlayerId" not in df_e.columns:
+        return pd.DataFrame()
+
+    df_s = df_s.set_index("PlayerId")
+    df_e = df_e.set_index("PlayerId")
+    common_ids = df_s.index.intersection(df_e.index)
+
+    if len(common_ids) == 0:
+        return pd.DataFrame()
+
+    df_s = df_s.loc[common_ids]
+    df_e = df_e.loc[common_ids]
+
+    skip = {"Season", "Name", "Team", "MLBAMID", "NameASCII"}
+    numeric_cols = [
+        c for c in df_e.columns
+        if c not in skip
+        and pd.api.types.is_numeric_dtype(df_e[c])
+        and c in df_s.columns
+    ]
+
+    rows = []
+    for pid in common_ids:
+        row_s = df_s.loc[pid]
+        row_e = df_e.loc[pid]
+
+        record = {
+            "PlayerId": pid,
+            "Name": row_e.get("Name", row_s.get("Name", "")),
+            "Team": get_team_display(str(row_e.get("Team", "N/A"))),
+            "IP_start": pd.to_numeric(row_s.get("IP", np.nan), errors="coerce"),
+            "IP_end":   pd.to_numeric(row_e.get("IP", np.nan), errors="coerce"),
+        }
+
+        # Carry MLBAMID for headshots
+        for col in ["MLBAMID", "mlbamid"]:
+            val = row_e.get(col)
+            if val is not None and pd.notna(val):
+                record[col] = val
+                break
+
+        for col in numeric_cols:
+            s_val = pd.to_numeric(row_s.get(col, np.nan), errors="coerce")
+            e_val = pd.to_numeric(row_e.get(col, np.nan), errors="coerce")
+            record[f"{col}_start"] = s_val
+            record[f"{col}_end"]   = e_val
+            decimal = STAT_ROUND.get(col,1)
+            record[col] = e_val.round(decimal) - s_val.round(decimal)
+
+        rows.append(record)
+
+    return pd.DataFrame(rows)
     

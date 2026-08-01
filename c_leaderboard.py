@@ -180,10 +180,11 @@ with col1:
         sel_end   = st.session_state[f"{prefix}_year"]
 
         if f"{prefix}_last_year" not in st.session_state:
-            st.session_state.last_year = sel_start
-        if sel_start != st.session_state.last_year:
-            st.session_state[f"{prefix}_min_pa"] = get_dynamic_min_pa(sel_start)
-            st.session_state.last_year = sel_start
+            st.session_state[f"{prefix}_last_year"] = start_year
+        if start_year != st.session_state[f"{prefix}_last_year"]:
+            st.session_state[f"{prefix}_min_pa"] = get_dynamic_min_pa(start_year)
+            st.session_state[f"{prefix}_min_ip"] = get_dynamic_min_ip(start_year)
+            st.session_state[f"{prefix}_last_year"] = start_year
     else:
         start_options = list(range(current_year, start_year - 1, -1))
         current_start_val = st.session_state.get(f"{prefix}_start_year", current_year - 1)
