@@ -1,12 +1,6 @@
 from playwright.sync_api import sync_playwright
 
 APPS = [
-    "https://hitter-year-over-year.streamlit.app/",
-    "https://pitcher-year-over-year.streamlit.app/",
-    "https://hitter-stat-filter.streamlit.app/",
-    "https://pitcher-stat-filter.streamlit.app/",
-    "https://hitter-season.streamlit.app/",
-    "https://pitcher-season.streamlit.app/",
     "https://hitter-league-leaders.streamlit.app/",
     "https://pitcher-league-leaders.streamlit.app/",
     "https://hitter-indiv-yoy.streamlit.app/",
@@ -21,6 +15,9 @@ APPS = [
     "https://custom-database.streamlit.app/",
     "https://players-per-team.streamlit.app/",
     "https://custom-savant-page.streamlit.app/",
+    "https://season-counter.streamlit.app/",
+    "https://stat-filter.streamlit.app/",
+    "https://league-yoy.streamlit.app/"
 
 
 ]
