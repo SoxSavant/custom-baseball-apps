@@ -3,13 +3,15 @@ from playwright.sync_api import sync_playwright
 APPS = [
     "https://hitter-league-leaders.streamlit.app/",
     "https://pitcher-league-leaders.streamlit.app/",
-    "https://hitter-indiv-yoy.streamlit.app/",
-    "https://pitcher-indiv-yoy.streamlit.app/",
+
     "https://compositedatabase.streamlit.app/",
-    "https://stat-correlation.streamlit.app/",
     "https://compositedatabase2.streamlit.app/",
+
+    "https://stat-correlation.streamlit.app/",
     "https://stat-trajectory.streamlit.app/",
+
     "http://warleaders.streamlit.app/",
+
     "https://custom-comparison.streamlit.app/",
     "https://custom-leaderboard.streamlit.app/",
     "https://custom-database.streamlit.app/",
@@ -17,7 +19,8 @@ APPS = [
     "https://custom-savant-page.streamlit.app/",
     "https://season-counter.streamlit.app/",
     "https://stat-filter.streamlit.app/",
-    "https://league-yoy.streamlit.app/"
+    "https://league-yoy.streamlit.app/",
+    "https://player-yoy.streamlit.app/",
 
 
 ]
