@@ -150,6 +150,9 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
 
     return pd.DataFrame(grouped_rows)
 
+default_stat = "OPS" if is_hitting else "ERA"
+default_val = .800 if is_hitting else 3.50
+
 for key, default in [
     (f"{prefix}_year",           current_year),
     (f"{prefix}_start_year",     current_year),
@@ -158,11 +161,13 @@ for key, default in [
     (f"{prefix}_position",       "all"),
     (f"{prefix}_show_min_pa",    True),
     (f"{prefix}_show_player_pa", False),
+    (f"{prefix}_show_min_ip",    True),
+    (f"{prefix}_show_player_ip", False),
     (f"{prefix}_show_all_teams", False),
     (f"{prefix}_leaders_only",False),
     (f"{prefix}_collapse_split", False),
-    (f"{prefix}_val_0",          2.0),
-    (f"{prefix}_val_1",          2.0),
+    (f"{prefix}_stat_0", default_stat),
+    (f"{prefix}_val_0",          default_val),
     (f"{prefix}_min_type", "PA"),
 ]:
     if key not in st.session_state:
@@ -226,13 +231,11 @@ with col1:
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
-        default_stat  = "fWAR" if i == 0 else STAT_ALLOWLIST[0]
-        default_index = STAT_ALLOWLIST.index(default_stat) if default_stat in STAT_ALLOWLIST else 0
+
 
         new_stat = st.selectbox(
             f"Stat {i+1}", STAT_ALLOWLIST,
             key=f"{prefix}_stat_{i}",
-            index=default_index,
             format_func=lambda x: label_map.get(x, x),
             label_visibility="collapsed",
             on_change=update_stat_default,
@@ -241,7 +244,7 @@ with col1:
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            st.selectbox("Op", [">=", "<="], key=f"{prefix}_op_{i}", index=0, label_visibility="collapsed")
+            st.selectbox("Op", [">=", "<="], key=f"{prefix}_op_{i}", index=0 if is_hitting else 1, label_visibility="collapsed")
         with val_col:
             decimals = STAT_ROUND.get(new_stat, 0)
             step = 10 ** -decimals if decimals > 0 else 1.0
