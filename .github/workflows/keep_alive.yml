@@ -15,6 +15,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+      # after setup-python
+      - name: Install Playwright package
+        run: pip install playwright
+
+      - name: Install Playwright browser (always)
+        run: playwright install --with-deps chromium
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
