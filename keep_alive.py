@@ -1,13 +1,7 @@
 from playwright.sync_api import sync_playwright
 
 APPS = [
-    "https://custom-comparison-app.streamlit.app/",
-    "https://customizable-player-savant-page.streamlit.app/",
-    "https://hitterleaderboardapp.streamlit.app/",
     "https://hitter-year-over-year.streamlit.app/",
-    "https://custompitchercomparisonapp.streamlit.app/",
-    "https://pitcher-savant-page.streamlit.app/",
-    "https://pitcher-leaderboard.streamlit.app/",
     "https://pitcher-year-over-year.streamlit.app/",
     "https://hitter-stat-filter.streamlit.app/",
     "https://pitcher-stat-filter.streamlit.app/",
@@ -15,17 +9,20 @@ APPS = [
     "https://pitcher-season.streamlit.app/",
     "https://hitter-league-leaders.streamlit.app/",
     "https://pitcher-league-leaders.streamlit.app/",
-    "https://hitters-per-team.streamlit.app/",
-    "https://pitchers-per-team.streamlit.app/",
     "https://hitter-indiv-yoy.streamlit.app/",
     "https://pitcher-indiv-yoy.streamlit.app/",
-    "https://hitting-database.streamlit.app/",
-    "https://pitching-database.streamlit.app/",
     "https://compositedatabase.streamlit.app/",
     "https://stat-correlation.streamlit.app/",
     "https://compositedatabase2.streamlit.app/",
     "https://stat-trajectory.streamlit.app/",
     "http://warleaders.streamlit.app/",
+    "https://custom-comparison.streamlit.app/",
+    "https://custom-leaderboard.streamlit.app/",
+    "https://custom-database.streamlit.app/",
+    "https://players-per-team.streamlit.app/",
+    "https://custom-savant-page.streamlit.app/",
+
+
 ]
 
 WAKE_BUTTON_SELECTOR = "button:has-text('get this app back up')"
