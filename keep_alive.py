@@ -14,7 +14,7 @@ APPS = [
 
     "https://custom-comparison.streamlit.app/",
     "https://custom-leaderboard.streamlit.app/",
-    "https://custom-database.streamlit.app/",
+    "https://soxsavant-database.streamlit.app/",
     "https://players-per-team.streamlit.app/",
     "https://custom-savant-page.streamlit.app/",
     "https://season-counter.streamlit.app/",
