@@ -162,7 +162,7 @@ def aggregate_multi_year(df: pd.DataFrame) -> pd.DataFrame:
 
 for key, default in [
     ("wl_view", "Graphic"),
-    ("wl_stat", "fWAR-bWAR Avg"),
+    ("wl_stat", "fWAR"),
     ("wl_mode", MODE_SINGLE),
     ("wl_year", current_year),
     ("wl_start_year", current_year - 1),
@@ -187,7 +187,7 @@ with col1:
     if view_mode == "Graphic":
         stat = st.selectbox("Stat", WAR_STATS, key="wl_stat")
     else:
-        stat = "fWAR-bWAR Avg"
+        stat = "fWAR"
 
     mode = st.radio("Mode", options=[MODE_SINGLE, MODE_SPLIT, MODE_MULTI], key="wl_mode")
 
@@ -270,7 +270,7 @@ if df.empty:
 with col2:
     if view_mode == "Graphic":
         sort_worst = st.session_state.get("wl_sort_worst", False)
-        ascending = sort_worst  # higher is always better for fWAR/bWAR/Avg
+        ascending = sort_worst  
         df_graphic = df.sort_values(by=stat, ascending=ascending).dropna(subset=[stat]).head(10)
 
         cards = []
@@ -415,7 +415,7 @@ html, body {{
     # ── DATABASE VIEW ─────────────────────────────────────────────────────────
 
     else:
-        df_db = df.sort_values(by="fWAR-bWAR Avg", ascending=False, na_position="last").dropna(subset=["fWAR-bWAR Avg"])
+        df_db = df.sort_values(by="fWAR", ascending=False, na_position="last").dropna(subset=["fWAR"])
 
         base_cols = ["Name"]
         if mode == MODE_SPLIT and "Season" in df_db.columns:
