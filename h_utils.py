@@ -587,9 +587,8 @@ STAT_PRESETS = {
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Standard": [
-        "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
-        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
-        "K%", "BB%", "DRS",
+        "fWAR", "bWAR", "G", "PA", "AVG", "OBP", "SLG", "OPS",
+        "H",  "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
     ],
     "Fielding": [
         "DRS", "FRV", "OAA", "Def"
@@ -618,7 +617,7 @@ STAT_PRESETS_SAVANT = {
     
     "Standard": [
         "bWAR", "fWAR", "PA", "AVG", "OBP", "SLG", "OPS",
-        "2B", "3B", "HR", "XBH", "RBI", "SB","K%", "BB%",
+        "2B", "3B", "HR", "XBH", "RBI", "SB"
     ],
 "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": [
