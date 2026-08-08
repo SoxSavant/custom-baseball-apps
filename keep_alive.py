@@ -21,6 +21,7 @@ APPS = [
     "https://stat-filter.streamlit.app/",
     "https://league-yoy.streamlit.app/",
     "https://player-yoy.streamlit.app/",
+    "https://streak-finder.streamlit.app/"
 
 
 ]
