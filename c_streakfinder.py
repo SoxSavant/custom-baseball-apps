@@ -62,17 +62,17 @@ if is_hitting:
 else:
     from p_utils import get_team_display
 
-default_stat = "OPS" if is_hitting else "xERA"
+default_stat = "xwOBA" if is_hitting else "xERA"
 if default_stat not in STAT_ALLOWLIST:
     default_stat = STAT_ALLOWLIST[0]
 
 for key, default in [
-    (f"{prefix}_start_year", current_year - 4),
+    (f"{prefix}_start_year", current_year - 3),
     (f"{prefix}_end_year", current_year),
     (f"{prefix}_stat", default_stat),
     (f"{prefix}_min_pa", 300),
     (f"{prefix}_min_ip", 100),
-    (f"{prefix}_direction", "Increasing"),
+    (f"{prefix}_direction", "Decreasing"),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -206,6 +206,21 @@ else:
     year_cols = [str(y) for y in years]
     stat_label = STAT_DISPLAY_NAMES.get(stat, label_map.get(stat, stat))
     decimals = STAT_ROUND.get(stat, 1)
+
+    if is_hitting:
+        st.markdown(
+            f"<div style='text-align:center; margin-bottom: 1rem; color:#888; font-size:0.85rem;'>"
+            f"{direction} in {stat_label} each year from {sel_start} to {sel_end} – Min {min_pa_val} PA each year"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"<div style='text-align:center;  margin-bottom: 1rem; color:#888; font-size:0.85rem;'>"
+            f"{direction} in {stat_label} each year from {sel_start} to {sel_end} – Min {min_ip_val} IP each year"
+            f"</div>",
+            unsafe_allow_html=True,
+    )
 
     st.dataframe(
         table,
