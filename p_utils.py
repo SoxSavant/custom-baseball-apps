@@ -581,7 +581,7 @@ STAT_PRESETS_YOY = {
 
 STAT_PRESETS_DATABASE = {
     "Default": [
-        "fWAR", "bWAR",  "fWAR-bWAR Avg","GS","ERA", "xERA", "FIP", "xFIP", "IP",
+        "fWAR", "bWAR",  "fWAR-bWAR Avg","GS","IP", "ERA", "xERA", "FIP", "xFIP", 
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Statcast": [
