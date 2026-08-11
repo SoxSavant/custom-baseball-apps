@@ -87,7 +87,7 @@ for key, default in [
 col1, col2 = st.columns([.5, 2])
 
 with col1:
-    domain = st.radio("", ["Hitting", "Pitching"], key="cr_domain", horizontal=True)
+    domain = st.radio("", ["Hitting", "Pitching", "Combined"], key="cr_domain", horizontal=True)
 
     if domain == "Hitting":
         from h_utils import (
@@ -96,13 +96,105 @@ with col1:
             POSITION_OPTIONS, normalize_team, filter_by_position,
         )
         min_type_default = "PA"
-    else:
+
+    elif domain == "Pitching":
         from p_utils import (
             STAT_ALLOWLIST, format_stat, start_year, label_map,
             load_final_year, lower_better, aggregate_player_group,
             normalize_team,
         )
         min_type_default = "IP"
+
+    else:  # Combined
+        from h_utils import load_final_year as load_hitting_year, normalize_team, start_year
+
+        from p_utils import load_final_year as load_pitching_year
+
+        min_type_default = "PA/IP"
+
+        STAT_ALLOWLIST = ["fWAR", "bWAR"]
+        label_map = {"fWAR": "fWAR", "bWAR": "bWAR"}
+        lower_better = set()
+
+        def format_stat(stat, val):
+            if pd.isna(val):
+                return "—"
+            return f"{val:.1f}"
+
+        _COMBINED_SLIM_COLS = ["PlayerId", "Name", "Team", "MLBAMID", "fWAR", "bWAR", "PA", "IP"]
+
+        def _combined_slim(df, suffix):
+            out = pd.DataFrame(columns=_COMBINED_SLIM_COLS)
+            if df is not None and not df.empty:
+                present = [c for c in _COMBINED_SLIM_COLS if c in df.columns]
+                out = df[present].copy()
+                for c in _COMBINED_SLIM_COLS:
+                    if c not in out.columns:
+                        out[c] = np.nan
+                out["PlayerId"] = pd.to_numeric(out["PlayerId"], errors="coerce").astype("Int64").astype(str)
+            return out.rename(columns={
+                "Name": f"Name_{suffix}",
+                "Team": f"Team_{suffix}",
+                "MLBAMID": f"MLBAMID_{suffix}",
+                "fWAR": f"fWAR_{suffix}",
+                "bWAR": f"bWAR_{suffix}",
+                "PA": f"PA_{suffix}",
+                "IP": f"IP_{suffix}",
+            })
+
+        def load_final_year(year):
+            hit_slim = _combined_slim(load_hitting_year(year), "h")
+            pit_slim = _combined_slim(load_pitching_year(year), "p")
+
+            merged = hit_slim.merge(pit_slim, on="PlayerId", how="outer")
+
+            merged["Name"] = merged["Name_h"].combine_first(merged["Name_p"])
+            merged["Team"] = merged["Team_h"].combine_first(merged["Team_p"])
+            merged["MLBAMID"] = merged["MLBAMID_h"].combine_first(merged["MLBAMID_p"])
+
+            merged["fWAR"] = pd.to_numeric(merged["fWAR_h"], errors="coerce").fillna(0) + \
+                              pd.to_numeric(merged["fWAR_p"], errors="coerce").fillna(0)
+            merged["bWAR"] = pd.to_numeric(merged["bWAR_h"], errors="coerce").fillna(0) + \
+                              pd.to_numeric(merged["bWAR_p"], errors="coerce").fillna(0)
+            # PA only ever comes from the hitting side, IP only from the pitching side;
+            # summing is safe (and covers two-way players) since the other side is 0/NaN.
+            merged["PA"] = pd.to_numeric(merged["PA_h"], errors="coerce").fillna(0) + \
+                            pd.to_numeric(merged["PA_p"], errors="coerce").fillna(0)
+            merged["IP"] = pd.to_numeric(merged["IP_h"], errors="coerce").fillna(0) + \
+                            pd.to_numeric(merged["IP_p"], errors="coerce").fillna(0)
+
+            merged = merged.drop(columns=[
+                "Name_h", "Name_p", "Team_h", "Team_p",
+                "MLBAMID_h", "MLBAMID_p", "fWAR_h", "fWAR_p", "bWAR_h", "bWAR_p",
+                "PA_h", "PA_p", "IP_h", "IP_p",
+            ])
+            merged = merged[merged["PlayerId"].notna() & (merged["PlayerId"] != "<NA>")]
+            merged = merged[merged["Name"].notna()]
+            return merged
+
+        def aggregate_player_group(df):
+            df = df.copy()
+            for col in ["fWAR", "bWAR", "PA", "IP"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+            last = df.sort_values("Season").groupby("PlayerId", as_index=False).last()[
+                ["PlayerId", "Name", "MLBAMID"]
+            ]
+
+            team_info = (
+                df.groupby("PlayerId")["Team"]
+                .apply(lambda teams: (
+                    "2+ Teams"
+                    if len({normalize_team(t) for t in teams if pd.notna(t) and str(t).strip() not in ("", "- - -")}) > 1
+                    else (normalize_team(str(teams.dropna().iloc[0])) if teams.dropna().shape[0] else "N/A")
+                ))
+                .reset_index()
+            )
+
+            summed = df.groupby("PlayerId", as_index=False)[["fWAR", "bWAR", "PA", "IP"]].sum()
+
+            result = summed.merge(last, on="PlayerId", how="left").merge(team_info, on="PlayerId", how="left")
+            return result
 
     if "cr_last_domain" not in st.session_state:
         st.session_state.cr_last_domain = domain
@@ -137,8 +229,14 @@ with col1:
 
     if domain == "Hitting":
         st.number_input("Min PA", min_value=0, max_value=20000, key="cr_min_pa")
-    else:
+    elif domain == "Pitching":
         st.number_input("Min IP", min_value=0, max_value=5000, key="cr_min_ip")
+    else:
+        min_c1, min_c2 = st.columns(2)
+        with min_c1:
+            st.number_input("Min PA", min_value=0, max_value=20000, key="cr_min_pa")
+        with min_c2:
+            st.number_input("Min IP", min_value=0, max_value=5000, key="cr_min_ip")
 
 
     team_disabled = (mode == MODE_MULTI)
@@ -221,9 +319,13 @@ if domain == "Hitting":
 
     if mode == MODE_SINGLE:
         df = filter_by_position(df, position_val)
-else:
+elif domain == "Pitching":
     qualifier_col = "IP"
     min_val = int(st.session_state.get("cr_min_ip", 0))
+else:
+    qualifier_col = None
+    min_pa_val = int(st.session_state.get("cr_min_pa", 0))
+    min_ip_val = int(st.session_state.get("cr_min_ip", 0))
 
 team_disabled = (mode == MODE_MULTI)
 league_disabled = (sel_start < 2013)
@@ -242,7 +344,14 @@ if df.empty:
     st.error("No players match the selected filters.")
     st.stop()
 
-if min_val > 0 and qualifier_col in df.columns:
+if domain == "Combined":
+    if (min_pa_val > 0 or min_ip_val > 0) and {"PA", "IP"}.issubset(df.columns):
+        pa_num = pd.to_numeric(df["PA"], errors="coerce").fillna(0)
+        ip_num = pd.to_numeric(df["IP"], errors="coerce").fillna(0)
+        pa_ok = pa_num >= min_pa_val if min_pa_val > 0 else pd.Series(False, index=df.index)
+        ip_ok = ip_num >= min_ip_val if min_ip_val > 0 else pd.Series(False, index=df.index)
+        df = df[pa_ok | ip_ok]
+elif min_val > 0 and qualifier_col in df.columns:
     df = df[pd.to_numeric(df[qualifier_col], errors="coerce").fillna(0) >= min_val]
 
 if x_stat not in df.columns or y_stat not in df.columns:
@@ -375,7 +484,10 @@ with col2:
     ))
 
     span_label = f"{sel_start}" if mode == MODE_SINGLE else f"{sel_start}–{sel_end}"
-    qualifier_label = f"Minimum {min_val} {qualifier_col}"
+    if domain == "Combined":
+        qualifier_label = f"Minimum {min_pa_val} PA or {min_ip_val} IP"
+    else:
+        qualifier_label = f"Minimum {min_val} {qualifier_col}"
 
     extra_bits = []
     if domain == "Hitting" and position_val != "all":
