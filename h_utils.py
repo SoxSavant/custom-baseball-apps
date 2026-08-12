@@ -610,8 +610,8 @@ STAT_PRESETS_SAVANT = {
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Stat Mix": [
-        "fWAR", "bWAR", "G", "PA", "HR", "OPS", "wRC+",
-        "K%", "BB%",  "BsR", "SB", "FRV", "DRS",
+        "fWAR", "bWAR", "HR", "OPS", "wRC+",
+        "K%", "BB%",  "BsR", "SB", "OAA", "FRV", "DRS",
     ],
     "Fielding": ["DRS", "FRV", "OAA", "Def"],
     
