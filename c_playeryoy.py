@@ -760,8 +760,7 @@ with right_col:
     row_count = len(rows_html)
     card_height = 295 + row_count * 40
     st.iframe(card_html, height=card_height)
-    st.caption("Screenshot to save")
-    st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
+
 
     # ── Leaderboard ──────────────────────────────────────────────────────
     st.markdown("---")

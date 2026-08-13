@@ -896,6 +896,3 @@ with right_col:
         ])
 
         st.markdown("\n".join(rows), unsafe_allow_html=True)
-
-        st.caption("Screenshot to save")
-        st.caption("Find a player's FanGraphs ID in their FanGraphs profile URL")
