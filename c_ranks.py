@@ -498,7 +498,7 @@ card_html = f"""
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     box-sizing: border-box;
     width: 100%;
-    max-width: 675px;
+    max-width: 700px;
     margin: 0 auto;
   }}
   .player-header {{
@@ -592,7 +592,7 @@ card_html = f"""
   }}
   .footer p {{
     margin: 0;
-    font-size: 0.75rem;
+    font-size: 1rem;
     color: #666;
     white-space: nowrap;
   }}
