@@ -665,9 +665,9 @@ STAT_PRESETS_DATABASE = {
         "Chase%", "Whiff%", "K%", "BB%",
     ],
     "Standard": [
-        "fWAR", "AVG", "OBP", "SLG", "OPS",
-        "H", "1B", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
-        "K%", "BB%", "DRS",
+        "fWAR", "bWAR", "AVG", "OBP", "SLG", "OPS",
+        "H", "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+       
     ],
     "Fielding": [
         "DRS", "FRV", "OAA", "Def", "FRM",
@@ -675,6 +675,33 @@ STAT_PRESETS_DATABASE = {
     "Discipline": ["Chase%","Z-Swing%", "Z-Swing% - Chase%", "Swing%", 
     "O-Contact%", "Z-Contact%", "Zone%",],
     "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Add your own": [
+        "fWAR",
+    ],
+
+}
+
+STAT_PRESETS_RANKS = {
+    "Default": [
+         "fWAR", "bWAR", "fWAR-bWAR Avg", "HR", "OPS", "wRC+", 
+        "K%", "BB%", "BsR", "SB", "OAA", "FRV", "DRS",
+    ],
+    "Statcast": [
+        "xwOBA", "xBA", "xSLG", "EV", "Barrel%", "HardHit%", "Sweet-Spot%",
+        "BatSpd","Squared-Up%",
+        "Chase%", "Whiff%", "K%", "BB%",
+    ],
+    "Standard": [
+        "fWAR", "bWAR", "AVG", "OBP", "SLG", "OPS",
+        "H",  "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+       
+    ],
+    "Fielding": [
+        "DRS", "FRV", "OAA", "Def",
+    ],
+    "Discipline": ["Chase%","Z-Swing%", "Z-Swing% - Chase%", "Swing%", 
+    "O-Contact%", "Z-Contact%", "Zone%",],
+
     "Blank – Add your own": [
         "fWAR",
     ],

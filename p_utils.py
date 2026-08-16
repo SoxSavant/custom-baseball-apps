@@ -571,7 +571,7 @@ STAT_PRESETS_YOY = {
         "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
     ],
     "Standard": [
-        "fWAR", "bWAR", "W-L", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
+        "fWAR", "bWAR", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
     ], 
     "Every Stat": EVERY_STAT_PRESET,
     "Blank – Create your own": ["fWAR"],
@@ -595,6 +595,27 @@ STAT_PRESETS_DATABASE = {
     ],
     "Misc": [ "fWAR/200", "bWAR/200", "fWAR-bWAR Avg", "ERA-", "FIP-", "SIERA", "WPA", "Clutch", 
     ] ,
+    "Every Stat": EVERY_STAT_PRESET,
+    "Blank – Add your own": ["fWAR"],
+
+}
+
+STAT_PRESETS_RANKS = {
+    "Default": [
+        "fWAR", "bWAR",  "fWAR-bWAR Avg","GS","IP", "ERA", "xERA", "FIP", "xFIP", 
+        "K%", "BB%", "Whiff%", "Chase%", 
+    ],
+    "Statcast": [
+     "xERA", "xBA", "vFA","EV", "Chase%", "Whiff%", "K%", "BB%", "Barrel%", "HardHit%", "GB%",
+    ],
+     "Stat Mix": [
+        "fWAR", "bWAR", "GS", "IP", "ERA",  "FIP", 
+        "K%", "BB%", "Whiff%", "Chase%", "HardHit%", "GB%",
+    ],
+     "Standard": [
+        "fWAR", "bWAR", "ERA", "G", "GS", "IP", "AVG", "WHIP", "HR/9",
+    ], 
+   
     "Every Stat": EVERY_STAT_PRESET,
     "Blank – Add your own": ["fWAR"],
 
