@@ -5,9 +5,8 @@ import html
 from datetime import date
 import h_utils
 import p_utils
-import unicodedata
 
-from utils import TEAM_OPTIONS, LEAGUES
+from utils import LEAGUES
 
 
 st.set_page_config(page_title="Player Ranks", layout="wide", page_icon="⚾")
@@ -110,7 +109,7 @@ def team_in_league(team, league) -> bool:
     return False
 
 
-MIN_LEAGUE_YEAR = 2013  # league splits disabled before this, matching other apps
+MIN_LEAGUE_YEAR = 2013 
 
 
 left_col, right_col = st.columns([1, 2])
@@ -430,7 +429,7 @@ for stat in stats_order:
         continue
 
     pool_size = len(vals)
-    ascending = stat in lower_better  # lower value = better rank when True
+    ascending = stat in lower_better 
     ranks = vals.rank(method="min", ascending=ascending)
     player_positions = ids[ids == player_id].index
     rank_val = int(ranks.loc[player_positions[0]])
