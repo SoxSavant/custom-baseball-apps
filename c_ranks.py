@@ -66,9 +66,7 @@ current_year = date.today().year
 last_updated = U.get_last_updated(current_year)
 st.caption(f"{current_year} data last updated: {last_updated}")
 
-# NOTE: league scope is resolved via utils.LEAGUES (assumed shape: {"AL": [team
-# abbrevs...], "NL": [...]}), same as your other AL/NL-filtered apps. If LEAGUES is
-# shaped differently (e.g. team -> league), adjust team_in_league() below.
+
 STAT_PRESETS = U.STAT_PRESETS_RANKS
 STAT_DISPLAY_NAMES = U.STAT_DISPLAY_NAMES
 STAT_ALLOWLIST = U.STAT_ALLOWLIST
@@ -200,9 +198,7 @@ with left_col:
         st.stop()
     player_row = player_rows.iloc[0]
 
-    # ── Build ranking populations ────────────────
-    # Counting stats rank against everyone in scope; rate stats additionally
-    # require the min PA/IP threshold so small samples don't skew the ranks.
+
     scope_pool = df_year.copy()
     if scope != "MLB" and "Team" in scope_pool.columns:
         scope_pool = scope_pool[scope_pool["Team"].apply(lambda t: team_in_league(t, scope))]
@@ -231,7 +227,6 @@ with left_col:
         st.error("No comparable numeric stats for this player/pool.")
         st.stop()
 
-    # ── Stat builder helpers ─────────────────────
 
     def bump_version():
         st.session_state[STAT_VERSION_KEY] = st.session_state.get(STAT_VERSION_KEY, 0) + 1
@@ -414,7 +409,7 @@ if not stats_order:
         st.info("Add at least one stat and mark it as shown.")
     st.stop()
 
-# ── Compute ranks ─────────────────────────────
+# compute ranks
 display_name = str(player_row.get("Name", name_input)).strip()
 team_raw = str(player_row.get("Team", "N/A"))
 team_display = get_team_display(team_raw)
