@@ -104,7 +104,7 @@ def load_combined_year(year: int) -> pd.DataFrame:
 
     merged = hit_slim.merge(pit_slim, on="PlayerId", how="outer")
 
-    merged["Name"] = merged["Name_h"].combine_first(merged["Name_p"])
+    merged["Name"] = merged["Name_p"].combine_first(merged["Name_h"])
     merged["Team"] = merged["Team_h"].combine_first(merged["Team_p"])
     merged["MLBAMID"] = merged["MLBAMID_h"].combine_first(merged["MLBAMID_p"])
 
