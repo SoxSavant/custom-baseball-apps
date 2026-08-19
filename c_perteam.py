@@ -219,7 +219,7 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
 
 if is_combined:
     default_stat = WAR_STATS[0]
-    default_val = 3.0
+    default_val = 4.0
 elif is_hitting:
     default_stat = "OPS"
     default_val = .800
