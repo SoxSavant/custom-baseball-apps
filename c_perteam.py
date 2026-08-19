@@ -107,7 +107,7 @@ MODE_MULTI  = "Multi-Year Span"
 current_year = date.today().year
 MAX_TEAMS    = 9
 
-SLIM_COLS = ["PlayerId", "Name", "Team", "MLBAMID", "fWAR", "bWAR"]
+SLIM_COLS = ["PlayerId", "Name", "Team", "MLBAMID", "fWAR", "bWAR","Year"]
 
 
 def _slim(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
@@ -183,6 +183,9 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
     for year in range(start_yr, end_yr + 1):
         if is_combined:
             df = load_combined_year(year)
+            if df is not None and not df.empty:
+                df = df.copy()
+                df["Season"] = year
         else:
             df = load_final_year(year)
         if df is not None and not df.empty:
@@ -199,7 +202,8 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
         return combined
 
     # MODE_MULTI: aggregate each player per team across years
-    combined = filter_by_position(combined, position)
+    if is_hitting:
+        combined = filter_by_position(combined, position)
     if combined.empty or "PlayerId" not in combined.columns:
         return combined
 
