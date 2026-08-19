@@ -63,8 +63,6 @@ is_hitting = (type_mode == "Hitting")
 is_pitching = (type_mode == "Pitching")
 is_combined = (type_mode == "Combined")
 
-# Combined mode reuses h_utils for display helpers (headshots, team display,
-# formatting) — same approach as war_leaders_app.py.
 U = p_utils if is_pitching else h_utils
 prefix = "hcc" if is_hitting else "pcc" if is_pitching else "ccc"
 
@@ -287,7 +285,7 @@ if is_hitting:
 elif is_pitching:
     if min_ip_val > 0 and "IP" in df_all.columns:
         df_all = df_all[pd.to_numeric(df_all["IP"], errors="coerce").fillna(0) >= min_ip_val]
-# Combined: no PA/IP threshold applied.
+# combined jas no PA/IP minimum its just war
 
 if team_val != "all" and "Team" in df_all.columns:
     target = normalize_team(team_val)
@@ -296,7 +294,7 @@ if team_val != "all" and "Team" in df_all.columns:
 if is_hitting:
     df_all = filter_by_position(df_all, position)
 
-# Apply all stat filters — a season row must pass ALL filters
+# apply all stat filters bc a season row must pass all filters
 mask = pd.Series([True] * len(df_all), index=df_all.index)
 for stat, op, val in active_filters:
     if stat not in df_all.columns:

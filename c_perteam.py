@@ -57,10 +57,12 @@ with meta_col:
         unsafe_allow_html=True,
     )
 
-type_mode = st.radio("Type", ["Hitting", "Pitching"], horizontal=True, key="cc_mode", label_visibility="collapsed")
+type_mode = st.radio("Type", ["Hitting", "Pitching","Combined"], horizontal=True, key="cc_mode", label_visibility="collapsed")
 is_hitting = (type_mode == "Hitting")
+is_pitching = (type_mode == "Pitching")
+is_combined = (type_mode == "Combined")
 U = h_utils if is_hitting else p_utils
-prefix = "hcc" if is_hitting else "pcc"
+prefix = "hcc" if is_hitting else "pcc" if is_pitching else "ccc"
 
 current_year = date.today().year
 last_updated = U.get_last_updated(current_year)
@@ -73,7 +75,9 @@ from h_utils import (
     filter_by_position, 
 )
 
-STAT_ALLOWLIST = U.STAT_ALLOWLIST
+WAR_STATS = ["fWAR", "bWAR", "fWAR-bWAR Avg"]
+
+STAT_ALLOWLIST = WAR_STATS if is_combined else U.STAT_ALLOWLIST
 STAT_DEFAULTS = U.STAT_DEFAULTS
 RATE_STATS = U.RATE_STATS
 TRUTHY_STRINGS = U.TRUTHY_STRINGS
@@ -103,6 +107,60 @@ MODE_MULTI  = "Multi-Year Span"
 current_year = date.today().year
 MAX_TEAMS    = 9
 
+SLIM_COLS = ["PlayerId", "Name", "Team", "MLBAMID", "fWAR", "bWAR"]
+
+
+def _slim(df: pd.DataFrame, suffix: str) -> pd.DataFrame:
+    """Pull PlayerId/Name/Team/MLBAMID/fWAR/bWAR out of a hitting or pitching
+    frame, renaming the movable columns with a suffix so they survive a merge."""
+    out = pd.DataFrame(columns=SLIM_COLS)
+    if df is not None and not df.empty:
+        present = [c for c in SLIM_COLS if c in df.columns]
+        out = df[present].copy()
+        for c in SLIM_COLS:
+            if c not in out.columns:
+                out[c] = np.nan
+        out["PlayerId"] = pd.to_numeric(out["PlayerId"], errors="coerce").astype("Int64").astype(str)
+    return out.rename(columns={
+        "Name": f"Name_{suffix}",
+        "Team": f"Team_{suffix}",
+        "MLBAMID": f"MLBAMID_{suffix}",
+        "fWAR": f"fWAR_{suffix}",
+        "bWAR": f"bWAR_{suffix}",
+    })
+
+
+def load_combined_year(year: int) -> pd.DataFrame:
+    hit_slim = _slim(h_utils.load_final_year(year), "h")
+    pit_slim = _slim(p_utils.load_final_year(year), "p")
+
+    merged = hit_slim.merge(pit_slim, on="PlayerId", how="outer")
+
+    merged["Name"] = merged["Name_h"].fillna(merged["Name_p"])
+    merged["Team"] = merged["Team_h"].fillna(merged["Team_p"])
+    merged["MLBAMID"] = merged["MLBAMID_h"].fillna(merged["MLBAMID_p"])
+
+    merged["fWAR"] = pd.to_numeric(merged["fWAR_h"], errors="coerce").fillna(0) + \
+                      pd.to_numeric(merged["fWAR_p"], errors="coerce").fillna(0)
+    merged["bWAR"] = pd.to_numeric(merged["bWAR_h"], errors="coerce").fillna(0) + \
+                      pd.to_numeric(merged["bWAR_p"], errors="coerce").fillna(0)
+    merged["fWAR-bWAR Avg"] = (merged["fWAR"] + merged["bWAR"]) / 2
+
+    merged = merged.drop(columns=[
+        "Name_h", "Name_p", "Team_h", "Team_p",
+        "MLBAMID_h", "MLBAMID_p", "fWAR_h", "fWAR_p", "bWAR_h", "bWAR_p",
+    ])
+    merged = merged[merged["PlayerId"].notna() & (merged["PlayerId"] != "<NA>")]
+    merged = merged[merged["Name"].notna()]
+    return merged
+
+def aggregate_combined_group(grp: pd.DataFrame) -> dict:
+    row = grp.iloc[-1].to_dict()
+    row["fWAR"] = pd.to_numeric(grp["fWAR"], errors="coerce").fillna(0).sum()
+    row["bWAR"] = pd.to_numeric(grp["bWAR"], errors="coerce").fillna(0).sum()
+    row["fWAR-bWAR Avg"] = (row["fWAR"] + row["bWAR"]) / 2
+    return row
+
 def update_stat_default(i):
     stat = st.session_state[f"{prefix}_stat_{i}"]
     st.session_state[f"{prefix}_val_{i}"] = float(STAT_DEFAULTS.get(stat, 0.0))
@@ -116,11 +174,17 @@ def format_threshold(stat: str, val: float, op: str) -> str:
 
 def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> pd.DataFrame:
     if mode == MODE_SINGLE:
-        return load_final_year(start_yr)
+        if is_combined:
+            return load_combined_year(start_yr)
+        else:
+            return load_final_year(start_yr)
 
     frames = []
     for year in range(start_yr, end_yr + 1):
-        df = load_final_year(year)
+        if is_combined:
+            df = load_combined_year(year)
+        else:
+            df = load_final_year(year)
         if df is not None and not df.empty:
             if mode == MODE_SPLIT and is_hitting:
                 df = filter_by_position(df,position_val)
@@ -146,12 +210,22 @@ def load_data(start_yr: int, end_yr: int, mode: str, position: str = "all") -> p
     grouped_rows = []
     group_cols = ["PlayerId", "TeamNorm"] if "TeamNorm" in combined.columns else ["PlayerId"]
     for _, grp in combined.groupby(group_cols):
-        grouped_rows.append(aggregate_player_group_single(grp))
+        if is_combined:
+            grouped_rows.append(aggregate_combined_group(grp))
+        else:
+            grouped_rows.append(aggregate_player_group_single(grp))
 
     return pd.DataFrame(grouped_rows)
 
-default_stat = "OPS" if is_hitting else "ERA"
-default_val = .800 if is_hitting else 3.50
+if is_combined:
+    default_stat = WAR_STATS[0]
+    default_val = 3.0
+elif is_hitting:
+    default_stat = "OPS"
+    default_val = .800
+else:
+    default_stat = "ERA"
+    default_val = 3.50
 
 for key, default in [
     (f"{prefix}_year",           current_year),
@@ -187,7 +261,7 @@ with col1:
     )
 
     num_stats = st.radio(
-        "Number of stat filters", [1, 2, 3, 4],
+        "Number of stat filters", [1, 2, 3] if is_combined else [1, 2, 3, 4],
         index=0, horizontal=True, key=f"{prefix}_num_stats",
     )
 
@@ -225,12 +299,15 @@ with col1:
             st.number_input("Min Inn", min_value=0, max_value=20000, value=200, key=f"{prefix}_min_inn")
         else:
             st.number_input("Min PA", min_value=0, max_value=20000, value=min_pa, key=f"{prefix}_min_pa")
-    else:
-
+    elif is_pitching:
         st.number_input("Min IP", min_value=0, max_value=50000, value=min_ip, key=f"{prefix}_min_ip")
 
     for i in range(num_stats):
         st.markdown(f"**Stat {i+1}**")
+        if is_combined:
+            default_stat = WAR_STATS[i] if i < len(WAR_STATS) else WAR_STATS[0]
+        else:
+            default_stat = "fWAR" if i == 0 else "bWAR" if i == 1 else STAT_ALLOWLIST[0]
 
 
         new_stat = st.selectbox(
@@ -244,9 +321,9 @@ with col1:
 
         op_col, val_col = st.columns([1, 2])
         with op_col:
-            st.selectbox("Op", [">=", "<="], key=f"{prefix}_op_{i}", index=0 if is_hitting else 1, label_visibility="collapsed")
+            st.selectbox("Op", [">=", "<="], key=f"{prefix}_op_{i}", index=0 if not is_pitching else 1, label_visibility="collapsed")
         with val_col:
-            decimals = STAT_ROUND.get(new_stat, 0)
+            decimals = 1 if is_combined else STAT_ROUND.get(new_stat, 0)
             step = 10 ** -decimals if decimals > 0 else 1.0
             fmt = f"%.{decimals}f"
             st.number_input(
@@ -270,7 +347,7 @@ with col1:
             st.checkbox("Show Player PA", key=f"{prefix}_show_player_pa")
         else:
             st.checkbox("Show Player Inn", key=f"{prefix}_show_player_pa")
-    else:
+    elif is_pitching:
         st.checkbox("Show Min IP", key = f"{prefix}_show_min_ip")
         st.checkbox("Show Player IP", key = f"{prefix}_show_player_ip")
 
@@ -303,7 +380,7 @@ if is_hitting:
     else:
         if min_pa_val > 0 and "PA" in df.columns:
             df = df[pd.to_numeric(df["PA"], errors="coerce").fillna(0) >= min_pa_val]
-else:
+elif is_pitching:
     if min_ip_val > 0 and "IP" in df.columns:
         df = df[pd.to_numeric(df["IP"], errors="coerce").fillna(0) >= min_ip_val]
 
@@ -330,7 +407,7 @@ if not df.empty and active_filters:
         if stat not in df.columns:
             continue
         col_vals    = pd.to_numeric(df[stat], errors="coerce")
-        decimals = STAT_ROUND.get(stat, 0)
+        decimals = 1 if is_combined else STAT_ROUND.get(new_stat, 0)
         col_vals = col_vals.round(decimals)
         compare_val = val
         if stat in RATE_STATS:
@@ -450,8 +527,11 @@ pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" e
 middle_label = " – " if mode == MODE_SINGLE else ": "
 if is_hitting:
     title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
-else:
+elif is_pitching:
     title_text   = f"Most Pitchers with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+else:
+    title_text   = f"Most Players with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+
 
 if is_hitting:
     if st.session_state.get(f"{prefix}_show_min_pa"):
@@ -461,11 +541,14 @@ if is_hitting:
             min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_pa_val} PA</div>'
     else:
         min_pa_subtitle = ""
-else:
+elif is_pitching:
     if st.session_state.get(f"{prefix}_show_min_ip"):
         min_pa_subtitle = f'<div class="leaderboard-subtitle">Min {min_ip_val} IP</div>'
     else:
         min_pa_subtitle = ""
+else:
+    min_pa_subtitle = ""
+
 
 show_player_pa = st.session_state.get(f"{prefix}_show_player_pa", False)
 show_player_ip = st.session_state.get(f"{prefix}_show_player_ip", False)
