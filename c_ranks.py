@@ -147,27 +147,7 @@ with left_col:
     st.selectbox("Year", options=years_desc, key="pr_year")
     year = st.session_state["pr_year"]
 
-    scope_options = ["MLB", "AL", "NL"] if year >= MIN_LEAGUE_YEAR else ["MLB"]
-    if st.session_state.get("pr_scope") not in scope_options:
-        st.session_state["pr_scope"] = "MLB"
-    st.selectbox("Scope", options=scope_options, key="pr_scope")
-    scope = st.session_state["pr_scope"]
-    if year < MIN_LEAGUE_YEAR:
-        st.caption("League splits are only available for 2013+ seasons.")
-
-    if is_hitting:
-        min_thresh = st.number_input(
-            "Min PA", min_value=0, max_value=700,
-            value=get_dynamic_min_pa(year), step=25,
-        )
-    else:
-        min_thresh = st.number_input(
-            "Min IP", min_value=0, max_value=700,
-            value=int(get_dynamic_min_ip(year)), step=25,
-        )
-    thresh_col = "PA" if is_hitting else "IP"
-
-    # ── Resolve player ──────────────────────────
+    # ── Resolve player (moved up so Scope options can include Position) ──
     if mode_val == "Name":
         if not name_input.strip():
             st.warning("Enter a player name.")
@@ -197,9 +177,36 @@ with left_col:
         st.stop()
     player_row = player_rows.iloc[0]
 
+    has_pos_col = "Pos" in df_year.columns
+    player_pos = str(player_row.get("Pos", "")).strip() if has_pos_col else ""
+
+    # ── Scope ─────────────────────────────────────
+    scope_options = ["MLB", "AL", "NL"] if year >= MIN_LEAGUE_YEAR else ["MLB"]
+    if has_pos_col and player_pos:
+        scope_options = scope_options + ["Position"]
+    if st.session_state.get("pr_scope") not in scope_options:
+        st.session_state["pr_scope"] = "MLB"
+    st.selectbox("Scope", options=scope_options, key="pr_scope")
+    scope = st.session_state["pr_scope"]
+    if year < MIN_LEAGUE_YEAR:
+        st.caption("League splits are only available for 2013+ seasons.")
+
+    if is_hitting:
+        min_thresh = st.number_input(
+            "Min PA", min_value=0, max_value=700,
+            value=get_dynamic_min_pa(year), step=25,
+        )
+    else:
+        min_thresh = st.number_input(
+            "Min IP", min_value=0, max_value=700,
+            value=int(get_dynamic_min_ip(year)), step=25,
+        )
+    thresh_col = "PA" if is_hitting else "IP"
 
     scope_pool = df_year.copy()
-    if scope != "MLB" and "Team" in scope_pool.columns:
+    if scope == "Position":
+        scope_pool = scope_pool[scope_pool["Pos"].astype(str).str.strip() == player_pos]
+    elif scope != "MLB" and "Team" in scope_pool.columns:
         scope_pool = scope_pool[scope_pool["Team"].apply(lambda t: team_in_league(t, scope))]
     if player_id not in scope_pool["PlayerId"].values:
         scope_pool = pd.concat([scope_pool, player_rows], ignore_index=True)
@@ -207,7 +214,6 @@ with left_col:
     rate_pool = scope_pool.copy()
     if thresh_col in rate_pool.columns:
         rate_pool = rate_pool[pd.to_numeric(rate_pool[thresh_col], errors="coerce") >= min_thresh]
-    # always include the player being viewed, even if under the threshold
     if player_id not in rate_pool["PlayerId"].values:
         rate_pool = pd.concat([rate_pool, player_rows], ignore_index=True)
 
@@ -417,7 +423,7 @@ esc = html.escape
 
 table_rows = []
 for stat in stats_order:
-    pool = rate_pool if stat in RATE_STATS else scope_pool
+    pool = rate_pool
     if stat not in pool.columns:
         continue
     vals = pd.to_numeric(pool[stat], errors="coerce")
@@ -474,8 +480,11 @@ for tr in table_rows:
     </div>""")
 
 rows_html_str = "\n".join(rows_html)
-scope_label = "MLB" if scope == "MLB" else scope
-thresh_label = f"Min {min_thresh} {thresh_col} for rate stats"
+if scope == "Position":
+    scope_label = player_pos
+else:
+    scope_label = "MLB" if scope == "MLB" else scope
+thresh_label = f"Min {min_thresh} {thresh_col}"
 
 card_html = f"""
 <html>
