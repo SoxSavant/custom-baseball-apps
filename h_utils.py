@@ -520,12 +520,16 @@ def filter_by_position(df, position):
     position = position.upper()
     
     def player_matches(player_df):
+        modes = player_df["Pos"].mode()
+        if modes.empty:
+            return False  # no known position → excluded from any specific position filter
+
+        primary = modes.iloc[0]
+
         if position == "OF":
             of_positions = {"LF", "CF", "RF"}
-            primary = player_df["Pos"].mode().iloc[0]
             return primary in of_positions
         else:
-            primary = player_df["Pos"].mode().iloc[0]
             return primary == position
     
     # Group by player, check if their primary pos matches, return all their rows if so
