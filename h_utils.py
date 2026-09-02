@@ -424,7 +424,7 @@ def format_stat(stat: str, val) -> str:
 
     if upper_stat in {"WRC+"}:
         return f"{int(round(float(val)))}"
-    ALREADY_PCT_POINTS = {"Barrel%", "HardHit%", "Sweet-Spot%"}
+    ALREADY_PCT_POINTS = {"Barrel%", "HardHit%", "Sweet-Spot%","HR/PA","HR/AB"}
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
         or "Swing" in stat or "Whiff" in stat or "%" in stat or "HR/PA" in stat or "HR/AB" in stat
