@@ -319,9 +319,9 @@ def aggregate_player_group(df: pd.DataFrame) -> pd.DataFrame:
     if "FRM/1350" in result.columns:
         result["FRM/1350"] = frm / inn.replace(0, float("nan")) * 1350
     if "HR" in result.columns and "PA" in result.columns:
-        result["HR/PA"] = hr / pa.replace(0, float("nan"))
+        result["HR/PA"] = hr / pa.replace(0, float("nan")) * 100
     if "HR" in result.columns and "AB" in result.columns:
-        result["HR/AB"] = hr / ab.replace(0, float("nan"))
+        result["HR/AB"] = hr / ab.replace(0, float("nan")) * 100
 
     return result
 
