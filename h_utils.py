@@ -412,7 +412,7 @@ def format_stat(stat: str, val) -> str:
     if upper_stat in {"FRV", "OAA", "DRS","TZ","DRS/1350", "OAA/1350","FRV/1350",}:
         return f"{int(round(float(val)))}"
 
-    if upper_stat in {"Inn","WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350","FWAR-BWAR AVG","HR/PA","HR/AB"}:
+    if upper_stat in {"Inn","WAR", "BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD","FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350","FWAR-BWAR AVG"}:
         v = float(val)
         return f"{int(round(v))}.0" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
 
@@ -446,7 +446,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
         v = int(round(float(val)))
         return f"+{v}" if show_sign and v > 0 else f"{v}"
 
-    if upper_stat in {"Inn","BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350","FWAR-BWAR AVG","HR/PA","HR/AB"}:
+    if upper_stat in {"Inn","BWAR", "FWAR", "EV", "AVG EXIT VELO", "OFF", "DEF", "BSR", "MAXEV", "BATSPD", "FRM", "FWAR/650", "BWAR/650","SWEET-SPOT%","FRM/1350","FWAR-BWAR AVG"}:
         v = float(val)
         formatted = f"{int(round(abs(v)))}.0" if abs(v - round(v)) < 1e-9 else f"{abs(v):.1f}"
         if show_sign and v > 0:
