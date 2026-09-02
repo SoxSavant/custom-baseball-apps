@@ -427,7 +427,7 @@ def format_stat(stat: str, val) -> str:
     ALREADY_PCT_POINTS = {"Barrel%", "HardHit%", "Sweet-Spot%"}
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
+        or "Swing" in stat or "Whiff" in stat or "%" in stat or "HR/PA" in stat or "HR/AB" in stat
     ):
         v = float(val)
         if v <= 1 and stat not in ALREADY_PCT_POINTS:
@@ -470,7 +470,7 @@ def format_stat_yoy(stat: str, val, show_sign: bool = False) -> str:
 
     if (
         "Barrel" in stat or "Hard" in stat or "K%" in stat
-        or "Swing" in stat or "Whiff" in stat or "%" in stat
+        or "Swing" in stat or "Whiff" in stat or "%" in stat  or "HR/PA" in stat or "HR/AB" in stat
     ):
         v = float(val)
         
