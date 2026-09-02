@@ -88,7 +88,7 @@ EVERY_STAT_PRESET = [
     "Chase%", "Whiff%", "K%", "BB%", "BB/K","BB", "IBB", "SO",
     "H", "1B", "2B", "3B",  "TB", "R",
     "K-BB%", "DRS", "WPA", "Clutch", "Swing%", "Z-Swing%", "Z-Swing% - Chase%"
-    "O-Contact%","Z-Contact%","Zone%","BatSpd", "Squared-Up%", "Inn"
+    "O-Contact%","Z-Contact%","Zone%","BatSpd", "Squared-Up%", "Inn",
     "fWAR/650","bWAR/650","DRS/1350", "OAA/1350","FRV/1350","FRM/1350",
 ]
 
