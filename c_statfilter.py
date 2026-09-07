@@ -360,12 +360,13 @@ if not df.empty:
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_year}"
-mode_label   = " (Single Season)" if mode == MODE_SPLIT else ""
-pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
-team_suffix  = f" ({team_val})" if team_val != "all" else ""
-league_label = f" ({league_val})" if league_val != "All" else ""
+mode_label = f'<span style="white-space: nowrap;"> (Single Season)</span>' if mode == MODE_SPLIT else ""
+pos_suffix = f'<span style="white-space: nowrap;"> ({POSITION_OPTIONS[position_val]})</span>' if position_val != "all" else ""
+team_suffix = f'<span style="white-space: nowrap;"> ({team_val})</span>' if team_val != "all" else ""
+league_label = f'<span style="white-space: nowrap;"> ({league_val})</span>' if league_val != "All" else ""
 middle_label = " – " if mode == MODE_SINGLE else ": "
-title = f"{filter_str}{middle_label}{span_label}{mode_label}{league_label}{team_suffix}{pos_suffix}" if len(filter_parts) < 3 else f"{filter_str}{middle_label}\n{span_label}{mode_label}{league_label}{team_suffix}{pos_suffix}"
+
+title = f"{filter_str}{middle_label}{span_label} {mode_label}{league_label}{team_suffix}{pos_suffix}"
 
 
 # ── GRAPHIC VIEW ──────────────────────────────────────────────────────────────
@@ -444,7 +445,7 @@ with col2:
 
         grid_html = f"""
         <div class="leaderboard-card">
-            <div class="leaderboard-title">{html.escape(title)}</div>
+            <div class="leaderboard-title">{title}</div>
             {min_pa_subtitle}
             {overflow_note}
             <div class="players-grid">{body}</div>
@@ -478,7 +479,8 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
     max-width: 900px;
     box-sizing: border-box;
 }}
-.leaderboard-title {{ font-weight: 900; font-size: 2.25rem; margin-bottom: 1.2rem; text-align: center; line-height: 1.2; }}
+.leaderboard-title {{ font-weight: 900; font-size: 2.25rem; margin-bottom: 1.2rem; text-align: center; line-height: 1.2; 
+}}
 .leaderboard-subtitle, .overflow-note {{ text-align: center; color: #888; font-size: 1.1rem; margin-bottom: 1rem; margin-top: -0.5rem; }}
 .players-grid {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem 1rem; }}
 .player-card {{ flex: 0 0 155px; width: 155px; text-align: center; }}
