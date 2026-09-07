@@ -520,21 +520,38 @@ else:
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
-span_label   = f'<span style="white-space: nowrap;">{s_year}' if mode == MODE_SINGLE else f'<span style="white-space: nowrap;">{s_year}–{e_year}'
+span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
 if mode == MODE_SPLIT and collapse_split: # ex NYY (eight individual judge seasons), BOS (5 mookie seasons, 3 devers)
-    mode_label   = f'<span style="white-space: nowrap;"> (Combined Single Seasons)</span>'
+    mode_label   = f'(Combined Single Seasons)'
 elif mode == MODE_SPLIT: # ex NYY - 2019, BOS - 2018
-     mode_label   = f'<span style="white-space: nowrap;"> (Single Season)</span>'
+     mode_label   = f' (Single Season) '
 else:
     mode_label = " "
-pos_suffix   = f'<span style="white-space: nowrap;"> ({POSITION_OPTIONS[position_val]})' if position_val != "all" else ""
+pos_suffix   = f'({POSITION_OPTIONS[position_val]})' if position_val != "all" else ""
 middle_label = " – " if mode == MODE_SINGLE else ": "
 if is_hitting:
-    title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+    graphic_text   = (
+        f"Most Hitters with {filter_str}{middle_label}"
+        f'<span style="white-space: nowrap;">{span_label}</span>'
+        f'<span style="white-space: nowrap;">{mode_label}</span>'
+        f'<span style="white-space: nowrap;">{pos_suffix}</span>'
+    )
+    db_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
 elif is_pitching:
-    title_text   = f"Most Pitchers with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+    graphic_text   = (
+        f"Most Pitchers with {filter_str}{middle_label}"
+        f'<span style="white-space: nowrap;">{span_label}</span>'
+        f'<span style="white-space: nowrap;">{mode_label}</span>'
+        f'<span style="white-space: nowrap;">{pos_suffix}</span>'
+    )
+    db_text   = f"Most Pitchers with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
 else:
-    title_text   = f"Most Players with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
+    graphic_text   = (
+        f"Most Players with {filter_str}{middle_label}"
+        f'<span style="white-space: nowrap;">{span_label}</span>'
+        f'<span style="white-space: nowrap;">{mode_label}</span>'
+    )
+    db_text   = f"Most Players with {filter_str}{middle_label}{span_label}{mode_label}"
 
 
 if is_hitting:
@@ -645,7 +662,7 @@ total_players_shown = sum(tg["player_count"] for tg in team_groups)
 
 grid_html = f"""
 <div class="leaderboard-card">
-    <div class="leaderboard-title">{title_text}</div>
+    <div class="leaderboard-title">{graphic_text}</div>
     {min_pa_subtitle}
     <div class="teams-grid">{team_card_html}</div>
     <div class="footer">
@@ -927,7 +944,7 @@ with col2:
                 db_df = pd.DataFrame(db_rows)
                 db_df.index += 1
 
-                st.caption(title_text)
+                st.caption(db_text)
                 st.dataframe(
                     db_df,
                     width="stretch",

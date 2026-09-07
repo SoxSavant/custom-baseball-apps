@@ -360,13 +360,20 @@ if not df.empty:
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
 span_label   = f"{start_year}" if mode == MODE_SINGLE else f"{start_year}–{end_year}"
-mode_label = f'<span style="white-space: nowrap;"> (Single Season)</span>' if mode == MODE_SPLIT else ""
-pos_suffix = f'<span style="white-space: nowrap;"> ({POSITION_OPTIONS[position_val]})</span>' if position_val != "all" else ""
-team_suffix = f'<span style="white-space: nowrap;"> ({team_val})</span>' if team_val != "all" else ""
-league_label = f'<span style="white-space: nowrap;"> ({league_val})</span>' if league_val != "All" else ""
+mode_txt = " (Single Season)" if mode == MODE_SPLIT else ""
+pos_txt = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
+team_txt = f" ({team_val})" if team_val != "all" else ""
+league_txt = f" ({league_val})" if league_val != "All" else ""
 middle_label = " – " if mode == MODE_SINGLE else ": "
 
-title = f"{filter_str}{middle_label}{span_label} {mode_label}{league_label}{team_suffix}{pos_suffix}"
+graphic_title = (
+    f"{filter_str}{middle_label}{span_label} "
+    f'<span style="white-space: nowrap;">{mode_txt}</span>'
+    f'<span style="white-space: nowrap;">{league_txt}</span>'
+    f'<span style="white-space: nowrap;">{team_txt}</span>'
+    f'<span style="white-space: nowrap;">{pos_txt}</span>'
+)
+db_title = f"{filter_str}{middle_label}{span_label}{mode_txt}{league_txt}{team_txt}{pos_txt}"
 
 
 # ── GRAPHIC VIEW ──────────────────────────────────────────────────────────────
@@ -445,7 +452,7 @@ with col2:
 
         grid_html = f"""
         <div class="leaderboard-card">
-            <div class="leaderboard-title">{title}</div>
+            <div class="leaderboard-title">{graphic_title}</div>
             {min_pa_subtitle}
             {overflow_note}
             <div class="players-grid">{body}</div>
@@ -549,7 +556,7 @@ html, body {{ background: transparent; font-family: "Source Sans Pro", sans-seri
             else:
                 col_config[label] = st.column_config.NumberColumn(label=label, format=f"%.{decimals}f")
 
-        st.caption(f"{total_qualified} hitters – {title}")
+        st.caption(f"{total_qualified} hitters – {db_title}")
         st.dataframe(display, width="stretch", height=700, column_config=col_config)
 
         st.markdown(
