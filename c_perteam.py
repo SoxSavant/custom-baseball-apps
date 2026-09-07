@@ -520,14 +520,14 @@ else:
 
 filter_parts = [format_threshold(s, v, op) for s, op, v in active_filters]
 filter_str   = ", ".join(filter_parts)
-span_label   = f"{s_year}" if mode == MODE_SINGLE else f"{s_year}–{e_year}"
+span_label   = f'<span style="white-space: nowrap;">{s_year}' if mode == MODE_SINGLE else f'<span style="white-space: nowrap;">{s_year}–{e_year}'
 if mode == MODE_SPLIT and collapse_split: # ex NYY (eight individual judge seasons), BOS (5 mookie seasons, 3 devers)
-    mode_label   = " (Combined Single Seasons)"
+    mode_label   = f'<span style="white-space: nowrap;"> (Combined Single Seasons)</span>'
 elif mode == MODE_SPLIT: # ex NYY - 2019, BOS - 2018
-     mode_label   = " (Single Season)"
+     mode_label   = f'<span style="white-space: nowrap;"> (Single Season)</span>'
 else:
     mode_label = " "
-pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" else ""
+pos_suffix   = f'<span style="white-space: nowrap;"> ({POSITION_OPTIONS[position_val]})' if position_val != "all" else ""
 middle_label = " – " if mode == MODE_SINGLE else ": "
 if is_hitting:
     title_text   = f"Most Hitters with {filter_str}{middle_label}{span_label}{mode_label}{pos_suffix}"
@@ -645,7 +645,7 @@ total_players_shown = sum(tg["player_count"] for tg in team_groups)
 
 grid_html = f"""
 <div class="leaderboard-card">
-    <div class="leaderboard-title">{html.escape(title_text)}</div>
+    <div class="leaderboard-title">{title_text}</div>
     {min_pa_subtitle}
     <div class="teams-grid">{team_card_html}</div>
     <div class="footer">
