@@ -365,7 +365,7 @@ pos_suffix   = f" ({POSITION_OPTIONS[position_val]})" if position_val != "all" e
 team_suffix  = f" ({team_val})" if team_val != "all" else ""
 league_label = f" ({league_val})" if league_val != "All" else ""
 middle_label = " – " if mode == MODE_SINGLE else ": "
-title = f"{filter_str}{middle_label}{span_label}{mode_label}{league_label}{team_suffix}{pos_suffix}"
+title = f"{filter_str}{middle_label}{span_label}{mode_label}{league_label}{team_suffix}{pos_suffix}" if len(filter_parts) < 3 else f"{filter_str}{middle_label}\n{span_label}{mode_label}{league_label}{team_suffix}{pos_suffix}"
 
 
 # ── GRAPHIC VIEW ──────────────────────────────────────────────────────────────
