@@ -608,7 +608,7 @@ STAT_PRESETS = {
     ],
     "Standard": [
         "fWAR", "bWAR", "G", "PA", "AVG", "OBP", "SLG", "OPS",
-        "H",  "2B", "3B", "HR", "XBH", "RBI", "SB", "R",
+        "HR",  "RBI", "SB", "FRV", "DRS",
     ],
     "Fielding": [
         "DRS", "FRV", "OAA", "Def"

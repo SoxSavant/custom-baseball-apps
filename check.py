@@ -10,7 +10,7 @@ with AWS env vars set.
 
 from warleaders import load_combined_year
 
-START_YEAR = 1947
+START_YEAR = 1901
 END_YEAR = 2026
 
 
