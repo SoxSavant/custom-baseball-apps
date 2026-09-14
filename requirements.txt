@@ -2,7 +2,6 @@ streamlit==1.59.2
 pandas
 numpy
 matplotlib
-pybaseball==2.2.7
 streamlit-aggrid==0.3.4.post3
 requests
 reportlab

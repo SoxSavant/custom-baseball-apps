@@ -560,17 +560,7 @@ with col2:
 
     st.caption(f"Trend line: y = {math_slope:.4f}x + {math_intercept:.4f}")
 
-    fig.update_layout(margin=dict(l=80, r=40, t=60, b=100))
-    pdf_buffer = BytesIO()
-    fig.write_image(pdf_buffer, format="pdf", width=1200, height=700)
-    pdf_buffer.seek(0)
-    fig.update_layout(margin=dict(l=80, r=40, t=60, b=40))
-    st.download_button(
-        "Download as PDF",
-        data=pdf_buffer,
-        file_name=f"{span_label} {x_label} vs {y_label}.pdf",
-        mime="application/pdf",
-    )
+
 
     st.markdown(
         "<div style='text-align:center; color:#888; font-size:1rem; margin-top:1rem; margin-bottom:3rem;'>"
