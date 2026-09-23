@@ -108,7 +108,7 @@ def load_data(start_year: int, end_year: int, mode: str, position: str = "all") 
     for year in range(start_year, end_year + 1):
         df = load_final_year(year)
         if df is not None and not df.empty:
-            if mode == MODE_SPLIT:
+            if mode == MODE_SPLIT and is_hitting:
                 df = filter_by_position(df, position_val)
             frames.append(df)
 
